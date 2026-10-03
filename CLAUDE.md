@@ -406,3 +406,12 @@
 - CSS `@media (orientation: landscape) and (max-height: 540px)`: το μενού πάει δεξιά και το
   σκηνή (canvas) αριστερά· στις cutscenes η ζωγραφιά αριστερά και οι γραμμές δεξιά·
   μικρότερα κουμπιά/κενά. Όλες οι οθόνες κυλάνε αν δεν χωράνε (`justify-content: safe center`).
+
+## Game jam (3/10/2026)
+- Φιλοξενείται σε iframe σε υποφάκελο άλλου site. Μέσα σε iframe (ή με `?embed` στο URL) →
+  `EMBEDDED` στο main.js / `body.embedded`: χωρίς δικό μας fullscreen, και η πάνω δεξιά γωνία
+  (~60×60 px, κουμπί του site) μένει ελεύθερη: λύρα/αγγείο 64 px πιο κάτω, Skip αριστερά.
+- Safe areas σε όλες τις πλευρές (`--safe-top/right/bottom/left` στο CSS).
+- Zip: `descent-jam.zip` (εκτός git) με `index.html`, `thumb.jpg` (1280×720), `css/`, `js/`
+  στη ρίζα — **χωρίς** CLAUDE.md / STORY.md (ανωνυμία). Φτιάχνεται με
+  `C:\Windows\System32\tar.exe -a -c -f descent-jam.zip index.html thumb.jpg css js`.

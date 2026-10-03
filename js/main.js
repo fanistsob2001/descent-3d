@@ -765,8 +765,16 @@ function blurButtons() {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
 
+// Μέσα σε iframe (π.χ. στο site του game jam) ή με ?embed στο URL: χωρίς δικό μας
+// fullscreen, και η πάνω δεξιά γωνία μένει ελεύθερη για το κουμπί του site (CSS body.embedded).
+const EMBEDDED = (() => {
+  if (/[?&]embed\b/.test(location.search)) return true;
+  try { return window.self !== window.top; } catch (_) { return true; }
+})();
+
 // ---- Ροή παιχνιδιού ----
 function goFullscreen() {
+  if (EMBEDDED) return;
   if (!matchMedia('(pointer: coarse)').matches) return;   // στο PC όχι
   const el = document.documentElement;
   const req = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -1046,6 +1054,7 @@ function init() {
   document.addEventListener('dblclick', (e) => e.preventDefault());
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  document.body.classList.toggle('embedded', EMBEDDED);
   Pixel.init();
   Sprites.init();
   resize();
