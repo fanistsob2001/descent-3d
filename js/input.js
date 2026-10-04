@@ -12,16 +12,39 @@ const MAX_CHARGE = 1.5;
 // φόρτιση, το κύμα ακυρώνεται με ασφάλεια (δεν βγαίνει κανένας ήχος).
 const CANCEL_DRAG = 80;
 
+// Το κουμπί της λύρας (κάτω δεξιά, σε CSS px από τις άκρες): κράτημα = φόρτιση κύματος.
+const LYRE_BTN = { right: 76, bottom: 100, r: 50 };
+
 const Input = {
   keys: {},
-  moveX: 0,
-  moveY: 0,
+  moveX: 0,         // πλάγια κίνηση (+ = δεξιά)
+  moveY: 0,         // μπρος / πίσω (- = μπροστά, όπως το "πάνω" του joystick)
+  turn: 0,          // στροφή από τα βελάκια (-1..1)
+  lookDX: 0,        // πόσο έσυρε το δάχτυλο για να γυρίσει το βλέμμα (CSS px, μαζεύεται ως το επόμενο καρέ)
+  mouseDX: 0,       // το ίδιο από το ποντίκι (με pointer lock)
   running: false,   // true = γρήγορο περπάτημα με θόρυβο βημάτων
+  canLook: () => false,   // το main λέει πότε το ποντίκι μπορεί να "κλειδώσει" (μόνο όσο παίζεις)
 
   // Εικονικό joystick (αριστερό μισό οθόνης). Εμφανίζεται εκεί που ακουμπάς.
   joy: { id: null, ox: 0, oy: 0, x: 0, y: 0 },
+  // Το δάχτυλο που γυρίζει το βλέμμα (δεξί μισό, έξω από το κουμπί της λύρας).
+  look: { id: null, x: 0 },
 
-  // Φόρτιση κύματος (δεξί μισό οθόνης ή Space).
+  // Το κέντρο και η ακτίνα του κουμπιού της λύρας (CSS px).
+  lyreButton() {
+    // Οι safe areas (env(...)) διαβάζονται μόνο από ένα στοιχείο που τις χρησιμοποιεί.
+    if (!this._safe) {
+      this._safe = document.createElement('div');
+      this._safe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;' +
+        'padding-right:env(safe-area-inset-right,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+      document.body.appendChild(this._safe);
+    }
+    const s = getComputedStyle(this._safe);
+    const sr = parseFloat(s.paddingRight) || 0, sb = parseFloat(s.paddingBottom) || 0;
+    return { x: window.innerWidth - LYRE_BTN.right - sr, y: window.innerHeight - LYRE_BTN.bottom - sb, r: LYRE_BTN.r };
+  },
+
+  // Φόρτιση κύματος (κουμπί λύρας, Space ή αριστερό κλικ με κλειδωμένο ποντίκι).
   charging: false,
   chargeStart: 0,
   chargeSource: null,   // 'key' ή pointerId
@@ -41,7 +64,7 @@ const Input = {
         if (!e.repeat) this.startCharge('key');
       }
       // Στο PC: X ακυρώνει το κύμα που φορτίζει (αντίστοιχο του drag-to-cancel).
-      if (e.code === 'KeyX' && this.charging && this.chargeSource === 'key') this.dragCancel();
+      if (e.code === 'KeyX' && this.charging && (this.chargeSource === 'key' || this.chargeSource === 'mouse')) this.dragCancel();
       this.keys[e.code] = true;
     });
     window.addEventListener('keyup', (e) => {
@@ -51,20 +74,53 @@ const Input = {
     window.addEventListener('blur', () => {
       this.keys = {};
       this.joy.id = null;
+      this.look.id = null;
       this.cancelCharge();
+    });
+
+    // Ποντίκι (PC): το πρώτο κλικ "κλειδώνει" τον κέρσορα (pointer lock) — μετά η κίνηση
+    // γυρίζει το βλέμμα και το αριστερό κλικ (κράτημα) φορτίζει κύμα, σαν το Space.
+    this.locked = false;
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      if (!this.locked && this.chargeSource === 'mouse') this.cancelCharge();
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (this.locked) this.mouseDX += e.movementX || 0;
     });
 
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      if (e.pointerType === 'mouse') {
+        if (!this.locked) {
+          if (this.canLook() && canvas.requestPointerLock) {
+            try {
+              const p = canvas.requestPointerLock();
+              if (p && p.catch) p.catch(() => {});
+            } catch (_) { /* π.χ. μέσα σε iframe χωρίς άδεια */ }
+          }
+        } else if (e.button === 0) {
+          this.startCharge('mouse');
+        } else if (e.button === 2 && this.chargeSource === 'mouse') {
+          this.dragCancel();   // δεξί κλικ ενώ φορτίζεις = ακύρωση (σαν το X)
+        }
+        return;
+      }
       if (e.clientX < window.innerWidth / 2) {
         if (this.joy.id !== null) return;
         this.joy.id = e.pointerId;
         this.joy.ox = this.joy.x = e.clientX;
         this.joy.oy = this.joy.y = e.clientY;
       } else {
-        this.startCharge(e.pointerId);
-        this.chargeX = e.clientX;
-        this.chargeY = e.clientY;
+        const b = this.lyreButton();
+        if (Math.hypot(e.clientX - b.x, e.clientY - b.y) <= b.r * 1.3) {
+          this.startCharge(e.pointerId);
+          this.chargeX = e.clientX;
+          this.chargeY = e.clientY;
+        } else if (this.look.id === null) {
+          this.look.id = e.pointerId;
+          this.look.x = e.clientX;
+        }
       }
       try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* δεν πειράζει */ }
     });
@@ -73,6 +129,10 @@ const Input = {
         this.joy.x = e.clientX;
         this.joy.y = e.clientY;
       }
+      if (e.pointerId === this.look.id) {
+        this.lookDX += e.clientX - this.look.x;
+        this.look.x = e.clientX;
+      }
       if (this.charging && e.pointerId === this.chargeSource) {
         const d = Math.hypot(e.clientX - this.chargeX, e.clientY - this.chargeY);
         this.chargeDrag = Math.min(1, d / CANCEL_DRAG);
@@ -80,7 +140,12 @@ const Input = {
       }
     });
     const up = (e) => {
+      if (e.pointerType === 'mouse') {
+        if (e.button === 0) this.endCharge('mouse');
+        return;
+      }
       if (e.pointerId === this.joy.id) this.joy.id = null;
+      if (e.pointerId === this.look.id) this.look.id = null;
       if (e.type === 'pointercancel' && this.chargeSource === e.pointerId) this.cancelCharge();
       else this.endCharge(e.pointerId);
     };
@@ -145,9 +210,11 @@ const Input = {
       }
     }
 
+    // WASD: μπρος/πίσω/πλάγια· ←/→: στροφή· ↑/↓: μπρος/πίσω.
     const k = this.keys;
-    const kx = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
+    const kx = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
     const ky = (k.KeyS || k.ArrowDown ? 1 : 0) - (k.KeyW || k.ArrowUp ? 1 : 0);
+    this.turn = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
     if (kx || ky) {
       // Με Shift: αργό, αθόρυβο περπάτημα.
       const sneak = k.ShiftLeft || k.ShiftRight;

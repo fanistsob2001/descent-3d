@@ -23,6 +23,7 @@ const Sound = {
   growls: [],        // μία "φωνή" ανά τέρας
   listenerX: 0,      // θέση του παίκτη, για panning / απόσταση
   listenerY: 0,
+  listenerAngle: 0,  // προς τα πού κοιτάει ο παίκτης (πρώτο πρόσωπο): το panning γυρίζει μαζί του
 
   loadSettings() {
     this.muted = !Settings.sound;
@@ -329,13 +330,19 @@ const Sound = {
     src.stop(t + 0.3);
   },
 
+  // Πόσο δεξιά (θετικό) ή αριστερά (αρνητικό) βρίσκεται ένα σημείο (dx, dy από τον παίκτη)
+  // σε σχέση με το πού κοιτάει.
+  lateral(dx, dy) {
+    return -Math.sin(this.listenerAngle) * dx + Math.cos(this.listenerAngle) * dy;
+  },
+
   // Ένας ήχος από τη θέση (x, y) του κόσμου: ένταση και panning ανάλογα με
   // το πού είναι σε σχέση με τον παίκτη. Επιστρέφει τον κόμβο εξόδου.
   spatial(x, y, baseVol, falloff) {
     const dx = x - this.listenerX, dy = y - this.listenerY;
     const g = this.ctx.createGain();
     g.gain.value = baseVol * Math.max(0.15, 1 - Math.hypot(dx, dy) / falloff);
-    const pan = this.panner(dx / 300);
+    const pan = this.panner(this.lateral(dx, dy) / 300);
     if (pan) { g.connect(pan); pan.connect(this.sfx); pan.connect(this.echoSend); }
     else { g.connect(this.sfx); g.connect(this.echoSend); }
     return g;
@@ -487,7 +494,7 @@ const Sound = {
   softStep(x, y) {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
-    const dx = x - this.listenerX;
+    const dx = this.lateral(x - this.listenerX, y - this.listenerY);
     const src = this.noiseSource();
     const bp = ac.createBiquadFilter();
     bp.type = 'bandpass';
@@ -956,7 +963,7 @@ const Sound = {
         const dx = m.x - this.listenerX, dy = m.y - this.listenerY;
         const p = Math.max(0, 1 - Math.hypot(dx, dy) / 380);
         vol = p * p * 0.55;
-        pan = Math.max(-1, Math.min(1, dx / 220));
+        pan = Math.max(-1, Math.min(1, this.lateral(dx, dy) / 220));
         cutoff = m.los ? 300 : 150;
       }
       g.out.gain.setTargetAtTime(vol, t, 0.15);

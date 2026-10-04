@@ -6,6 +6,11 @@ const RUN_SPEED = 115;             // γρήγορο περπάτημα, μον�
 const SNEAK_SPEED = 50;            // αργό, αθόρυβο περπάτημα
 const STEP_LENGTH = 32;            // απόσταση ανάμεσα σε δύο βήματα
 
+// Πόσο γυρίζει το βλέμμα (ακτίνια): ανά CSS px συρσίματος, ανά px ποντικιού, ανά δευτ. με τα βελάκια.
+const LOOK_TOUCH = 0.0065;
+const LOOK_MOUSE = 0.0026;
+const TURN_SPEED = 2.4;
+
 const STEP_WAVE = { radius: 65, strength: 0.22 };                   // αχνά βήματα (μόνο όταν τρέχεις)
 const CALL_WAVE = { minR: 110, maxR: 560, minS: 0.5, maxS: 1.0 };   // το "κύμα" του παίκτη
 
@@ -20,8 +25,8 @@ const DEATH_DELAY = 1.7;
 
 // Οδηγίες χειρισμού (όχι κείμενα της ιστορίας): πώς πετάς αγγείο / παίζεις τη Μελωδία.
 const JAR_HINTS = [
-  { touch: 'Tap the jar button at the top right to throw it where you are heading.',
-    keys: 'Press E to throw the jar where you are heading.', until: 'jar', time: 10 },
+  { touch: 'Tap the jar button at the top right to throw it where you are looking.',
+    keys: 'Press E to throw the jar where you are looking.', until: 'jar', time: 10 },
 ];
 const MELODY_HINTS = [
   { touch: 'Tap the lyre button to play.', keys: 'Press Q to play the lyre.', until: 'melody', time: 10 },
@@ -56,11 +61,14 @@ let lastFrame = 0;
 let endTime = 0;         // πότε πέθανε
 let monsters = [];
 let killer = null;       // η σκιά που έπιασε τον παίκτη
-let showMap = false;     // βοήθεια για δοκιμές (από την κονσόλα): σκιές, έξοδος, τοίχοι
+let showMap = false;     // βοήθεια για δοκιμές (από την κονσόλα): μικρός χάρτης με σκιές, έξοδο, τοίχους
+let view2d = false;      // βοήθεια για δοκιμές (από την κονσόλα): η παλιά κάτοψη αντί για πρώτο πρόσωπο
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
 
-// fx, fy = προς τα πού "κοιτάει" (τελευταία κατεύθυνση κίνησης) — εκεί πετιέται το αγγείο.
+// angle = προς τα πού κοιτάει η κάμερα (ακτίνια, 0 = ανατολικά, π/2 = νότια/κάτω στον χάρτη).
+// fx, fy = το ίδιο ως διάνυσμα — εκεί πετιέται το αγγείο.
 const player = {
-  x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1,
+  x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1, angle: Math.PI / 2,
   dir: 1,          // προς ποια πλευρά κοιτάει η μορφή (1 = δεξιά)
   walkPhase: 0,    // φάση του βηματισμού (ακτίνια)
   walkSpeed: 0,    // 0..1, εξομαλυμένη ταχύτητα για την κίνηση των ποδιών
@@ -82,15 +90,26 @@ function resize() {
     : Math.min(cssW / VIEW_MIN_W, cssH / VIEW_MIN_H);
   document.body.classList.toggle('landscape', landscape);
   Pixel.resize(cssW, cssH);
+  Raycast.resize(Pixel.w, Pixel.h);
 }
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 // ---- Παίκτης ----
 function updatePlayer(dt) {
+  // Το βλέμμα: σύρσιμο στο δεξί μισό, ποντίκι, ή ←/→.
+  let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * LOOK_MOUSE + Input.turn * TURN_SPEED * dt;
+  Input.lookDX = Input.mouseDX = 0;
+  if (a > Math.PI) a -= Math.PI * 2;
+  if (a <= -Math.PI) a += Math.PI * 2;
+  player.angle = a;
+  player.fx = Math.cos(a);
+  player.fy = Math.sin(a);
+
+  // moveY < 0 = μπροστά (προς το βλέμμα), moveX > 0 = πλάγια δεξιά.
   const mx = Input.moveX, my = Input.moveY;
   const amount = Math.hypot(mx, my);
-  // Η κίνηση των ποδιών ακολουθεί ομαλά το αν περπατάς (και πόσο γρήγορα).
+  // Η κίνηση των ποδιών (και το "κούνημα" της κάμερας) ακολουθεί ομαλά το αν περπατάς.
   const target = amount < 0.01 ? 0 : (Input.running ? 1 : 0.55);
   player.walkSpeed += (target - player.walkSpeed) * Math.min(1, dt * 10);
   if (amount < 0.01) return;
@@ -98,9 +117,8 @@ function updatePlayer(dt) {
   const speed = Input.running
     ? RUN_SPEED
     : SNEAK_SPEED * Math.min(1, amount / RUN_THRESHOLD);
-  const ux = mx / amount, uy = my / amount;
-  player.fx = ux;
-  player.fy = uy;
+  const ux = (player.fx * -my - player.fy * mx) / amount;
+  const uy = (player.fy * -my + player.fx * mx) / amount;
   if (Math.abs(ux) > 0.15) player.dir = ux < 0 ? -1 : 1;
 
   const ox = player.x, oy = player.y;
@@ -291,6 +309,11 @@ function draw() {
     return;
   }
 
+  if (!view2d) {
+    draw3D(pc, W, H);
+    return;
+  }
+
   pxScale = scale / Pixel.px;
   const halfW = W / 2 / pxScale, halfH = H / 2 / pxScale;
   const view = {
@@ -352,6 +375,146 @@ function draw() {
   Souls.draw(ctx, gameTime, view);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (state === 'play') drawJoystick();
+}
+
+// ---- Πρώτο πρόσωπο ----
+// Ο κόσμος από τα μάτια του Ορφέα (js/raycast.js), στον μικρό καμβά του Pixel.
+function draw3D(pc, W, H) {
+  // Το βλέμμα "κουνιέται" λίγο με τα βήματα.
+  const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6;
+  Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
+
+  let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
+  if (state === 'dead') {
+    const k = Math.max(0, 1 - (gameTime - endTime - SCARE_TIME) / (DEATH_DELAY - SCARE_TIME));
+    shakeX = (Math.random() - 0.5) * 10 * k;
+    shakeY = (Math.random() - 0.5) * 10 * k;
+  }
+
+  const saved = ctx;
+  ctx = pc;
+  if (state === 'play' || state === 'paused') {
+    drawCharge3D(pc, W, H);
+    Dread.drawVignette(pc, W, H, gameTime);
+  }
+  Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
+  if (showMap) drawMiniMap(pc, W, H);
+  if (state === 'dead') drawDeathFlash(W, H);
+  ctx = saved;
+
+  Pixel.present(ctx, dpr, shakeX, shakeY);
+
+  // Από πάνω, σε πλήρη ανάλυση: το joystick και το κουμπί της λύρας.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (state === 'play') {
+    drawJoystick();
+    if (IS_TOUCH) drawLyreButton();
+  }
+}
+
+// Η φόρτιση του κύματος (προσωρινά, ώσπου να μπουν τα χέρια με τη λύρα): ένα δαχτυλίδι
+// κάτω στη μέση που μεγαλώνει και τρέμει όσο κρατάς. Στο VIII γίνεται κόκκινο πέρα από το όριο.
+function drawCharge3D(pc, W, H) {
+  const cx = W / 2, cy = Math.round(H * 0.8);
+  const ct = (gameTime - cancelFx.t) / 0.35;
+  if (ct >= 0 && ct < 1) {
+    pc.strokeStyle = `rgba(${POT.light},${(0.5 * (1 - ct)).toFixed(3)})`;
+    pc.lineWidth = 1;
+    pc.beginPath();
+    pc.arc(cx, cy, Math.max(1, (4 + cancelFx.r) * (1 - ct)), 0, Math.PI * 2);
+    pc.stroke();
+  }
+  if (!Input.charging) return;
+  const c = Input.chargeAmount();
+  const pulse = 0.5 + 0.5 * Math.sin(gameTime * (8 + c * 16));
+  const rule = lookBackRuleActive();
+  const warn = c >= LOOK_BACK_CHARGE && rule;
+  const fadeDrag = 1 - Input.chargeDrag * 0.75;
+  const color = warn ? '255,40,30' : POT.light;
+  pc.setLineDash(Input.chargeDrag > 0.2 ? [2, 2] : []);
+  pc.lineWidth = warn ? 2 : 1;
+  pc.strokeStyle = `rgba(${color},${(((warn ? 0.6 : 0.3) + 0.4 * c * pulse) * fadeDrag).toFixed(3)})`;
+  pc.beginPath();
+  pc.arc(cx, cy, 6 + c * 18, 0, Math.PI * 2);
+  pc.stroke();
+  if (rule && !warn) {
+    pc.strokeStyle = `rgba(255,60,40,${(0.35 * fadeDrag).toFixed(3)})`;
+    pc.setLineDash([2, 3]);
+    pc.beginPath();
+    pc.arc(cx, cy, 6 + LOOK_BACK_CHARGE * 18, 0, Math.PI * 2);
+    pc.stroke();
+  }
+  pc.setLineDash([]);
+}
+
+// Το κουμπί της λύρας (κινητό): κράτημα = κύμα. Γεμίζει όσο φορτίζει.
+const LYRE_PATH = typeof Path2D !== 'undefined'
+  ? new Path2D('M7 4c-3 3-3 9 0 13h10c3-4 3-10 0-13M7 4c1 2 1 4 0 6M17 4c-1 2-1 4 0 6M6 10h12M9 10v7M12 10v7M15 10v7M8 20h8')
+  : null;
+function drawLyreButton() {
+  const b = Input.lyreButton();
+  const c = Input.chargeAmount();
+  const warn = c >= LOOK_BACK_CHARGE && lookBackRuleActive();
+  const col = warn ? '255,40,30' : POT.terra;
+  ctx.fillStyle = `rgba(${col},${(0.08 + c * 0.3).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(${col},${Input.charging ? 0.75 : 0.4})`;
+  ctx.stroke();
+  if (Input.charging) {
+    // Το τόξο της φόρτισης γύρω γύρω.
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(${warn ? col : POT.light},0.8)`;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r + 5, -Math.PI / 2, -Math.PI / 2 + c * Math.PI * 2);
+    ctx.stroke();
+  }
+  if (LYRE_PATH) {
+    ctx.save();
+    ctx.translate(b.x - 24, b.y - 25);
+    ctx.scale(2, 2);
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = `rgba(${POT.light},${Input.charging ? 0.95 : 0.6})`;
+    ctx.stroke(LYRE_PATH);
+    ctx.restore();
+  }
+}
+
+// Βοήθεια για δοκιμές (showMap = true): μικρός χάρτης γύρω από τον παίκτη, με τις σκιές.
+function drawMiniMap(pc, W, H) {
+  const cell = 3, R = 14;
+  const ptx = Math.floor(player.x / TILE), pty = Math.floor(player.y / TILE);
+  const ox = W - (R * 2 + 1) * cell - 4, oy = 10;
+  pc.fillStyle = 'rgba(0,0,0,0.7)';
+  pc.fillRect(ox, oy, (R * 2 + 1) * cell, (R * 2 + 1) * cell);
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      const t = Level.terrainAt(ptx + dx, pty + dy);
+      if (t === T_FLOOR) continue;
+      pc.fillStyle = t === T_WALL ? 'rgba(206,108,56,0.55)' : t === T_WATER ? 'rgba(80,40,30,0.8)' : 'rgba(40,20,10,0.8)';
+      pc.fillRect(ox + (dx + R) * cell, oy + (dy + R) * cell, cell, cell);
+    }
+  }
+  const at = (x, y) => [ox + (x / TILE - ptx + R) * cell, oy + (y / TILE - pty + R) * cell];
+  for (const m of monsters) {
+    const [x, y] = at(m.x, m.y);
+    if (x < ox || y < oy || x > ox + (R * 2 + 1) * cell || y > oy + (R * 2 + 1) * cell) continue;
+    pc.fillStyle = m.kind === 'erinys' ? '#ff0' : m.guard ? '#f80' : '#f22';
+    pc.fillRect(x - 1, y - 1, 3, 3);
+  }
+  const [x, y] = at(player.x, player.y);
+  pc.fillStyle = '#fff';
+  pc.fillRect(x - 1, y - 1, 3, 3);
+  pc.strokeStyle = '#fff';
+  pc.lineWidth = 1;
+  pc.beginPath();
+  pc.moveTo(x + 0.5, y + 0.5);
+  pc.lineTo(x + 0.5 + player.fx * 6, y + 0.5 + player.fy * 6);
+  pc.stroke();
 }
 
 // Πού μπαίνει η σκηνή του μενού (σε art pixels): στον χώρο #menu-art, πάνω από τον τίτλο.
@@ -701,6 +864,7 @@ function frame(t) {
   // Γρύλισμα, καρδιοχτύπι, βινιετάρισμα: μόνο όσο παίζεις.
   Sound.listenerX = player.x;
   Sound.listenerY = player.y;
+  Sound.listenerAngle = player.angle;
   Dread.update(dt, gameTime, player, monsters, state === 'play');
 
   draw();
@@ -790,10 +954,14 @@ function goFullscreen() {
 function stopInput() {
   Input.cancelCharge();
   Input.joy.id = null;
+  Input.look.id = null;
+  Input.lookDX = Input.mouseDX = 0;
 }
 
 function setState(s) {
   state = s;
+  // Το ποντίκι μένει "κλειδωμένο" μόνο όσο παίζεις (αλλιώς δεν πατιούνται τα κουμπιά).
+  if (s !== 'play' && s !== 'dead' && document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
   if (s !== 'play' && warnOn) { warnOn = false; Sound.tension(false); }
   Sound.setAmbient(AMBIENT[s]);
 }
@@ -852,6 +1020,7 @@ function spawn(saved) {
   const stx = Math.floor(player.x / TILE), sty = Math.floor(player.y / TILE);
   const open = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
   [player.fx, player.fy] = open || [0, 1];
+  player.angle = Math.atan2(player.fy, player.fx);
 
   stopInput();
   Dread.reset();
@@ -939,8 +1108,10 @@ function reachedExit() {
   });
 }
 
+let pausedAt = 0;
 function pauseGame() {
   if (state !== 'play') return;
+  pausedAt = performance.now();
   setState('paused');
   stopInput();
   showScreen('pause');
@@ -998,12 +1169,14 @@ function init() {
   Cutscene.init();
 
   Level.loadWorld(CHAPTERS);
+  Raycast.init();
   player.x = camera.x = Level.start.x;
   player.y = camera.y = Level.start.y;
 
   Input.now = () => gameTime;
   Input.onRelease = emitCall;
   Input.onCancel = cancelCall;
+  Input.canLook = () => state === 'play';
   Input.init(canvas);
 
   for (const btn of document.querySelectorAll('[data-action]')) {
@@ -1031,7 +1204,8 @@ function init() {
       if (!e.repeat) closeMap();
     } else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (state === 'play') pauseGame();
-      else if (state === 'paused') resumeGame();
+      // (όχι αμέσως: το Esc που ξεκλείδωσε το ποντίκι έβαλε ήδη παύση)
+      else if (state === 'paused' && performance.now() - pausedAt > 300) resumeGame();
     } else if (e.code === 'KeyE' && !e.repeat) {
       throwJar();
     } else if (e.code === 'KeyQ' && !e.repeat) {
@@ -1043,6 +1217,11 @@ function init() {
 
   // Αν η σελίδα κρυφτεί (π.χ. έρχεται κλήση), το παιχνίδι μπαίνει σε παύση
   // και ο ήχος σταματάει.
+  // PC: αν ο κέρσορας ξεκλειδώσει ενώ παίζεις (π.χ. Esc), μπαίνει σε παύση.
+  document.addEventListener('pointerlockchange', () => {
+    if (!document.pointerLockElement && state === 'play') pauseGame();
+  });
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pauseGame();
     Sound.setBackground(document.hidden);
