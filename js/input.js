@@ -12,6 +12,10 @@ const MAX_CHARGE = 1.5;
 // φόρτιση, το κύμα ακυρώνεται με ασφάλεια (δεν βγαίνει κανένας ήχος).
 const CANCEL_DRAG = 80;
 
+// Ποντίκι χωρίς κλείδωμα: τόσο ποσοστό του πλάτους στην αριστερή/δεξιά άκρη γυρίζει συνέχεια το βλέμμα.
+const MOUSE_EDGE = 0.08;
+const MOUSE_TOP = 90;      // CSS px από πάνω: η ζώνη των κουμπιών, όπου η άκρη δεν γυρίζει το βλέμμα
+
 // Το κουμπί της λύρας (κάτω δεξιά, σε CSS px από τις άκρες): κράτημα = φόρτιση κύματος.
 const LYRE_BTN = { right: 76, bottom: 100, r: 50 };
 
@@ -78,26 +82,38 @@ const Input = {
       this.cancelCharge();
     });
 
-    // Ποντίκι (PC): το πρώτο κλικ "κλειδώνει" τον κέρσορα (pointer lock) — μετά η κίνηση
-    // γυρίζει το βλέμμα και το αριστερό κλικ (κράτημα) φορτίζει κύμα, σαν το Space.
+    // Ποντίκι (PC): η κίνηση του ποντικιού γυρίζει το βλέμμα αμέσως, χωρίς κλικ — κι όταν ο
+    // κέρσορας φτάσει στην άκρη της οθόνης, συνεχίζει να γυρίζει (MOUSE_EDGE). Το πρώτο κλικ
+    // "κλειδώνει" τον κέρσορα (pointer lock: στροφή χωρίς όρια, χωρίς κέρσορα)· μετά το αριστερό
+    // κλικ (κράτημα) φορτίζει κύμα, σαν το Space. Αν ο browser δεν επιτρέπει κλείδωμα, το κλικ
+    // φορτίζει κύμα κατευθείαν.
     this.locked = false;
+    this.lockFailed = false;
+    this.mouseX = -1;        // πού είναι ο κέρσορας (-1 = έξω από το παράθυρο)
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
       if (!this.locked && this.chargeSource === 'mouse') this.cancelCharge();
     });
-    canvas.addEventListener('mousemove', (e) => {
-      if (this.locked) this.mouseDX += e.movementX || 0;
+    document.addEventListener('pointerlockerror', () => { this.lockFailed = true; });
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;   // όχι από άγγιγμα (κινητό)
+      // Η πάνω ζώνη με τα κουμπιά (παύση, χάρτης, λύρα) δεν γυρίζει το βλέμμα από την άκρη.
+      this.mouseX = e.clientY > MOUSE_TOP ? e.clientX : -1;
+      if (this.locked || this.canLook()) this.mouseDX += e.movementX || 0;
     });
+    document.addEventListener('mouseleave', () => { this.mouseX = -1; });
+    window.addEventListener('blur', () => { this.mouseX = -1; });
 
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (e.pointerType === 'mouse') {
-        if (!this.locked) {
+        if (!this.locked && !this.lockFailed && !canvas.requestPointerLock) this.lockFailed = true;
+        if (!this.locked && !this.lockFailed) {
           if (this.canLook() && canvas.requestPointerLock) {
             try {
               const p = canvas.requestPointerLock();
-              if (p && p.catch) p.catch(() => {});
-            } catch (_) { /* π.χ. μέσα σε iframe χωρίς άδεια */ }
+              if (p && p.catch) p.catch(() => { this.lockFailed = true; });
+            } catch (_) { this.lockFailed = true; /* π.χ. μέσα σε iframe χωρίς άδεια */ }
           }
         } else if (e.button === 0) {
           this.startCharge('mouse');
@@ -215,6 +231,13 @@ const Input = {
     const kx = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
     const ky = (k.KeyS || k.ArrowDown ? 1 : 0) - (k.KeyW || k.ArrowUp ? 1 : 0);
     this.turn = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
+    // Κέρσορας (χωρίς κλείδωμα) κοντά στην αριστερή/δεξιά άκρη: συνεχής στροφή προς τα εκεί.
+    if (!this.locked && this.mouseX >= 0 && this.joy.id === null) {
+      const edge = Math.max(24, window.innerWidth * MOUSE_EDGE);
+      if (this.mouseX < edge) this.turn -= 1 - this.mouseX / edge;
+      else if (this.mouseX > window.innerWidth - edge) this.turn += 1 - (window.innerWidth - this.mouseX) / edge;
+      this.turn = Math.max(-1, Math.min(1, this.turn));
+    }
     if (kx || ky) {
       // Με Shift: αργό, αθόρυβο περπάτημα.
       const sneak = k.ShiftLeft || k.ShiftRight;
