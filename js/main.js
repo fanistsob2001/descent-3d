@@ -1276,6 +1276,7 @@ function init() {
   Input.onRelease = emitCall;
   Input.onCancel = cancelCall;
   Input.canLook = () => state === 'play';
+  Input.allowLockFallback = EMBEDDED;
   Input.init(canvas);
 
   for (const btn of document.querySelectorAll('[data-action]')) {
