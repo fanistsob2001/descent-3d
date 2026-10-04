@@ -709,7 +709,9 @@ body.embedded.landscape #hint {
   }
 }
 
-/* PC: όσο παίζεις, ο κέρσορας κρύβεται (όπως στο Minecraft) */
-body.playing #game {
-  cursor: none;
+/* PC: όσο παίζεις, ο κέρσορας κρύβεται σε όλη τη σελίδα (όπως στο Minecraft) — και όπου ο browser
+   δεν επιτρέπει να "πιαστεί" το ποντίκι */
+body.playing,
+body.playing * {
+  cursor: none !important;
 }

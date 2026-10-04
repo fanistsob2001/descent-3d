@@ -30,7 +30,6 @@ const Input = {
   mouseDY: 0,       // κάθετη κίνηση του ποντικιού (βλέμμα πάνω / κάτω)
   running: false,   // true = γρήγορο περπάτημα με θόρυβο βημάτων
   canLook: () => false,   // το main λέει πότε το ποντίκι μπορεί να "κλειδώσει" (μόνο όσο παίζεις)
-  allowLockFallback: false,   // μόνο μέσα σε iframe: αν το κλείδωμα απαγορεύεται, ελεύθερος κέρσορας ως εφεδρεία
 
   // Εικονικό joystick (αριστερό μισό οθόνης). Εμφανίζεται εκεί που ακουμπάς.
   joy: { id: null, ox: 0, oy: 0, x: 0, y: 0 },
@@ -86,54 +85,65 @@ const Input = {
     });
 
     // Ποντίκι (PC), όπως σε κάθε παιχνίδι πρώτου προσώπου: όσο παίζεις, το ποντίκι είναι
-    // "πιασμένο" (pointer lock — χωρίς κέρσορα, στροφή χωρίς όρια). Πιάνεται μόνο του όταν
-    // ξεκινάς / συνεχίζεις (main: lockMouse στο setState('play')), ή με ένα κλικ στο παιχνίδι.
-    // Κίνηση = βλέμμα (οριζόντια και κάθετα), αριστερό κλικ (κράτημα) = κύμα, δεξί = ακύρωση.
-    // Esc το ελευθερώνει (→ παύση). Ο κέρσορας δεν "φεύγει" ποτέ από το κέντρο: αν το κλείδωμα
-    // αποτύχει (π.χ. το Chrome το αρνείται για ~1 δευτ. μετά το Esc), ξαναδοκιμάζει μόνο του
-    // (LOCK_RETRY), και κάθε κλικ όσο παίζεις το ξαναπιάνει. Μόνο μέσα σε iframe που απαγορεύει
-    // το κλείδωμα (allowLockFallback, δύο αποτυχίες σε κλικ) υπάρχει εφεδρεία: ο κέρσορας γυρίζει
-    // το βλέμμα όπως κινείται, και συνεχώς στις άκρες (MOUSE_EDGE)· το κλικ φορτίζει κύμα κατευθείαν.
+    // "πιασμένο" (pointer lock — ο κέρσορας μένει κρυφός στο κέντρο, στροφή χωρίς όρια). Πιάνεται
+    // μόνο του όταν ξεκινάς / συνεχίζεις (main: setState('play')), ή με οποιοδήποτε κλικ όσο παίζεις.
+    // Κίνηση = βλέμμα (οριζόντια και κάθετα), αριστερό κλικ (κράτημα) = κύμα, δεξί = ακύρωση,
+    // Esc = το ελευθερώνει (→ παύση). Αν το κλείδωμα αποτύχει προσωρινά (π.χ. το Chrome το αρνείται
+    // ~1 δευτ. μετά το Esc), ξαναδοκιμάζει μόνο του (LOCK_RETRY).
+    // Όπου ο browser δεν το επιτρέπει ΠΟΤΕ (lockUnsupported: π.χ. ο browser μέσα στην εφαρμογή του
+    // Claude ή ένα iframe — WrongDocumentError), το βλέμμα γυρίζει με την κίνηση του (κρυφού)
+    // κέρσορα και συνεχώς όταν φτάσει στις άκρες (MOUSE_EDGE)· το κλικ φορτίζει κύμα κατευθείαν.
     this.canvas = canvas;
     this.locked = false;
-    this.lockFailed = false;
-    this.mouseX = -1;        // πού είναι ο κέρσορας (-1 = έξω από το παράθυρο) — μόνο για την εφεδρεία
+    this.lockUnsupported = false;   // το κλείδωμα απαγορεύεται μόνιμα εδώ
+    this.lockFailed = false;        // χωρίς κλείδωμα: το κλικ φορτίζει κύμα κατευθείαν (μόνιμα ή μετά από 2 αποτυχίες)
+    this.mouseX = -1;               // πού είναι ο κέρσορας (-1 = έξω από το παράθυρο) — για τη στροφή στις άκρες
     let fails = 0, fromClick = false, retry = 0, retries = 0;
+    const unsupported = () => { this.lockUnsupported = true; this.lockFailed = true; clearTimeout(retry); };
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
-      if (this.locked) { fails = 0; retries = 0; clearTimeout(retry); }
+      if (this.locked) { fails = 0; retries = 0; this.lockFailed = this.lockUnsupported; clearTimeout(retry); }
       if (!this.locked && this.chargeSource === 'mouse') this.cancelCharge();
     });
     document.addEventListener('pointerlockerror', () => {
-      if (fromClick) { retries = 0; if (++fails >= 2 && this.allowLockFallback) this.lockFailed = true; }
+      if (this.lockUnsupported) return;
+      if (fromClick) { retries = 0; if (++fails >= 2) this.lockFailed = true; }
       fromClick = false;
-      // Ξαναδοκίμασε σε λίγο (το "άγγιγμα" του χρήστη μετράει ακόμα για μερικά δευτερόλεπτα) —
-      // ως 2 φορές μετά από κάθε κλικ, ώστε να μη δοκιμάζει για πάντα αν κάτι το εμποδίζει.
+      // Ξαναδοκίμασε σε λίγο (ως 2 φορές μετά από κάθε κλικ, ώστε να μη δοκιμάζει για πάντα).
       clearTimeout(retry);
       if (retries++ < 2) retry = setTimeout(() => { if (this.canLook()) this.requestLock(false); }, LOCK_RETRY);
     });
     this.requestLock = (click) => {
-      if (this.locked || this.lockFailed) return;
-      if (!canvas.requestPointerLock) { if (this.allowLockFallback) this.lockFailed = true; return; }
+      if (this.locked || this.lockUnsupported) return;
+      if (!canvas.requestPointerLock) { unsupported(); return; }
       fromClick = !!click;
       try {
-        const p = canvas.requestPointerLock();
-        if (p && p.catch) p.catch(() => {});   // η αποτυχία έρχεται και ως pointerlockerror
-      } catch (_) { /* - */ }
+        const pr = canvas.requestPointerLock();
+        if (pr && pr.catch) {
+          pr.catch((e) => {
+            // Μόνιμη άρνηση (η σελίδα είναι ενσωματωμένη / δεν υποστηρίζεται) ≠ προσωρινή (SecurityError).
+            if (e && (e.name === 'WrongDocumentError' || e.name === 'NotSupportedError')) unsupported();
+          });
+        }
+      } catch (e) {
+        if (e && (e.name === 'WrongDocumentError' || e.name === 'NotSupportedError')) unsupported();
+      }
     };
     // Οποιοδήποτε κλικ στη σελίδα όσο παίζεις (όχι μόνο στον καμβά) ξαναπιάνει το ποντίκι.
     window.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && !this.locked && !this.lockFailed && this.canLook()) this.requestLock(true);
+      if (e.pointerType === 'mouse' && !this.locked && this.canLook()) this.requestLock(true);
     }, true);
     window.addEventListener('pointermove', (e) => {
       if (e.pointerType !== 'mouse') return;   // όχι από άγγιγμα (κινητό)
       if (this.locked) {
         this.mouseDX += e.movementX || 0;
         this.mouseDY += e.movementY || 0;
-      } else if (this.lockFailed && this.canLook()) {
+      } else if (this.canLook()) {
+        // Χωρίς κλείδωμα (ο κέρσορας είναι κρυφός όσο παίζεις): η κίνησή του γυρίζει το βλέμμα.
         // Η πάνω ζώνη με τα κουμπιά δεν γυρίζει το βλέμμα από την άκρη.
         this.mouseX = e.clientY > MOUSE_TOP ? e.clientX : -1;
         this.mouseDX += e.movementX || 0;
+        this.mouseDY += e.movementY || 0;
       }
     });
     document.addEventListener('mouseleave', () => { this.mouseX = -1; });
@@ -145,6 +155,7 @@ const Input = {
       if (e.pointerType === 'mouse') {
         if (!this.locked && !this.lockFailed) {
           // Το κλικ ζήτησε ήδη να πιαστεί το ποντίκι (window pointerdown πιο πάνω)· δεν είναι κύμα.
+          // (Όπου το κλείδωμα δεν γίνεται — lockFailed — το κλικ είναι κύμα, παρακάτω.)
         } else if (e.button === 0) {
           this.startCharge('mouse');
         } else if (e.button === 2 && this.chargeSource === 'mouse') {
@@ -261,8 +272,8 @@ const Input = {
     const kx = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
     const ky = (k.KeyS || k.ArrowDown ? 1 : 0) - (k.KeyW || k.ArrowUp ? 1 : 0);
     this.turn = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
-    // Εφεδρεία χωρίς κλείδωμα: κέρσορας κοντά στην αριστερή/δεξιά άκρη = συνεχής στροφή προς τα εκεί.
-    if (this.lockFailed && this.mouseX >= 0 && this.joy.id === null) {
+    // Χωρίς κλείδωμα: ο (κρυφός) κέρσορας κοντά στην αριστερή/δεξιά άκρη = συνεχής στροφή προς τα εκεί.
+    if (!this.locked && this.mouseX >= 0 && this.joy.id === null) {
       const edge = Math.max(24, window.innerWidth * MOUSE_EDGE);
       if (this.mouseX < edge) this.turn -= 1 - this.mouseX / edge;
       else if (this.mouseX > window.innerWidth - edge) this.turn += 1 - (window.innerWidth - this.mouseX) / edge;
