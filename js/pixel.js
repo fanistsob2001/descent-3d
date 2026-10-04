@@ -63,15 +63,17 @@ const Pixel = {
   // Bloom: ό,τι λάμπει "ξεχειλίζει" απαλά γύρω του. Ο καμβάς μικραίνει στο 1/4, πολλαπλασιάζεται
   // με τον εαυτό του (τα σκοτεινά σβήνουν, μένουν μόνο τα φωτεινά), θολώνει, και ξαναμπαίνει
   // από πάνω προσθετικά. Γίνεται πριν από την κβάντιση, οπότε η λάμψη βγαίνει κι αυτή "κουκκιδωτή".
-  bloom(strength = 0.5) {
+  // lights = [{ x, y (art px), a (0..1) }]: πηγές φωτός (φλόγες, έξοδος) — από αυτές απλώνονται
+  // ακτίνες (god rays): η φωτεινή περιοχή γύρω από την πηγή "σέρνεται" ακτινωτά προς τα έξω, οπότε
+  // ό,τι μπαίνει μπροστά της (κολόνες, ακμές) αφήνει σκοτεινές λωρίδες.
+  bloom(strength = 0.5, lights = []) {
     const w = Math.max(1, Math.ceil(this.w / 4)), h = Math.max(1, Math.ceil(this.h / 4));
     if (!this._bloom || this._bloom.width !== w || this._bloom.height !== h) {
-      this._bloom = document.createElement('canvas');
-      this._bloom.width = w;
-      this._bloom.height = h;
-      this._bloom2 = document.createElement('canvas');
-      this._bloom2.width = w;
-      this._bloom2.height = h;
+      const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+      this._bloom = mk();
+      this._bloom2 = mk();
+      this._rays = mk();
+      this._rays2 = mk();
     }
     const b = this._bloom.getContext('2d'), b2 = this._bloom2.getContext('2d');
     b.globalCompositeOperation = 'source-over';
@@ -91,6 +93,34 @@ const Pixel = {
     c.globalAlpha = strength;
     c.imageSmoothingEnabled = true;
     c.drawImage(this._bloom2, 0, 0, this.w, this.h);
+
+    // Ακτίνες φωτός από τις πηγές (το πολύ 3): μόνο η φωτεινή περιοχή γύρω από κάθε πηγή,
+    // σερνόμενη ακτινωτά προς τα έξω σε 9 βήματα που σβήνουν.
+    if (lights.length > 0) {
+      const r = this._rays.getContext('2d'), acc = this._rays2.getContext('2d');
+      acc.globalCompositeOperation = 'source-over';
+      acc.clearRect(0, 0, w, h);
+      for (const L of lights.slice(0, 3)) {
+        const lx = L.x / 4, ly = L.y / 4, R = Math.max(4, h * 0.22);
+        r.globalCompositeOperation = 'source-over';
+        r.clearRect(0, 0, w, h);
+        r.save();
+        r.beginPath();
+        r.arc(lx, ly, R, 0, Math.PI * 2);
+        r.clip();
+        r.drawImage(this._bloom, 0, 0);
+        r.restore();
+        acc.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 9; i++) {
+          const s = 1 + i * 0.1;
+          acc.globalAlpha = Math.min(1, L.a) * 0.42 * (1 - i / 9);
+          acc.drawImage(this._rays, lx - lx * s, ly - ly * s, w * s, h * s);
+        }
+        acc.globalAlpha = 1;
+      }
+      c.globalAlpha = strength;
+      c.drawImage(this._rays2, 0, 0, this.w, this.h);
+    }
     c.restore();
   },
 

@@ -25,6 +25,8 @@ const RC_CEIL = 0.45;                // το ταβάνι φωτίζεται λ�
 const RC_ALTAR_R = 3.4;              // ως πόσα κελιά φτάνει το φως ενός αναμμένου βωμού
 const RC_SPX = 1.9;                  // μονάδες κόσμου ανά pixel ενός sprite (η σκιά = 16 px ≈ 30 μονάδες)
 const RC_DAY = [255, 236, 190];      // το φως της ημέρας στην έξοδο
+const RC_AO = 0.3;                   // ως πόσο μακριά (σε κελιά) από τοίχο σκοτεινιάζει το δάπεδο/ταβάνι
+const RC_RED_R = 1.8;                // ακτίνα (κελιά) της κόκκινης λάμψης κάτω από μια σκιά που φάνηκε
 
 // Ποια υφή τοίχου έχει κάθε κεφάλαιο: σπηλιά, λαξευμένη πέτρα, παλάτι (με μαίανδρο).
 const RC_THEMES = ['rock', 'rock', 'rock', 'blocks', 'rock', 'blocks', 'palace', 'rock'];
@@ -65,6 +67,13 @@ const Raycast = {
   exitCells: [],      // τα κελιά μπροστά στην έξοδο που φωτίζει το φως της ημέρας: [κελί, ένταση, ...]
   exitA: 0,           // πόσο φαίνεται τώρα η έξοδος (το βάζει το main πριν το render)
   sprites: [],        // τα billboards αυτού του καρέ (sprite → flushSprites)
+  cellFloor: null,    // ανά κελί: η υφή του δαπέδου (ανάλογα με την περιοχή: σπηλιά, πλακάκια, παλάτι)
+  cellCeil: null,     // ανά κελί: η υφή του ταβανιού
+  aoMask: null,       // Uint8Array ανά κελί: ποιοι γείτονες είναι τοίχοι (για το ambient occlusion)
+  redCell: null,      // Float32Array: κόκκινη λάμψη ανά κελί (κάτω από σκιές που φάνηκαν), αυτό το καρέ
+  _redTouched: [],
+  _redSrc: [],        // οι σκιές που λάμπουν αυτό το καρέ: [x, y (κελιά), ένταση, ...]
+  monsters: [],       // οι σκιές (το main τις δίνει πριν το render)
   // Ποιότητα: 'auto' | 'high' | 'low'. Στο 'low' (ή στο 'auto' αν το render αργεί, π.χ. σε
   // αδύναμο κινητό) το δάπεδο/ταβάνι ζωγραφίζεται με μισή οριζόντια ανάλυση (ο ακριβότερος βρόχος).
   quality: 'auto',
@@ -307,6 +316,87 @@ const Raycast = {
       if (u === 0 || v === 0 || (v === 20 && u < 26)) return mul(TERRA, 0.45);
       return mul([70, 34, 20], 0.6 + hash(Math.floor(u / 13), Math.floor(v / 9), 30) * 0.4);
     });
+
+    // Σπηλιά: δάπεδο από ακανόνιστες πλάκες πέτρας (Voronoi, χωρίς ραφές) με φωτεινούς αρμούς,
+    // και τραχύ, σκοτεινό ταβάνι από βράχο με λεπτές ρωγμές.
+    const voronoi = (n, seedBase, fn) => {
+      const seeds = [];
+      for (let k = 0; k < n; k++) seeds.push([hash(k, 5, seedBase) * N, hash(k, 6, seedBase + 1) * N]);
+      return make((u, v) => {
+        let d1 = 1e9, d2 = 1e9, id = 0;
+        for (let k = 0; k < n; k++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              const dx = u + 0.5 - (seeds[k][0] + ox * N), dy = v + 0.5 - (seeds[k][1] + oy * N);
+              const d = Math.sqrt(dx * dx + dy * dy);
+              if (d < d1) { d2 = d1; d1 = d; id = k; } else if (d < d2) d2 = d;
+            }
+          }
+        }
+        return fn(u, v, d2 - d1, id);
+      });
+    };
+    this.tex.caveFloor = [3, 17].map((sb) => voronoi(6, sb, (u, v, edge, id) => {
+      if (edge < 0.9) return mul(TERRA, 0.6);
+      const k = (0.42 + Math.min(1, edge / 10) * 0.3 + hash(id, 8, sb) * 0.2 + (hash(u, v, sb) - 0.5) * 0.14) * (edge < 2 ? 0.6 : 1);
+      return mul([96, 52, 32], k);
+    }));
+    this.tex.caveCeil = voronoi(5, 41, (u, v, edge, id) => {
+      if (edge < 0.7) return mul(TERRA, 0.38);
+      return mul([66, 34, 22], 0.45 + Math.min(1, edge / 9) * 0.35 + hash(id, 9, 41) * 0.2);
+    });
+    // Παλάτι: δάπεδο σκακιέρα από "μαύρο γάνωμα" και πηλό (τα χρώματα των αγγείων), με
+    // φωτεινούς αρμούς· ταβάνι με φατνώματα (τετράγωνα βαθουλώματα με πλαίσιο).
+    this.tex.palaceFloor = make((u, v) => {
+      const tu = u % 20, tv = v % 20;
+      if (tu === 0 || tv === 0) return mul(LIGHT, 0.55);
+      const dark = ((Math.floor(u / 20) + Math.floor(v / 20)) & 1) === 0;
+      const k = 0.85 + (hash(u, v, 51) - 0.5) * 0.1 + (tu === 1 || tv === 1 ? 0.2 : 0);
+      return dark ? mul([40, 24, 18], k) : mul([170, 90, 48], k);
+    });
+    this.tex.palaceCeil = make((u, v) => {
+      const tu = u % 20, tv = v % 20;
+      if (tu <= 1 || tv <= 1) return mul(TERRA, 0.6);                       // δοκάρια
+      if (tu === 2 || tv === 2) return mul(TERRA, 0.38);                    // ακμή του φατνώματος
+      if (tu >= 17 || tv >= 17) return mul([40, 22, 14], 0.8);              // σκιά μέσα στο φάτνωμα
+      return mul([70, 38, 24], 0.7 + hash(Math.floor(u / 20), Math.floor(v / 20), 52) * 0.15);
+    });
+
+    // Ανά κελί: ποια υφή δαπέδου / ταβανιού (ανάλογα με το θέμα της περιοχής), και ποιοι
+    // γείτονες είναι τοίχοι (ambient occlusion: bit 0..3 = Β, Ν, Δ, Α· 4..7 = διαγώνιες γωνίες
+    // ΒΔ, ΒΑ, ΝΔ, ΝΑ, μόνο όταν οι δύο πλαϊνοί δεν είναι τοίχοι).
+    const L = Level, cells = L.cols * L.rows;
+    this.cellFloor = new Array(cells);
+    this.cellCeil = new Array(cells);
+    this.aoMask = new Uint8Array(cells);
+    this.redCell = new Float32Array(cells);
+    for (let ty = 0; ty < L.rows; ty++) {
+      for (let tx = 0; tx < L.cols; tx++) {
+        const c = ty * L.cols + tx;
+        const theme = RC_THEMES[L.region[c]] || 'rock';
+        if (theme === 'palace') {
+          this.cellFloor[c] = this.tex.palaceFloor;
+          this.cellCeil[c] = this.tex.palaceCeil;
+        } else if (theme === 'blocks') {
+          this.cellFloor[c] = this.tex.floor[(tx * 7 + ty * 13) & 3];
+          this.cellCeil[c] = this.tex.ceil;
+        } else {
+          this.cellFloor[c] = this.tex.caveFloor[(tx * 5 + ty * 3) & 1];
+          this.cellCeil[c] = this.tex.caveCeil;
+        }
+        const o = (dx, dy) => L.isOpaque(tx + dx, ty + dy);
+        let m = 0;
+        if (o(0, -1)) m |= 1;
+        if (o(0, 1)) m |= 2;
+        if (o(-1, 0)) m |= 4;
+        if (o(1, 0)) m |= 8;
+        if (!(m & 5) && o(-1, -1)) m |= 16;
+        if (!(m & 9) && o(1, -1)) m |= 32;
+        if (!(m & 6) && o(-1, 1)) m |= 64;
+        if (!(m & 10) && o(1, 1)) m |= 128;
+        this.aoMask[c] = m;
+      }
+    }
   },
 
   resize(W, H) {
@@ -441,6 +531,31 @@ const Raycast = {
       for (let k = 0; k < ec.length; k += 2) cl[ec[k]] = Math.max(cl[ec[k]], ec[k + 1] * exA);
     }
 
+    // Κόκκινη λάμψη στο δάπεδο κάτω από κάθε σκιά τη στιγμή που φαίνεται (στη θέση που φάνηκε).
+    const red = this.redCell;
+    for (const c of this._redTouched) red[c] = 0;
+    this._redTouched.length = 0;
+    const rs = this._redSrc;
+    rs.length = 0;
+    for (const m of this.monsters) {
+      if (m.isFrozen()) continue;
+      const a = m.revealAlpha(now);
+      if (a < 0.03) continue;
+      const mx = m.revealX / TILE, my = m.revealY / TILE;
+      rs.push(mx, my, a);
+      const r = Math.ceil(RC_RED_R);
+      for (let ty = Math.floor(my) - r; ty <= Math.floor(my) + r; ty++) {
+        for (let tx = Math.floor(mx) - r; tx <= Math.floor(mx) + r; tx++) {
+          if (tx < 0 || ty < 0 || tx >= cols || ty >= rows || L.opaque[ty * cols + tx]) continue;
+          const d = Math.hypot(tx + 0.5 - mx, ty + 0.5 - my);
+          if (d > RC_RED_R) continue;
+          const c = ty * cols + tx, v = a * Math.pow(1 - d / RC_RED_R, 1.5);
+          if (red[c] === 0) this._redTouched.push(c);
+          if (v > red[c]) red[c] = v;
+        }
+      }
+    }
+
     const hasWaves = Echoes.waves.length > 0;
     if (hasWaves) this.prepareWaves();
     const gateAt = this.gateAt;
@@ -549,7 +664,7 @@ const Raycast = {
     }
 
     // ---- Δάπεδο και ταβάνι (γραμμή-γραμμή) ----
-    const fl = this.tex.floor, ceil = this.tex.ceil;
+    const cellFloor = this.cellFloor, cellCeil = this.cellCeil, aoMask = this.aoMask;
     const coarse = this.coarse;
     const ripple = now * 1.3;
     for (let y = 0; y < H; y++) {
@@ -576,6 +691,34 @@ const Raycast = {
           glow = this.glow * fog;
         }
         light *= fog;
+        // Ambient occlusion: πιο σκοτεινά δίπλα στους τοίχους και στις γωνίες.
+        const am = aoMask[c];
+        if (am !== 0 && light > 0.012) {
+          const fx = wx - tx, fy = wy - ty;
+          let d = 1;
+          if ((am & 1) && fy < d) d = fy;
+          if ((am & 2) && 1 - fy < d) d = 1 - fy;
+          if ((am & 4) && fx < d) d = fx;
+          if ((am & 8) && 1 - fx < d) d = 1 - fx;
+          if (am & 240) {
+            if (am & 16) { const q = Math.sqrt(fx * fx + fy * fy); if (q < d) d = q; }
+            if (am & 32) { const q = Math.sqrt((1 - fx) * (1 - fx) + fy * fy); if (q < d) d = q; }
+            if (am & 64) { const q = Math.sqrt(fx * fx + (1 - fy) * (1 - fy)); if (q < d) d = q; }
+            if (am & 128) { const q = Math.sqrt((1 - fx) * (1 - fx) + (1 - fy) * (1 - fy)); if (q < d) d = q; }
+          }
+          if (d < RC_AO) light *= 0.4 + 0.6 * (d / RC_AO);
+        }
+        // Κόκκινη λάμψη κάτω από σκιά (μόνο στο δάπεδο): στρογγυλή, με την απόσταση του pixel
+        // από τη σκιά (μόνο στα κελιά που την έχουν).
+        let rl = 0;
+        if (below && red[c] > 0) {
+          for (let k = 0; k < rs.length; k += 3) {
+            const dx = wx - rs[k], dy = wy - rs[k + 1];
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < RC_RED_R) { const v = rs[k + 2] * Math.pow(1 - d / RC_RED_R, 1.5); if (v > rl) rl = v; }
+          }
+          rl *= fog;
+        }
         // Νερό: ο φωτισμένος τοίχος πίσω του καθρεφτίζεται (ανάποδα, κυματιστά), πιο αχνά όσο
         // πλησιάζει το νερό προς τον παίκτη — φαίνεται ακόμα κι όταν το ίδιο το νερό είναι σκοτεινό.
         let rr = 0, rg = 0, rb = 0;
@@ -594,13 +737,14 @@ const Raycast = {
             }
           }
         }
-        if (light < 0.012 && glow < 0.01 && rr + rg + rb < 2) continue;
+        if (light < 0.012 && glow < 0.01 && rr + rg + rb < 2 && rl < 0.01) continue;
         if (light > 1.4) light = 1.4;
         const u = ((wx - tx) * RC_TEX) | 0, v = ((wy - ty) * RC_TEX) | 0;
         let r, g, b;
         if (!below) {
+          const ct = cellCeil[c];
           const i = (v * RC_TEX + u) * 3;
-          r = ceil[i]; g = ceil[i + 1]; b = ceil[i + 2];
+          r = ct[i]; g = ct[i + 1]; b = ct[i + 2];
         } else if (t === T_WATER) {
           // Σκούρο νερό με κυματάκια που κυλάνε αργά.
           const X = wx * TILE, Y = wy * TILE;
@@ -608,11 +752,11 @@ const Raycast = {
           const line = Math.abs((m < 0 ? m + 13 : m) - 6.5) < 0.6;
           if (line) { r = 112; g = 58; b = 30; } else { r = 30; g = 18; b = 13; }
         } else {
-          const tex = fl[(tx * 7 + ty * 13) & 3];
+          const tex = cellFloor[c];
           const i = (v * RC_TEX + u) * 3;
           r = tex[i]; g = tex[i + 1]; b = tex[i + 2];
         }
-        r = r * light + glow * 210 + rr; g = g * light + glow * 110 + rg; b = b * light + glow * 56 + rb;
+        r = r * light + glow * 210 + rr + rl * 190; g = g * light + glow * 110 + rg + rl * 22; b = b * light + glow * 56 + rb + rl * 14;
         if (r > 255) r = 255;
         if (g > 255) g = 255;
         if (b > 255) b = 255;

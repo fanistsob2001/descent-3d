@@ -422,13 +422,14 @@ function draw3D(pc, W, H) {
   // Το βλέμμα "κουνιέται" λίγο με τα βήματα, και ο ορίζοντας ανεβοκατεβαίνει με το βλέμμα πάνω / κάτω.
   const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6 + Raycast.focal * Math.tan(player.pitch);
   Raycast.exitA = World3D.exitAlpha(gameTime, player);
+  Raycast.monsters = monsters;
   const t0 = performance.now();
   Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
   if (state === 'play') Raycast.measure(performance.now() - t0);
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
   // Ό,τι λάμπει "ξεχειλίζει" απαλά (κύματα, φλόγες, φως της ημέρας).
-  Pixel.bloom(0.55);
+  Pixel.bloom(0.55, World3D.lights);
 
   let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
   if (state === 'dead') {
@@ -890,6 +891,7 @@ function frame(t) {
     Eggs.update(dt, gameTime);
     Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
     Echoes.update(dt, gameTime);
+    World3D.updateSparks(dt);
     Hints.update(gameTime);
     updateLookBackWarning();
     Notice.update(gameTime);
@@ -924,6 +926,7 @@ function frame(t) {
   } else if (state === 'dead') {
     gameTime += dt;
     Echoes.update(dt, gameTime);
+    World3D.updateSparks(dt);
     // Μετά το jump scare: πίσω στον τελευταίο βωμό, με ό,τι είχες εκεί.
     if (gameTime - endTime >= DEATH_DELAY) {
       Sound.gameOver();

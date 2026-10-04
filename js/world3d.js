@@ -81,6 +81,7 @@ const World3D = {
 
   // Καλείται σε κάθε spawn.
   reset() {
+    this.sparks = [];
     this.decor = Level.decor.map((d) => ({
       ...d, revealTime: -1e6, revealStrength: 0,
       onHear(wave, dist, los) {
@@ -284,7 +285,24 @@ const World3D = {
       });
     }
 
+    // Πού είναι στην οθόνη οι πηγές φωτός (για τις ακτίνες φωτός του bloom): οι φλόγες των βωμών
+    // και το φως της εξόδου, όσες φαίνονται (όχι πίσω από τοίχο).
+    this.lights.length = 0;
+    for (const a of Altars.list) {
+      if (!a.lit) continue;
+      const p = R.project(a.x, a.y);
+      if (!p || p.depth > 9 || !R.visible(p.sx, p.depth - 0.2)) continue;
+      const y = R.horizon + (R.focal * (RC_EYE - 34 / TILE)) / p.depth;
+      this.lights.push({ x: p.sx, y, a: Math.min(1, 1.4 / p.depth) });
+    }
+    if (R.exitA > 0.2 && R.exitDir) {
+      const [ix, iy] = R.exitDir;
+      const p = R.project(Level.exit.x - ix * TILE * 0.45, Level.exit.y - iy * TILE * 0.45);
+      if (p && R.visible(p.sx, p.depth - 0.3)) this.lights.push({ x: p.sx, y: R.horizon, a: R.exitA * 0.9 });
+    }
+
     R.flushSprites(pc);
+    this.drawSparks(pc, now);
     this.drawMotes(pc, now);
 
     // ---- Η Μελωδία: χρυσή λάμψη σε όλη την οθόνη (δεν είναι κύμα ήχου) ----
@@ -338,6 +356,64 @@ const World3D = {
         }
       },
     });
+  },
+
+  // Σπίθες: όπου το μέτωπο ενός κύματος χτυπάει τοίχο, πετάγονται μερικές μικρές πορτοκαλί
+  // σπίθες από την πέτρα και πέφτουν (μόνο οπτικό — δεν είναι ήχος). Ανά κύμα θυμόμαστε ως ποιο
+  // κομμάτι τοίχου έχουμε ήδη "δει" (w._spark), και διαλέγουμε λίγα από τα καινούργια.
+  sparks: [],
+  lights: [],
+  updateSparks(dt) {
+    const L = Level;
+    for (const w of Echoes.waves) {
+      if (w.kind === 'step') continue;
+      if (w._spark === undefined) w._spark = 0;
+      let budget = Math.round(5 * w.strength);
+      for (; w._spark < w.ptr; w._spark++) {
+        if (budget <= 0 || Math.random() > 0.16) continue;
+        const i = w.hits[w._spark].i;
+        if (this.sparks.length > 140) break;
+        budget--;
+        // Από το σημείο του τοίχου, προς τον διάδρομο (η κάθετος του κομματιού).
+        const mx = (L.segX1[i] + L.segX2[i]) / 2, my = (L.segY1[i] + L.segY2[i]) / 2;
+        const nx = L.testX[i] - mx, ny = L.testY[i] - my;
+        const sp = 25 + Math.random() * 45, side = (Math.random() - 0.5) * 30;
+        this.sparks.push({
+          x: mx + nx * 1.5, y: my + ny * 1.5, z: 4 + Math.random() * 32,
+          vx: nx * sp - ny * side, vy: ny * sp + nx * side, vz: 10 + Math.random() * 35,
+          life: 0.5 + Math.random() * 0.5, age: 0,
+        });
+      }
+    }
+    for (let k = this.sparks.length - 1; k >= 0; k--) {
+      const s = this.sparks[k];
+      s.age += dt;
+      if (s.age >= s.life) { this.sparks.splice(k, 1); continue; }
+      s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+      s.vz -= 160 * dt;                               // βαρύτητα
+      s.vx *= 1 - 2.5 * dt; s.vy *= 1 - 2.5 * dt;     // αντίσταση του αέρα
+      if (s.z < 0) { s.z = 0; s.vz *= -0.3; }         // αναπηδούν λίγο στο δάπεδο
+    }
+  },
+
+  drawSparks(pc) {
+    const R = Raycast;
+    if (this.sparks.length === 0) return;
+    pc.save();
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.globalCompositeOperation = 'lighter';
+    for (const s of this.sparks) {
+      const p = R.project(s.x, s.y);
+      if (!p || p.depth > 14 || !R.visible(p.sx, p.depth)) continue;
+      const y = R.horizon + (R.focal * (RC_EYE - s.z / TILE)) / p.depth;
+      const t = 1 - s.age / s.life;
+      const size = p.depth < 1.2 ? 2 : 1;
+      // Από λευκοκίτρινο (καυτό) σε πηλό καθώς σβήνει.
+      const c = t > 0.6 ? '255,214,150' : POT.light;
+      pc.fillStyle = `rgba(${c},${(t * 0.95).toFixed(3)})`;
+      pc.fillRect(Math.round(p.sx), Math.round(y), size, size);
+    }
+    pc.restore();
   },
 
   // Σκόνη στον αέρα (τα σωματίδια του Fx, γύρω από τον παίκτη): φαίνεται μόνο όπου φτάνει
