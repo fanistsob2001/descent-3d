@@ -51,6 +51,7 @@ Technical rules from CLAUDE.md still apply (plain HTML/CSS/JS + Canvas, no npm, 
 
 - Eurydice follows the player. Soft footsteps are heard behind the player, and now and then she whispers "Orpheus... I am right behind you."
 - Small waves are allowed. A **big wave** (charging past a threshold) means "looking back".
+- First-person version: **turning around** also means "looking back" — turning the view more than 120° away from the way you are going, towards her (she is then within 60° of where you look). A little before that, the edges of the screen turn red, with the same warning vibration and tension audio.
 - While charging in chapter VIII, the charge indicator turns red past that threshold as a warning, with a warning vibration pulse and rising tension audio.
 - **Drag-to-cancel:** the player can drag the finger away (while holding) to cancel a charged wave safely without releasing it. This works in every chapter.
 - If the player releases a big wave: a whisper "Orpheus..." that fades away into silence, then the text "The footsteps behind you stop." Her footsteps stop for good. The player continues alone, and this leads to the bad ending.

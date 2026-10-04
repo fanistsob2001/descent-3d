@@ -302,7 +302,10 @@ const CHAPTERS = [
       ? 'Your lyre is whole. Play it when the shades come near.'
       : 'Your lyre is still broken. You climb without its song.'),
     fade: 1.5,
-    hints: [],
+    hints: [
+      { touch: 'Do not turn around. If the edges of the screen turn red, you are about to look back.',
+        keys: 'Do not turn around. If the edges of the screen turn red, you are about to look back.', time: 9 },
+    ],
     map: [
       '############^############',
       '##########..C..##########',

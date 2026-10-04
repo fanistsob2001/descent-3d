@@ -169,10 +169,40 @@ function emitCall(held) {
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
 }
 
-// Στο V, όσο φορτίζεις πέρα από το όριο: ήχος έντασης που ανεβαίνει και παλμοί δόνησης.
+// Στο VIII "κοιτάζω πίσω" σημαίνει και να γυρίσεις την κάμερα προς την Ευρυδίκη: αν εκείνη
+// βρεθεί σε LOOK_BACK_ANGLE από το βλέμμα σου (δηλ. γύρισες > 120° από την κατεύθυνση που πας),
+// την κοίταξες. Από το LOOK_WARN_ANGLE και μέσα, προειδοποίηση (κόκκινες άκρες, ένταση, δόνηση).
+const LOOK_BACK_ANGLE = Math.PI / 3;          // 60°
+const LOOK_WARN_ANGLE = (80 * Math.PI) / 180;
+const LOOK_MIN_DIST = 14;                     // πιο κοντά (π.χ. μόλις άρχισε να ακολουθεί): δεν μετράει
+let turnWarn = 0;                             // 0..1: πόσο κοντά στο όριο της στροφής
+
+// Η γωνία ανάμεσα στο βλέμμα και στην Ευρυδίκη (0 = την κοιτάς, π = είναι ακριβώς πίσω σου).
+function eurydiceAngle() {
+  const dx = Eurydice.x - player.x, dy = Eurydice.y - player.y;
+  if (Math.hypot(dx, dy) < LOOK_MIN_DIST) return Math.PI;
+  let a = Math.atan2(dy, dx) - player.angle;
+  a = Math.atan2(Math.sin(a), Math.cos(a));
+  return Math.abs(a);
+}
+
+function checkTurnBack() {
+  turnWarn = 0;
+  if (!lookBackRuleActive()) return;
+  const a = eurydiceAngle();
+  if (a <= LOOK_BACK_ANGLE) {
+    lookBack();
+    return;
+  }
+  if (a < LOOK_WARN_ANGLE) turnWarn = (LOOK_WARN_ANGLE - a) / (LOOK_WARN_ANGLE - LOOK_BACK_ANGLE);
+}
+
+// Στο VIII, όσο φορτίζεις πέρα από το όριο (ή γυρίζεις προς τα πίσω): ήχος έντασης που
+// ανεβαίνει και παλμοί δόνησης.
 let warnOn = false, nextWarnPulse = 0;
 function updateLookBackWarning() {
-  const warn = state === 'play' && Input.charging && Input.chargeAmount() >= LOOK_BACK_CHARGE && lookBackRuleActive();
+  const warn = state === 'play' && lookBackRuleActive() &&
+    ((Input.charging && Input.chargeAmount() >= LOOK_BACK_CHARGE) || turnWarn > 0.3);
   if (warn && !warnOn) {
     Sound.tension(true);
     vibrate([60, 40, 60]);
@@ -202,7 +232,7 @@ function shadeSpeaks(m) {
   if (!Notice.busy(gameTime)) Notice.show(line, gameTime, d + 1, null, 'shade');
 }
 
-// Ο κανόνας "μην κοιτάξεις πίσω" ισχύει όσο η Ευρυδίκη ακολουθεί, μέσα στο κεφάλαιο V.
+// Ο κανόνας "μην κοιτάξεις πίσω" ισχύει όσο η Ευρυδίκη ακολουθεί, μέσα στο τελευταίο κεφάλαιο (VIII).
 function lookBackRuleActive() {
   return Eurydice.following() && playerRegion() === CHAPTERS.length - 1;
 }
@@ -397,7 +427,8 @@ function draw3D(pc, W, H) {
   const saved = ctx;
   ctx = pc;
   if (state === 'play' || state === 'paused') {
-    drawCharge3D(pc, W, H);
+    drawTurnWarning(pc, W, H);
+    drawHands3D(pc, W, H);
     Dread.drawVignette(pc, W, H, gameTime);
   }
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
@@ -416,39 +447,42 @@ function draw3D(pc, W, H) {
   }
 }
 
-// Η φόρτιση του κύματος (προσωρινά, ώσπου να μπουν τα χέρια με τη λύρα): ένα δαχτυλίδι
-// κάτω στη μέση που μεγαλώνει και τρέμει όσο κρατάς. Στο VIII γίνεται κόκκινο πέρα από το όριο.
-function drawCharge3D(pc, W, H) {
-  const cx = W / 2, cy = Math.round(H * 0.8);
-  const ct = (gameTime - cancelFx.t) / 0.35;
-  if (ct >= 0 && ct < 1) {
-    pc.strokeStyle = `rgba(${POT.light},${(0.5 * (1 - ct)).toFixed(3)})`;
-    pc.lineWidth = 1;
-    pc.beginPath();
-    pc.arc(cx, cy, Math.max(1, (4 + cancelFx.r) * (1 - ct)), 0, Math.PI * 2);
-    pc.stroke();
-  }
-  if (!Input.charging) return;
+// Τα χέρια του Ορφέα με τη λύρα (js/hands.js): οι χορδές λάμπουν και τρέμουν όσο φορτίζεις
+// κύμα, και για λίγο αφού το αφήσεις. Στο VIII κοκκινίζουν καθώς πλησιάζεις το όριο του
+// "κοιτάζω πίσω", και γίνονται έντονα κόκκινες πέρα από αυτό. Το σύρσιμο για ακύρωση τις σβήνει.
+function drawHands3D(pc, W, H) {
   const c = Input.chargeAmount();
-  const pulse = 0.5 + 0.5 * Math.sin(gameTime * (8 + c * 16));
   const rule = lookBackRuleActive();
-  const warn = c >= LOOK_BACK_CHARGE && rule;
-  const fadeDrag = 1 - Input.chargeDrag * 0.75;
-  const color = warn ? '255,40,30' : POT.light;
-  pc.setLineDash(Input.chargeDrag > 0.2 ? [2, 2] : []);
-  pc.lineWidth = warn ? 2 : 1;
-  pc.strokeStyle = `rgba(${color},${(((warn ? 0.6 : 0.3) + 0.4 * c * pulse) * fadeDrag).toFixed(3)})`;
-  pc.beginPath();
-  pc.arc(cx, cy, 6 + c * 18, 0, Math.PI * 2);
-  pc.stroke();
-  if (rule && !warn) {
-    pc.strokeStyle = `rgba(255,60,40,${(0.35 * fadeDrag).toFixed(3)})`;
-    pc.setLineDash([2, 3]);
-    pc.beginPath();
-    pc.arc(cx, cy, 6 + LOOK_BACK_CHARGE * 18, 0, Math.PI * 2);
-    pc.stroke();
-  }
-  pc.setLineDash([]);
+  const near = rule && Input.charging ? Math.max(0, Math.min(1, (c - LOOK_BACK_CHARGE * 0.5) / (LOOK_BACK_CHARGE * 0.5))) : 0;
+  const ct = (gameTime - cancelFx.t) / 0.35;
+  let melody = 0;
+  for (const r of Melody.rings) melody = Math.max(melody, 1 - (gameTime - r.t) / MELODY_RING_TIME);
+  const cell = Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE);
+  Hands.draw(pc, W, H, gameTime, {
+    strings,
+    charge: c,
+    charging: Input.charging,
+    pluck: Math.max(0, 1 - (gameTime - lastCallAt) / HANDS_PLUCK),
+    cancel: Math.max(Input.chargeDrag * 0.8, ct >= 0 && ct < 1 ? 1 - ct : 0),
+    warn: rule && Input.charging && c >= LOOK_BACK_CHARGE,
+    warnNear: near,
+    light: Math.min(1, Raycast.cellLight ? Raycast.cellLight[cell] || 0 : 0),
+    walkPhase: player.walkPhase,
+    walkSpeed: player.walkSpeed,
+    melody: Math.max(0, melody),
+  });
+}
+
+// Στο VIII, όταν γυρίζεις προς τα πίσω (προς την Ευρυδίκη): οι άκρες της οθόνης κοκκινίζουν
+// και πάλλονται — λίγο πριν από το όριο που σημαίνει "κοίταξες πίσω".
+function drawTurnWarning(pc, W, H) {
+  if (turnWarn <= 0.01) return;
+  const pulse = 0.6 + 0.4 * Math.sin(gameTime * 9);
+  const g = pc.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, 'rgba(255,40,30,0)');
+  g.addColorStop(1, `rgba(255,40,30,${(0.55 * turnWarn * pulse).toFixed(3)})`);
+  pc.fillStyle = g;
+  pc.fillRect(0, 0, W, H);
 }
 
 // Το κουμπί της λύρας (κινητό): κράτημα = κύμα. Γεμίζει όσο φορτίζει.
@@ -841,6 +875,7 @@ function frame(t) {
     const region = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
     if (region !== hudRegion) updateHud();
     Eurydice.update(player);
+    if (state === 'play') checkTurnBack();
     // Όπου περπατάς, το "βλέπεις" (για τον χάρτη), ακόμα και χωρίς κύμα.
     Level.seen[Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE)] = 1;
     if (Eurydice.wantsToSpeak(gameTime) && lookBackRuleActive() && !Notice.busy(gameTime)) {
@@ -1242,6 +1277,7 @@ function init() {
   Pixel.init();
   Sprites.init();
   World3D.init();
+  Hands.init();
   resize();
   showScreen('menu');
   requestAnimationFrame(frame);
