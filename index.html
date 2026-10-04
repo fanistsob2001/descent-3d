@@ -16,10 +16,10 @@
   <!-- Κατά τη διάρκεια του παιχνιδιού -->
   <div id="hud" class="hidden">
     <div class="hud-left">
-      <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause">
+      <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause" data-key="Esc">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
       </button>
-      <button id="btn-map" class="hud-btn" type="button" aria-label="Map">
+      <button id="btn-map" class="hud-btn" type="button" aria-label="Map" data-key="M">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>
       </button>
     </div>
@@ -28,11 +28,11 @@
       <div id="strings-label"></div>
     </div>
     <div class="hud-right">
-      <button id="btn-melody" class="hud-btn hidden" type="button" aria-label="Play the lyre">
+      <button id="btn-melody" class="hud-btn hidden" type="button" aria-label="Play the lyre" data-key="Q">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M7 4c-3 3-3 9 0 13h10c3-4 3-10 0-13M7 4c1 2 1 4 0 6M17 4c-1 2-1 4 0 6M6 10h12M9 10v7M12 10v7M15 10v7M8 20h8"/></svg>
         <span id="melody-count" class="count">0</span>
       </button>
-      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar">
+      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar" data-key="E">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M9 3h6M10 3v3c-4 2-5 7-3 11l2 3h6l2-3c2-4 1-9-3-11V3M7 10h10"/></svg>
         <span id="jar-count" class="count">0</span>
       </button>
@@ -58,7 +58,7 @@
       Wear headphones
     </p>
     <p class="controls touch-only">Left side: move &middot; Right side: look &middot; Lyre button: sound</p>
-    <p class="controls keys-only">WASD move &middot; Mouse look &middot; Left click / Space sound &middot; Right click / X cancel &middot; Shift sneak &middot; E jar &middot; Q lyre &middot; M map &middot; Esc pause</p>
+    <p class="controls keys-only">WASD move &middot; Mouse look &middot; Left click / Space sound &middot; Right click / X cancel &middot; Shift sneak &middot; E jar &middot; Q lyre &middot; M map &middot; F fullscreen &middot; Esc pause</p>
   </div>
 
   <div id="settings" class="overlay hidden">

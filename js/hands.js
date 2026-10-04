@@ -131,12 +131,14 @@ const Hands = {
   //      cancel (0..1: μόλις ακυρώθηκε), warn (κόκκινο: θα σήμαινε "κοιτάζω πίσω"), warnNear (0..1:
   //      πλησιάζει το όριο), light (0..1: φως από τον χώρο, π.χ. βωμός), walkPhase, walkSpeed, melody (0..1) }
   draw(pc, W, H, now, o) {
-    // Μέγεθος: σε κατακόρυφη οθόνη διπλάσια pixels (για να μη χάνεται στο κινητό).
-    const k = H > W * 1.3 ? 2 : 1;
+    // Μέγεθος: ακέραια μεγέθυνση ανάλογα με την ανάλυση (PC ~270 γραμμές → 2, κινητό οριζόντια → 1).
+    const k = Math.max(1, Math.round(Math.min(H, W * 0.75) / 165));
     const c = o.charging ? o.charge : 0;
     // Κίνηση: ταλαντεύεται με τα βήματα, σηκώνεται λίγο όσο φορτίζεις.
-    const sway = Math.sin(o.walkPhase) * o.walkSpeed * 2.5;
-    const bob = (1 - Math.cos(o.walkPhase * 2)) * o.walkSpeed * 1.5;
+    // Όταν στέκεσαι: αργή "ανάσα" (τα χέρια ανεβοκατεβαίνουν λίγο), όπως στα FPS.
+    const idle = 1 - Math.min(1, o.walkSpeed * 2);
+    const sway = Math.sin(o.walkPhase) * o.walkSpeed * 2.5 + Math.sin(now * 0.9) * 0.6 * idle;
+    const bob = (1 - Math.cos(o.walkPhase * 2)) * o.walkSpeed * 1.5 + (0.5 + 0.5 * Math.sin(now * 1.6)) * 1.1 * idle;
     const lift = c * 4 + o.pluck * 2;
     const x0 = Math.round(W / 2 - HANDS_OX * k + sway * k);
     const y0 = Math.round(H - HANDS_H * k + (bob - lift + 3) * k);

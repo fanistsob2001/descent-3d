@@ -13,10 +13,12 @@
 // Γράφουμε κατευθείαν στα pixels (ImageData, Uint32) και μετά το Pixel κάνει την
 // κβάντιση/dithering και τη μεγέθυνση όπως πριν.
 
-const RC_FOV = 66 * Math.PI / 180;   // οριζόντιο οπτικό πεδίο σε οριζόντια οθόνη
+const RC_FOV = 66 * Math.PI / 180;   // οριζόντιο οπτικό πεδίο σε οριζόντια οθόνη (κινητό)
+const RC_FOV_PC = 80 * Math.PI / 180;   // στο PC: πιο ανοιχτό, όπως στα FPS του υπολογιστή
 const RC_EYE = 0.5;                  // ύψος των ματιών σε κελιά (οι τοίχοι έχουν ύψος 1 κελί)
 const RC_MAX = 26;                   // ως πόσα κελιά μακριά ψάχνει τοίχο μια ακτίνα
-const RC_TEX = 40;                   // texels ανά πλευρά υφής (1 texel = 1 μονάδα κόσμου)
+const RC_TEX = 40;                   // texels ανά πλευρά υφής δαπέδου/ταβανιού (1 texel = 1 μονάδα κόσμου)
+const RC_WTEX = 64;                  // texels ανά πλευρά υφής τοίχου (πιο λεπτομερείς)
 const RC_RING = 10;                  // πάχος του μετώπου του κύματος (μονάδες κόσμου)
 const RC_FOG = 900;                  // σε τόσες μονάδες το φως έχει πέσει στο ελάχιστο
 const RC_CEIL = 0.45;                // το ταβάνι φωτίζεται λιγότερο από το δάπεδο
@@ -43,6 +45,7 @@ const Raycast = {
   zbuf: null,         // απόσταση (σε κελιά, κάθετη στο επίπεδο της κάμερας) του τοίχου ανά στήλη
   wallTop: null,      // πού αρχίζει / τελειώνει ο τοίχος σε κάθε στήλη (y σε art pixels)
   wallBot: null,
+  fov: RC_FOV,        // οριζόντιο οπτικό πεδίο (το main βάζει RC_FOV_PC στο PC)
   focal: 0,           // art pixels ανά μονάδα (σε απόσταση 1 κελιού = 1 κελί)
   horizon: 0,
   // Η κάμερα του τελευταίου καρέ (για τα sprites): θέση σε κελιά, κατεύθυνση, επίπεδο.
@@ -51,7 +54,8 @@ const Raycast = {
   segBase: null,      // Int32Array: για κάθε (κελί, πλευρά) το πρώτο κομμάτι τοίχου του Level
   segPer: 8,
   cellLight: null,    // Float32Array: φως κάθε κελιού δαπέδου αυτό το καρέ
-  tex: {},            // υφές: Uint8Array RGB (RC_TEX × RC_TEX × 3), σε "πλήρες φως"
+  tex: {},            // υφές δαπέδου/ταβανιού: Uint8Array RGB (RC_TEX × RC_TEX × 3), σε "πλήρες φως"
+  walls: {},          // υφές τοίχων ανά θέμα: [Uint8Array RGB (RC_WTEX × RC_WTEX × 3), ...] (παραλλαγές)
   gateAt: null,       // Int16Array: ποια πύλη (βάρκα του Χάροντα) είναι σε κάθε κελί, -1 = καμία
   altarCells: [],     // ανά βωμό: [κελί, ένταση, ...] — όσα φωτίζει η φλόγα του (με οπτική επαφή)
   altarSegs: [],      // ανά βωμό: [κομμάτι τοίχου, ένταση, ...]
@@ -64,6 +68,7 @@ const Raycast = {
   // Ποιότητα: 'auto' | 'high' | 'low'. Στο 'low' (ή στο 'auto' αν το render αργεί, π.χ. σε
   // αδύναμο κινητό) το δάπεδο/ταβάνι ζωγραφίζεται με μισή οριζόντια ανάλυση (ο ακριβότερος βρόχος).
   quality: 'auto',
+  slowMs: 7,          // πάνω από τόσα ms ανά render → χαμηλή ποιότητα (το main βάζει 10 στο PC)
   coarse: false,
   _avg: 0,
   _frames: 0,
@@ -96,7 +101,6 @@ const Raycast = {
     }
     this.cellLight = new Float32Array(L.cols * L.rows);
     this.segExtra = new Float32Array(L.segCount);
-    this.buildTextures();
 
     // Οι πύλες (η βάρκα του Χάροντα) δεν ζωγραφίζονται ως τοίχος: εκεί είναι νερό και η βάρκα.
     this.gateAt = new Int16Array(L.cols * L.rows).fill(-1);
@@ -147,7 +151,8 @@ const Raycast = {
     }
   },
 
-  // ---- Υφές (φτιάχνονται μία φορά, σε pixel art) ----
+  // ---- Υφές (φτιάχνονται μία φορά, σε pixel art· μετά το Sprites.init, γιατί οι ζωφόροι
+  // των τοίχων φτιάχνονται από τα sprites) ----
   buildTextures() {
     const N = RC_TEX;
     const hash = (a, b, s) => {
@@ -166,56 +171,124 @@ const Raycast = {
       return t;
     };
     const mul = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
-    const LIGHT = [236, 156, 98], TERRA = [206, 108, 56], DEEP = [112, 54, 30], DARK = [10, 6, 4];
+    const LIGHT = [236, 156, 98], TERRA = [206, 108, 56], DEEP = [112, 54, 30];
 
-    // Λαξευμένοι λίθοι: σειρές των 10 μονάδων, λίθοι των 20, μετατοπισμένοι ανά σειρά.
-    // Οι αρμοί είναι η "φωτεινή ακμή" που λάμπει όταν τους βρει ήχος.
-    const block = (u, v, s) => {
-      const row = Math.floor(v / 10);
-      const bu = (u + (row % 2) * 10) % 20, bv = v % 10;
-      if (bu === 0 || bv === 0) return mul(LIGHT, 0.95);
-      const id = Math.floor((u + (row % 2) * 10) / 20) + row * 7;
-      let k = 0.7 + hash(id, s, 1) * 0.3 + (hash(u, v, s) - 0.5) * 0.18;
-      if (bv === 1) k *= 1.3;          // πάνω ακμή κάθε λίθου, σαν ανάγλυφο
-      if (bv === 9 || bu === 19) k *= 0.6;
-      return mul(DEEP, k);
-    };
-    this.tex.blocks = make((u, v) => block(u, v, 3));
-
-    // Παλάτι: ίδιοι λίθοι, με ζωφόρο μαιάνδρου στην κορυφή (μαύρο πάνω σε πηλό).
-    this.tex.palace = make((u, v) => {
-      if (v < 9) {
-        if (v === 0 || v === 8) return DARK;
-        if (v === 1) return mul(TERRA, 0.85);
-        const m = RC_MEANDER[v - 2][u % 6];
-        return m === '#' ? DARK : mul(TERRA, 0.85 + hash(u, v, 9) * 0.1);
-      }
-      return block(u, v, 5);
-    });
-
-    // Σπηλιά: ακανόνιστοι βράχοι (κελιά Voronoi που επαναλαμβάνονται χωρίς ραφές),
-    // με φωτεινές ρωγμές ανάμεσά τους.
-    const seeds = [];
-    for (let k = 0; k < 5; k++) seeds.push([hash(k, 1, 2) * N, hash(k, 2, 3) * N]);
-    this.tex.rock = make((u, v) => {
-      let d1 = 1e9, d2 = 1e9, id = 0;
-      for (let k = 0; k < seeds.length; k++) {
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let ox = -1; ox <= 1; ox++) {
-            const dx = u + 0.5 - (seeds[k][0] + ox * N), dy = v + 0.5 - (seeds[k][1] + oy * N);
-            const d = Math.sqrt(dx * dx + dy * dy);
-            if (d < d1) { d2 = d1; d1 = d; id = k; } else if (d < d2) d2 = d;
-          }
+    // ---- Τοίχοι: υφές RC_WTEX × RC_WTEX, σε παραλλαγές ανά θέμα (this.walls[θέμα] = [υφές]) ----
+    const WN = RC_WTEX;
+    const makeW = (fn) => {
+      const t = new Uint8Array(WN * WN * 3);
+      for (let v = 0; v < WN; v++) {
+        for (let u = 0; u < WN; u++) {
+          const [r, g, b] = fn(u, v);
+          const i = (v * WN + u) * 3;
+          t[i] = r; t[i + 1] = g; t[i + 2] = b;
         }
       }
-      const edge = d2 - d1;
-      if (edge < 0.8) return mul(LIGHT, 0.72);
-      // Κάθε βράχος "φουσκώνει": πιο φωτεινός στη μέση, σκοτεινός δίπλα στη ρωγμή,
-      // με λίγο φως από πάνω (η πάνω πλευρά κάθε βράχου πιάνει περισσότερο).
-      const bulge = Math.min(1, edge / 9);
-      const k = 0.3 + bulge * 0.45 + hash(id, 4, 4) * 0.2 + (hash(u, v, 7) - 0.5) * 0.16;
-      return mul(DEEP, edge < 2 ? k * 0.55 : k);
-    });
+      return t;
+    };
+
+    // Λαξευμένοι λίθοι: σειρές των 16 texels, λίθοι των 32, μετατοπισμένοι ανά σειρά.
+    // Οι αρμοί είναι η "φωτεινή ακμή" που λάμπει όταν τους βρει ήχος· ανάγλυφο στις άκρες.
+    const block = (u, v, s) => {
+      const row = Math.floor(v / 16);
+      const bu = (u + (row % 2) * 16) % 32, bv = v % 16;
+      if (bu === 0 || bv === 0) return mul(LIGHT, 0.9);
+      const id = Math.floor((u + (row % 2) * 16) / 32) + row * 7;
+      let k = 0.66 + hash(id, s, 1) * 0.3 + (hash(u, v, s) - 0.5) * 0.14;
+      if (bv === 1 || bu === 1) k *= 1.32;           // φωτεινή πάνω/αριστερή ακμή (ανάγλυφο)
+      if (bv >= 14 || bu >= 30) k *= 0.62;            // σκιά στην κάτω/δεξιά ακμή
+      if (hash(u >> 1, v >> 1, s + 40) > 0.97) k *= 0.55;   // μικρές φθορές
+      return mul(DEEP, k);
+    };
+
+    // Σπηλιά: ακανόνιστοι βράχοι (Voronoi που επαναλαμβάνεται χωρίς ραφές), με λεπτές φωτεινές
+    // ρωγμές και "φουσκωμένες" πέτρες (φωτεινές στη μέση, σκοτεινές δίπλα στη ρωγμή).
+    const rock = (seedBase) => {
+      const seeds = [];
+      for (let k = 0; k < 7; k++) seeds.push([hash(k, 1, seedBase) * WN, hash(k, 2, seedBase + 1) * WN]);
+      return makeW((u, v) => {
+        let d1 = 1e9, d2 = 1e9, id = 0;
+        for (let k = 0; k < seeds.length; k++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            for (let ox = -1; ox <= 1; ox++) {
+              const dx = u + 0.5 - (seeds[k][0] + ox * WN), dy = v + 0.5 - (seeds[k][1] + oy * WN);
+              const d = Math.sqrt(dx * dx + dy * dy);
+              if (d < d1) { d2 = d1; d1 = d; id = k; } else if (d < d2) d2 = d;
+            }
+          }
+        }
+        const edge = d2 - d1;
+        if (edge < 0.9) return mul(LIGHT, 0.7);
+        const bulge = Math.min(1, edge / 13);
+        let k = 0.26 + bulge * 0.5 + hash(id, 4, seedBase) * 0.18 + (hash(u, v, 7) - 0.5) * 0.14;
+        if (edge < 2.2) k *= 0.5;
+        // Το φως "πέφτει" λίγο από πάνω: η πάνω μεριά κάθε πέτρας φωτεινότερη.
+        const up = seeds[id][1] - (v + 0.5);
+        k *= 1 + Math.max(-0.15, Math.min(0.15, up / 40));
+        return mul(DEEP, k);
+      });
+    };
+
+    // Μελανόμορφη ζωφόρος: οι μορφές των sprites ως μαύρες σιλουέτες πάνω σε πηλό, με
+    // "χαραγμένες" λεπτομέρειες στο χρώμα του πηλού — όπως στα αγγεία. Το "πρόσθετο λευκό" μόνο
+    // για γυναίκες και φαντάσματα (white = true: ό,τι είναι ανοιχτόχρωμο) και για τα μάτια των σκιών.
+    // figs = [[όνομα, καρέ, καθρέφτισμα, white], ...].
+    const BLACK = [16, 10, 7], CREAM = [236, 216, 182];
+    const stamp = (t, figs, bandTop, bandBot) => {
+      const n = figs.length;
+      figs.forEach(([name, frame, flip, white], i) => {
+        if (!Sprites.frames[name]) return;
+        const fr = Sprites.get(name, frame);
+        if (fr.h > bandBot - bandTop) return;
+        const data = (flip ? fr.f : fr.c).getContext('2d').getImageData(0, 0, fr.w, fr.h).data;
+        const x0 = Math.round(((i + 0.5) * WN) / n - fr.w / 2), y0 = bandBot - fr.h;
+        for (let y = 0; y < fr.h; y++) {
+          for (let x = 0; x < fr.w; x++) {
+            const p = (y * fr.w + x) * 4;
+            if (data[p + 3] < 128) continue;
+            const r = data[p], g = data[p + 1], b = data[p + 2];
+            const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+            let c = BLACK;
+            if (white ? lum > 185 : lum > 245) c = CREAM;     // πρόσθετο λευκό (ή μάτια που λάμπουν)
+            else if (r === 40 && g === 20 && b === 12) c = TERRA;   // χαραγμένη λεπτομέρεια
+            const u = ((x0 + x) % WN + WN) % WN, i3 = ((y0 + y) * WN + u) * 3;
+            t[i3] = c[0]; t[i3 + 1] = c[1]; t[i3 + 2] = c[2];
+          }
+        }
+      });
+      return t;
+    };
+    const clay = (u, v) => mul(TERRA, 0.84 + hash(u, v, 9) * 0.1);
+    const meander = (u, v) => (RC_MEANDER[v][u % 6] === '#' ? BLACK : clay(u, v));
+
+    // Παλάτι (VII): ζωφόρος μαιάνδρου, από κάτω μελανόμορφη σκηνή, και λίθοι στη βάση.
+    const palace = (figs) => stamp(makeW((u, v) => {
+      if (v === 0 || v === 11 || v === 38 || v === 40) return BLACK;
+      if (v <= 2 || v === 9 || v === 10 || v === 39) return clay(u, v);
+      if (v <= 8) return meander(u, v - 3);
+      if (v <= 37) return clay(u, v);
+      return block(u, v - 41 + 64, 5);
+    }), figs, 13, 37);
+    // Λαξευμένη πέτρα (IV, VI): λίθοι, και σε μερικές πλευρές μια στενή ζωφόρος με μορφές.
+    const frieze = (figs) => stamp(makeW((u, v) => {
+      if (v === 0 || v === 21) return BLACK;
+      if (v === 1 || v === 20) return clay(u, v);
+      if (v <= 19) return clay(u, v);
+      return block(u, v, 3);
+    }), figs, 2, 20);
+
+    this.walls = {
+      rock: [rock(2), rock(11), rock(23)],
+      blocks: [makeW((u, v) => block(u, v, 3)), makeW((u, v) => block(u, v, 8)), makeW((u, v) => block(u, v, 13)),
+        frieze([['soul', 0, false, true], ['soul', 1, false, true], ['soul', 0, false, true]]),
+        frieze([['shade', 0, false], ['shade', 1, false], ['erinys', 0, false]])],
+      palace: [
+        palace([['orpheus_play_3', 0, false], ['hades', 0, false], ['persephone', 1, false, true]]),
+        palace([['shade', 0, false], ['shade', 1, false], ['erinys', 1, false]]),
+        palace([['soul', 0, true, true], ['orpheus_walk_3', 1, true], ['eurydice', 0, true, true]]),
+        palace([['charon', 1, false], ['soul', 1, false, true], ['hound', 0, true]]),
+      ],
+    };
 
     // Δάπεδο: 2×2 πήλινα πλακάκια ανά κελί, με φωτεινούς αρμούς· 4 παραλλαγές (μία με ρωγμή).
     this.tex.floor = [0, 1, 2, 3].map((s) => make((u, v) => {
@@ -249,16 +322,16 @@ const Raycast = {
     this.wallBot = new Float32Array(W);
     // Σε οριζόντια οθόνη: οπτικό πεδίο RC_FOV. Σε κατακόρυφη το ίδιο θα έδειχνε πολύ μικρούς
     // τοίχους, οπότε κρατάμε λίγο μεγαλύτερη μεγέθυνση (λίγο στενότερο πεδίο).
-    this.focal = Math.max((W / 2) / Math.tan(RC_FOV / 2), H * 0.4);
+    this.focal = Math.max((W / 2) / Math.tan(this.fov / 2), H * 0.4);
   },
 
   // Μετά από κάθε render (ms): μέσος όρος, και στο 'auto' γυρίζει σε χαμηλή ποιότητα αν
-  // ξεπεράσει τα 7 ms (μένει χαμηλή — αλλιώς θα "αναβόσβηνε" η ανάλυση).
+  // ξεπεράσει τα slowMs (μένει χαμηλή — αλλιώς θα "αναβόσβηνε" η ανάλυση).
   measure(ms) {
     this._frames++;
     this._avg += (ms - this._avg) * 0.05;
     if (this.quality === 'auto') {
-      if (this._frames > 90 && this._avg > 7) this.coarse = true;
+      if (this._frames > 90 && this._avg > this.slowMs) this.coarse = true;
     } else {
       this.coarse = this.quality === 'low';
     }
@@ -428,16 +501,46 @@ const Raycast = {
       if (light > 1.4) light = 1.4;
       const gr = glow * 210, gg = glow * 110, gb = glow * 56;
 
-      // Η υφή δεν καθρεφτίζεται ανάλογα με την πλευρά.
-      let u = Math.floor(frac * RC_TEX);
-      if (side === 3 || side === 0) u = RC_TEX - 1 - u;
-      const tex = this.tex[(inside && RC_THEMES[L.region[ty * cols + tx]]) || this.regionThemeNear(tx, ty)] || this.tex.rock;
+      // Σκίαση πλευρών (όπως στα κλασικά raycasters): οι πλευρές προς ανατολή/δύση λίγο πιο
+      // σκοτεινές από αυτές προς βορρά/νότο — δίνει όγκο στις γωνίες.
+      const shade = xSide ? 0.8 : 1;
+
+      // Η υφή: παραλλαγή ανά πλευρά τοίχου (σταθερή), και δεν καθρεφτίζεται ανάλογα με την πλευρά.
+      const N = RC_WTEX;
+      let u = Math.floor(frac * N);
+      if (side === 3 || side === 0) u = N - 1 - u;
+      const variants = this.walls[(inside && RC_THEMES[L.region[ty * cols + tx]]) || this.regionThemeNear(tx, ty)] || this.walls.rock;
+      const tex = variants[(((tx * 73856093) ^ (ty * 19349663) ^ (side * 83492791)) >>> 0) % variants.length];
+
+      // Φωτεινές ακμές (όπως στα παιχνίδια ηχοεντοπισμού): η κορυφή και η βάση κάθε τοίχου, και
+      // οι κάθετες ακμές εκεί που ο τοίχος γυρίζει (εξωτερική ή εσωτερική γωνία).
+      const fdx = side === 2 ? -1 : side === 3 ? 1 : 0, fdy = side === 0 ? -1 : side === 1 ? 1 : 0;
+      const adx = fdy !== 0 ? 1 : 0, ady = fdx !== 0 ? 1 : 0;
+      const cw = Math.max(0.02, 1.2 / lineH);
+      let corner = false;
+      if (frac < cw) corner = !(L.isOpaque(tx - adx, ty - ady) && !L.isOpaque(tx - adx + fdx, ty - ady + fdy));
+      else if (frac > 1 - cw) corner = !(L.isOpaque(tx + adx, ty + ady) && !L.isOpaque(tx + adx + fdx, ty + ady + fdy));
+      const edge = Math.min(1.6, (light + glow) * 1.5);
+      const er = 236 * edge, eg = 156 * edge, eb = 98 * edge;
+
       const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bot));
-      const vStep = RC_TEX / (bot - top);
+      const yTop = Math.floor(top), yBot = Math.ceil(bot) - 1;
+      const span = bot - top;
+      const vStep = N / span;
       let v = (y0 + 0.5 - top) * vStep;
+      const lit = light * shade;
       for (let y = y0; y < y1; y++, v += vStep) {
-        const ti = ((v < 0 ? 0 : v >= RC_TEX ? RC_TEX - 1 : v | 0) * RC_TEX + u) * 3;
-        let r = tex[ti] * light + gr, g = tex[ti + 1] * light + gg, b = tex[ti + 2] * light + gb;
+        let r, g, b;
+        if (corner || y === yTop || y === yBot) {
+          r = er; g = eg; b = eb;
+        } else {
+          const ti = ((v < 0 ? 0 : v >= N ? N - 1 : v | 0) * N + u) * 3;
+          // Σκιά στη βάση του τοίχου (εκεί που ακουμπάει το δάπεδο) και λίγο στην κορυφή.
+          const vv = v / N;
+          const ao = vv > 0.84 ? 1 - (vv - 0.84) * 3 : vv < 0.05 ? 0.8 : 1;
+          const k = lit * ao;
+          r = tex[ti] * k + gr; g = tex[ti + 1] * k + gg; b = tex[ti + 2] * k + gb;
+        }
         if (r > 255) r = 255;
         if (g > 255) g = 255;
         if (b > 255) b = 255;
@@ -465,34 +568,51 @@ const Raycast = {
         const tx = Math.floor(wx), ty = Math.floor(wy);
         if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) continue;
         const c = ty * cols + tx;
+        const t = !below ? T_FLOOR : gateAt[c] >= 0 && !L.gates[gateAt[c]].open ? T_WATER : L.terrain[c];
+        if (t === T_CHASM) continue;   // χάσμα: μαύρο, χωρίς πάτο
         let light = cl[c], glow = 0;
         if (hasWaves) {
           light += this.ringAt(wx * TILE, wy * TILE, true, c);
           glow = this.glow * fog;
         }
         light *= fog;
-        if (light < 0.012 && glow < 0.01) continue;
+        // Νερό: ο φωτισμένος τοίχος πίσω του καθρεφτίζεται (ανάποδα, κυματιστά), πιο αχνά όσο
+        // πλησιάζει το νερό προς τον παίκτη — φαίνεται ακόμα κι όταν το ίδιο το νερό είναι σκοτεινό.
+        let rr = 0, rg = 0, rb = 0;
+        if (t === T_WATER) {
+          const wb = this.wallBot[x];
+          if (wb < H && y > wb) {
+            const my = Math.round(2 * wb - y);
+            if (my >= 0 && my >= this.wallTop[x]) {
+              let mx = x + Math.round(Math.sin(wy * 14 + now * 2.2) * 1.2);
+              mx = mx < 0 ? 0 : mx >= W ? W - 1 : mx;
+              const px = buf[my * W + mx];
+              const k = 0.45 * Math.max(0, 1 - (y - wb) / (wb - this.wallTop[x] + 1));
+              if (k > 0.01 && (px & 0xffffff) !== 0) {
+                rr = (px & 255) * k; rg = ((px >> 8) & 255) * k; rb = ((px >> 16) & 255) * k;
+              }
+            }
+          }
+        }
+        if (light < 0.012 && glow < 0.01 && rr + rg + rb < 2) continue;
         if (light > 1.4) light = 1.4;
         const u = ((wx - tx) * RC_TEX) | 0, v = ((wy - ty) * RC_TEX) | 0;
         let r, g, b;
-        const t = !below ? T_FLOOR : gateAt[c] >= 0 && !L.gates[gateAt[c]].open ? T_WATER : L.terrain[c];
         if (!below) {
           const i = (v * RC_TEX + u) * 3;
           r = ceil[i]; g = ceil[i + 1]; b = ceil[i + 2];
-        } else if (t === T_FLOOR) {
-          const tex = fl[(tx * 7 + ty * 13) & 3];
-          const i = (v * RC_TEX + u) * 3;
-          r = tex[i]; g = tex[i + 1]; b = tex[i + 2];
         } else if (t === T_WATER) {
           // Σκούρο νερό με κυματάκια που κυλάνε αργά.
           const X = wx * TILE, Y = wy * TILE;
           const m = (Y + Math.sin(X * 0.12 + ripple + tx * 1.7) * 3) % 13;
-          const line = Math.abs((m < 0 ? m + 13 : m) - 6.5) < 0.9;
-          if (line) { r = 150; g = 78; b = 40; } else { r = 34; g = 20; b = 15; }
+          const line = Math.abs((m < 0 ? m + 13 : m) - 6.5) < 0.6;
+          if (line) { r = 112; g = 58; b = 30; } else { r = 30; g = 18; b = 13; }
         } else {
-          continue;   // χάσμα: μαύρο, χωρίς πάτο
+          const tex = fl[(tx * 7 + ty * 13) & 3];
+          const i = (v * RC_TEX + u) * 3;
+          r = tex[i]; g = tex[i + 1]; b = tex[i + 2];
         }
-        r = r * light + glow * 210; g = g * light + glow * 110; b = b * light + glow * 56;
+        r = r * light + glow * 210 + rr; g = g * light + glow * 110 + rg; b = b * light + glow * 56 + rb;
         if (r > 255) r = 255;
         if (g > 255) g = 255;
         if (b > 255) b = 255;
@@ -500,6 +620,8 @@ const Raycast = {
       }
     }
 
+    // Dithering του κόσμου εδώ, στον buffer (πιο γρήγορα από getImageData/putImageData μετά).
+    Pixel.quantizeBuf(buf, W, H);
     pc.putImageData(this.img, 0, 0);
   },
 

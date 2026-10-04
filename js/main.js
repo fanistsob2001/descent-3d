@@ -92,7 +92,10 @@ function resize() {
     ? Math.min(cssW / VIEW_MIN_H, cssH / VIEW_MIN_W)
     : Math.min(cssW / VIEW_MIN_W, cssH / VIEW_MIN_H);
   document.body.classList.toggle('landscape', landscape);
-  Pixel.resize(cssW, cssH);
+  // PC: μεγαλύτερη ανάλυση και πιο ανοιχτό οπτικό πεδίο (παιχνίδι υπολογιστή, όχι κινητού).
+  Pixel.resize(cssW, cssH, IS_TOUCH ? PIXEL_TARGET : PIXEL_TARGET_PC);
+  Raycast.fov = IS_TOUCH ? RC_FOV : RC_FOV_PC;
+  Raycast.slowMs = IS_TOUCH ? 7 : 10;
   Raycast.resize(Pixel.w, Pixel.h);
 }
 window.addEventListener('resize', resize);
@@ -424,6 +427,8 @@ function draw3D(pc, W, H) {
   if (state === 'play') Raycast.measure(performance.now() - t0);
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
+  // Ό,τι λάμπει "ξεχειλίζει" απαλά (κύματα, φλόγες, φως της ημέρας).
+  Pixel.bloom(0.55);
 
   let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
   if (state === 'dead') {
@@ -444,7 +449,8 @@ function draw3D(pc, W, H) {
   if (state === 'dead') drawDeathFlash(W, H);
   ctx = saved;
 
-  Pixel.present(ctx, dpr, shakeX, shakeY);
+  // Ο κόσμος έχει ήδη κβαντιστεί στον raycaster· οι μορφές, οι λάμψεις και τα χέρια μένουν όπως είναι.
+  Pixel.present(ctx, dpr, shakeX, shakeY, false);
 
   // Από πάνω, σε πλήρη ανάλυση: τα λόγια των ψυχών, το joystick και το κουμπί της λύρας.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -812,7 +818,7 @@ function drawMap(pc, W, H) {
   pc.arc(px + 0.5, py + 0.5, 2 + ring * cell * 2.5, 0, Math.PI * 2);
   pc.stroke();
   // Προς τα πού κοιτάς: αχνή δέσμη (το οπτικό πεδίο) και μια γραμμή μπροστά από την κουκκίδα.
-  const reach = cell * 3 + 6, half = RC_FOV / 2;
+  const reach = cell * 3 + 6, half = Raycast.fov / 2;
   pc.globalCompositeOperation = 'lighter';
   pc.fillStyle = `rgba(${POT.light},0.16)`;
   pc.beginPath();
@@ -1020,6 +1026,20 @@ function goFullscreen() {
       p.catch(() => {});
     }
   } catch (_) { /* π.χ. iPhone: δεν υποστηρίζεται, συνεχίζουμε κανονικά */ }
+}
+
+// PC: F = πλήρης οθόνη (και πάλι F για έξοδο), όπως σε πολλά παιχνίδια υπολογιστή.
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  try {
+    if (d.fullscreenElement || d.webkitFullscreenElement) {
+      (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    } else {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      const p = req && req.call(el, { navigationUI: 'hide' });
+      if (p && p.then) p.then(() => { if (state === 'play') Input.requestLock(false); }).catch(() => {});
+    }
+  } catch (_) { /* - */ }
 }
 
 function stopInput() {
@@ -1294,6 +1314,8 @@ function init() {
       playMelody();
     } else if (e.code === 'KeyM' && !e.repeat) {
       openMap();
+    } else if (e.code === 'KeyF' && !e.repeat && !IS_TOUCH && !EMBEDDED) {
+      toggleFullscreen();
     }
   });
 
@@ -1302,6 +1324,8 @@ function init() {
   // PC: αν ο κέρσορας ξεκλειδώσει ενώ παίζεις (π.χ. Esc), μπαίνει σε παύση.
   document.addEventListener('pointerlockchange', () => {
     if (!document.pointerLockElement && state === 'play') pauseGame();
+    // Πιάστηκε ενώ δεν παίζεις (π.χ. αργοπορημένο αίτημα): άφησέ το, για να φαίνεται ο κέρσορας.
+    else if (document.pointerLockElement && state !== 'play' && state !== 'dead' && document.exitPointerLock) document.exitPointerLock();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -1318,6 +1342,7 @@ function init() {
   document.body.classList.toggle('embedded', EMBEDDED);
   Pixel.init();
   Sprites.init();
+  Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
   Hands.init();
   resize();
