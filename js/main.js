@@ -938,14 +938,9 @@ function frame(t) {
   Sound.updateListener();
   Dread.update(dt, gameTime, player, monsters, state === 'play');
 
-  // PC: "Click to play" όσο παίζεις χωρίς πιασμένο ποντίκι.
-  const clickPlay = state === 'play' && !IS_TOUCH && !Input.locked && !Input.lockFailed;
-  if (clickPlay !== clickPlayShown) { clickPlayShown = clickPlay; $('click-play').classList.toggle('visible', clickPlay); }
-
   draw();
   requestAnimationFrame(frame);
 }
-let clickPlayShown = false;
 
 // ---- Οθόνες ----
 function showScreen(name) {
@@ -1056,7 +1051,7 @@ function setState(s) {
   // Το ποντίκι μένει "κλειδωμένο" μόνο όσο παίζεις (αλλιώς δεν πατιούνται τα κουμπιά).
   if (s !== 'play' && s !== 'dead' && document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
   // PC: μόλις παίζεις (New Game, Continue, Resume...), το ποντίκι "πιάνεται" — όπως σε κάθε FPS.
-  // (Πετυχαίνει όταν γίνεται μέσα σε κλικ / πλήκτρο· αλλιώς φαίνεται το "Click to play".)
+  // (Πετυχαίνει όταν γίνεται μέσα σε κλικ / πλήκτρο· αλλιώς ένα κλικ στο παιχνίδι το πιάνει.)
   if (s === 'play' && !IS_TOUCH) Input.requestLock(false);
   if (s !== 'play' && warnOn) { warnOn = false; Sound.tension(false); }
   Sound.setAmbient(AMBIENT[s]);

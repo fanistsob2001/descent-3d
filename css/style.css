@@ -351,28 +351,6 @@ body {
   opacity: 0.8;
 }
 
-/* PC: "Click to play" στη μέση, όταν το ποντίκι δεν είναι πιασμένο (τα κλικ περνάνε στο παιχνίδι) */
-#click-play {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 4;
-  transform: translate(-50%, -50%);
-  padding: 10px 22px;
-  border: 2px solid var(--terra);
-  background: rgba(0, 0, 0, 0.75);
-  color: var(--bright);
-  font-family: system-ui, sans-serif;
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  pointer-events: none;
-  display: none;
-}
-
-#click-play.visible {
-  display: block;
-}
 
 #level-intro {
   position: fixed;
