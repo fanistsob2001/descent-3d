@@ -443,6 +443,7 @@ function draw3D(pc, W, H) {
     drawTurnWarning(pc, W, H);
     drawHands3D(pc, W, H);
     Dread.drawVignette(pc, W, H, gameTime);
+    if (!IS_TOUCH) drawCrosshair(pc, W, H);
   }
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
   if (showMap) drawMiniMap(pc, W, H);
@@ -485,6 +486,25 @@ function drawHands3D(pc, W, H) {
     walkSpeed: player.walkSpeed,
     melody: Math.max(0, melody),
   });
+}
+
+// PC: σταυρόνημα στο κέντρο (όπως στο Minecraft): ένα μικρό pixel "+" με σκούρο περίγραμμα.
+// Κοκκινίζει όταν στο VIII θα σήμαινε "κοιτάζω πίσω" (κόκκινο κύμα ή στροφή προς τα πίσω).
+function drawCrosshair(pc, W, H) {
+  const cx = Math.floor(W / 2), cy = Math.floor(H / 2);
+  const warn = lookBackRuleActive() && ((Input.charging && Input.chargeAmount() >= LOOK_BACK_CHARGE) || turnWarn > 0.3);
+  const arm = 3;
+  pc.save();
+  pc.setTransform(1, 0, 0, 1, 0, 0);
+  pc.globalAlpha = 1;
+  pc.globalCompositeOperation = 'source-over';
+  pc.fillStyle = 'rgba(10,6,4,0.75)';
+  pc.fillRect(cx - arm - 1, cy - 1, arm * 2 + 3, 3);
+  pc.fillRect(cx - 1, cy - arm - 1, 3, arm * 2 + 3);
+  pc.fillStyle = warn ? 'rgb(255,60,40)' : `rgba(${POT.cream},0.85)`;
+  pc.fillRect(cx - arm, cy, arm * 2 + 1, 1);
+  pc.fillRect(cx, cy - arm, 1, arm * 2 + 1);
+  pc.restore();
 }
 
 // Στο VIII, όταν γυρίζεις προς τα πίσω (προς την Ευρυδίκη): οι άκρες της οθόνης κοκκινίζουν
@@ -1051,6 +1071,8 @@ function stopInput() {
 
 function setState(s) {
   state = s;
+  // PC: όσο παίζεις, ο κέρσορας δεν φαίνεται ποτέ (το βλέμμα είναι το σταυρόνημα στο κέντρο).
+  document.body.classList.toggle('playing', s === 'play' || s === 'dead');
   // Το ποντίκι μένει "κλειδωμένο" μόνο όσο παίζεις (αλλιώς δεν πατιούνται τα κουμπιά).
   if (s !== 'play' && s !== 'dead' && document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
   // PC: μόλις παίζεις (New Game, Continue, Resume...), το ποντίκι "πιάνεται" — όπως σε κάθε FPS.

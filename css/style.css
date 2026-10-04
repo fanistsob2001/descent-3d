@@ -730,3 +730,8 @@ body.embedded.landscape #hint {
     letter-spacing: 0;
   }
 }
+
+/* PC: όσο παίζεις, ο κέρσορας κρύβεται — το βλέμμα είναι το σταυρόνημα στο κέντρο (όπως στο Minecraft) */
+body.playing #game {
+  cursor: none;
+}
