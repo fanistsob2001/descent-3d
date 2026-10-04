@@ -382,7 +382,10 @@ function draw() {
 function draw3D(pc, W, H) {
   // Το βλέμμα "κουνιέται" λίγο με τα βήματα.
   const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6;
+  Raycast.exitA = World3D.exitAlpha(gameTime, player);
   Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
+  // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
+  World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
 
   let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
   if (state === 'dead') {
@@ -404,8 +407,9 @@ function draw3D(pc, W, H) {
 
   Pixel.present(ctx, dpr, shakeX, shakeY);
 
-  // Από πάνω, σε πλήρη ανάλυση: το joystick και το κουμπί της λύρας.
+  // Από πάνω, σε πλήρη ανάλυση: τα λόγια των ψυχών, το joystick και το κουμπί της λύρας.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  World3D.overlay(ctx, gameTime, Pixel.px);
   if (state === 'play') {
     drawJoystick();
     if (IS_TOUCH) drawLyreButton();
@@ -1008,9 +1012,10 @@ function spawn(saved) {
   Notice.clear();
   Souls.reset();
   Eggs.reset();
+  World3D.reset();
   // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
   Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
-  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners()];
+  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners(), ...World3D.listeners()];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;
@@ -1236,6 +1241,7 @@ function init() {
   document.body.classList.toggle('embedded', EMBEDDED);
   Pixel.init();
   Sprites.init();
+  World3D.init();
   resize();
   showScreen('menu');
   requestAnimationFrame(frame);

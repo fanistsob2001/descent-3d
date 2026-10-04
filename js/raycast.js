@@ -20,6 +20,9 @@ const RC_TEX = 40;                   // texels ανά πλευρά υφής (1 t
 const RC_RING = 10;                  // πάχος του μετώπου του κύματος (μονάδες κόσμου)
 const RC_FOG = 900;                  // σε τόσες μονάδες το φως έχει πέσει στο ελάχιστο
 const RC_CEIL = 0.45;                // το ταβάνι φωτίζεται λιγότερο από το δάπεδο
+const RC_ALTAR_R = 3.4;              // ως πόσα κελιά φτάνει το φως ενός αναμμένου βωμού
+const RC_SPX = 1.9;                  // μονάδες κόσμου ανά pixel ενός sprite (η σκιά = 16 px ≈ 30 μονάδες)
+const RC_DAY = [255, 236, 190];      // το φως της ημέρας στην έξοδο
 
 // Ποια υφή τοίχου έχει κάθε κεφάλαιο: σπηλιά, λαξευμένη πέτρα, παλάτι (με μαίανδρο).
 const RC_THEMES = ['rock', 'rock', 'rock', 'blocks', 'rock', 'blocks', 'palace', 'rock'];
@@ -49,6 +52,15 @@ const Raycast = {
   segPer: 8,
   cellLight: null,    // Float32Array: φως κάθε κελιού δαπέδου αυτό το καρέ
   tex: {},            // υφές: Uint8Array RGB (RC_TEX × RC_TEX × 3), σε "πλήρες φως"
+  gateAt: null,       // Int16Array: ποια πύλη (βάρκα του Χάροντα) είναι σε κάθε κελί, -1 = καμία
+  altarCells: [],     // ανά βωμό: [κελί, ένταση, ...] — όσα φωτίζει η φλόγα του (με οπτική επαφή)
+  altarSegs: [],      // ανά βωμό: [κομμάτι τοίχου, ένταση, ...]
+  segExtra: null,     // Float32Array: φως από βωμούς σε κάθε κομμάτι τοίχου, αυτό το καρέ
+  _segTouched: [],
+  exitKey: -1,        // (κελί*4 + πλευρά) του τοίχου πίσω από την έξοδο: εκεί φαίνεται το φως της ημέρας
+  exitCells: [],      // τα κελιά μπροστά στην έξοδο που φωτίζει το φως της ημέρας: [κελί, ένταση, ...]
+  exitA: 0,           // πόσο φαίνεται τώρα η έξοδος (το βάζει το main πριν το render)
+  sprites: [],        // τα billboards αυτού του καρέ (sprite → flushSprites)
 
   // Μία φορά, αφού φορτωθεί ο κόσμος.
   init() {
@@ -77,7 +89,56 @@ const Raycast = {
       if (k === 0) this.segBase[(ty * L.cols + tx) * 4 + side] = i;
     }
     this.cellLight = new Float32Array(L.cols * L.rows);
+    this.segExtra = new Float32Array(L.segCount);
     this.buildTextures();
+
+    // Οι πύλες (η βάρκα του Χάροντα) δεν ζωγραφίζονται ως τοίχος: εκεί είναι νερό και η βάρκα.
+    this.gateAt = new Int16Array(L.cols * L.rows).fill(-1);
+    L.gates.forEach((g, i) => { this.gateAt[g.ty * L.cols + g.tx] = i; });
+
+    // Το φως κάθε βωμού: κελιά και κομμάτια τοίχων σε ακτίνα RC_ALTAR_R, με οπτική επαφή.
+    const R = RC_ALTAR_R * TILE;
+    this.altarCells = L.altars.map((a) => {
+      const out = [];
+      const r = Math.ceil(RC_ALTAR_R);
+      for (let ty = Math.floor(a.y / TILE) - r; ty <= Math.floor(a.y / TILE) + r; ty++) {
+        for (let tx = Math.floor(a.x / TILE) - r; tx <= Math.floor(a.x / TILE) + r; tx++) {
+          if (L.isOpaque(tx, ty)) continue;
+          const cx = (tx + 0.5) * TILE, cy = (ty + 0.5) * TILE;
+          const d = Math.hypot(cx - a.x, cy - a.y);
+          if (d > R || !L.lineOfSight(a.x, a.y, cx, cy)) continue;
+          out.push(ty * L.cols + tx, Math.pow(1 - d / R, 1.3));
+        }
+      }
+      return out;
+    });
+    this.altarSegs = L.altars.map((a) => {
+      const out = [];
+      for (let i = 0; i < L.segCount; i++) {
+        const d = Math.hypot(L.testX[i] - a.x, L.testY[i] - a.y);
+        if (d > R || !L.lineOfSight(a.x, a.y, L.testX[i], L.testY[i])) continue;
+        out.push(i, Math.pow(1 - d / R, 1.3));
+      }
+      return out;
+    });
+
+    // Η έξοδος: ο τοίχος απέναντι από τον διάδρομο γίνεται "άνοιγμα" με φως της ημέρας,
+    // και το φως χύνεται στα κελιά μπροστά του.
+    const ex = L.exit;
+    const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => !L.isWall(ex.tx + dx, ex.ty + dy));
+    if (open) {
+      const [ix, iy] = open;                        // προς τον διάδρομο
+      const wx = ex.tx - ix, wy = ex.ty - iy;        // ο τοίχος πίσω από την έξοδο
+      const side = ix === 1 ? 3 : ix === -1 ? 2 : iy === 1 ? 1 : 0;
+      this.exitKey = (wy * L.cols + wx) * 4 + side;
+      this.exitDir = [ix, iy];
+      this.exitCells = [];
+      for (let k = 0; k < 4; k++) {
+        const tx = ex.tx + ix * k, ty = ex.ty + iy * k;
+        if (L.isOpaque(tx, ty)) break;
+        this.exitCells.push(ty * L.cols + tx, 1 - k / 4);
+      }
+    }
   },
 
   // ---- Υφές (φτιάχνονται μία φορά, σε pixel art) ----
@@ -267,8 +328,31 @@ const Raycast = {
       cl[c] = Echoes.cellStr[c] * f * Math.sqrt(f);
     }
 
+    // Οι αναμμένοι βωμοί: μόνιμο φως που τρεμοπαίζει (κελιά και κομμάτια τοίχων γύρω τους).
+    const se = this.segExtra;
+    for (const i of this._segTouched) se[i] = 0;
+    this._segTouched.length = 0;
+    Altars.list.forEach((a, n) => {
+      if (!a.lit) return;
+      const f = (0.82 + 0.1 * Math.sin(now * 13 + a.x) + 0.08 * Math.sin(now * 5.3 + a.y * 0.3)) *
+        (0.62 + 0.5 * Math.max(0, 1 - (now - a.litAt) / 1.4));
+      const cs = this.altarCells[n], ss = this.altarSegs[n];
+      for (let k = 0; k < cs.length; k += 2) cl[cs[k]] = Math.max(cl[cs[k]], cs[k + 1] * f);
+      for (let k = 0; k < ss.length; k += 2) {
+        if (se[ss[k]] === 0) this._segTouched.push(ss[k]);
+        se[ss[k]] = Math.max(se[ss[k]], ss[k + 1] * f);
+      }
+    });
+    // Το φως της ημέρας μπροστά στην έξοδο.
+    const exA = this.exitA;
+    if (exA > 0.01) {
+      const ec = this.exitCells;
+      for (let k = 0; k < ec.length; k += 2) cl[ec[k]] = Math.max(cl[ec[k]], ec[k + 1] * exA);
+    }
+
     const hasWaves = Echoes.waves.length > 0;
     if (hasWaves) this.prepareWaves();
+    const gateAt = this.gateAt;
     const per = this.segPer;
 
     // ---- Τοίχοι ----
@@ -284,8 +368,10 @@ const Raycast = {
       while (dist < RC_MAX) {
         if (sdx < sdy) { dist = sdx; sdx += ddx; tx += sx; xSide = true; }
         else { dist = sdy; sdy += ddy; ty += sy; xSide = false; }
-        if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) break;
-        if (L.opaque[ty * cols + tx] === 1) { hit = true; break; }
+        // Έξω από τον χάρτη = τοίχος (π.χ. πίσω από την έξοδο, που είναι στην τελευταία γραμμή).
+        if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) { hit = true; break; }
+        const ci = ty * cols + tx;
+        if (L.opaque[ci] === 1 && gateAt[ci] < 0) { hit = true; break; }
       }
       if (!hit) {
         this.zbuf[x] = Infinity;
@@ -303,9 +389,15 @@ const Raycast = {
       if (xSide) { frac = posY + dist * rdy; side = sx > 0 ? 2 : 3; }
       else { frac = posX + dist * rdx; side = sy > 0 ? 0 : 1; }
       frac -= Math.floor(frac);
-      const base = this.segBase[(ty * cols + tx) * 4 + side];
-      let light = base >= 0 ? this.segLight(base + Math.min(per - 1, Math.floor(frac * per)), now) : 0;
+      const inside = tx >= 0 && ty >= 0 && tx < cols && ty < rows;
+      const base = inside ? this.segBase[(ty * cols + tx) * 4 + side] : -1;
+      const seg = base >= 0 ? base + Math.min(per - 1, Math.floor(frac * per)) : -1;
+      let light = seg >= 0 ? this.segLight(seg, now) + se[seg] : 0;
       let glow = 0;
+      if (exA > 0.01 && (ty * cols + tx) * 4 + side === this.exitKey) {
+        this.drawDaylight(x, top, bot, frac, exA, now);
+        continue;
+      }
       if (hasWaves) {
         const hx = (posX + dist * rdx) * TILE, hy = (posY + dist * rdy) * TILE;
         light += this.ringAt(hx, hy, false, -1) * 0.8;
@@ -321,7 +413,7 @@ const Raycast = {
       // Η υφή δεν καθρεφτίζεται ανάλογα με την πλευρά.
       let u = Math.floor(frac * RC_TEX);
       if (side === 3 || side === 0) u = RC_TEX - 1 - u;
-      const tex = this.tex[RC_THEMES[L.region[(ty * cols + tx)]] || this.regionThemeNear(tx, ty)] || this.tex.rock;
+      const tex = this.tex[(inside && RC_THEMES[L.region[ty * cols + tx]]) || this.regionThemeNear(tx, ty)] || this.tex.rock;
       const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bot));
       const vStep = RC_TEX / (bot - top);
       let v = (y0 + 0.5 - top) * vStep;
@@ -362,7 +454,7 @@ const Raycast = {
         if (light > 1.4) light = 1.4;
         const u = ((wx - tx) * RC_TEX) | 0, v = ((wy - ty) * RC_TEX) | 0;
         let r, g, b;
-        const t = below ? L.terrain[c] : T_FLOOR;
+        const t = !below ? T_FLOOR : gateAt[c] >= 0 && !L.gates[gateAt[c]].open ? T_WATER : L.terrain[c];
         if (!below) {
           const i = (v * RC_TEX + u) * 3;
           r = ceil[i]; g = ceil[i + 1]; b = ceil[i + 2];
@@ -388,6 +480,104 @@ const Raycast = {
     }
 
     pc.putImageData(this.img, 0, 0);
+  },
+
+  // Το άνοιγμα της εξόδου: φως της ημέρας σε μια στήλη του τοίχου, με πλαίσιο από πηλό
+  // και ακτίνες που τρεμοπαίζουν. a = πόσο φαίνεται (0..1).
+  drawDaylight(x, top, bot, frac, a, now) {
+    const W = this.W, H = this.H, buf = this.buf;
+    const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bot));
+    const edge = frac < 0.08 || frac > 0.92;
+    const ray = 0.85 + 0.15 * Math.sin(frac * 23 + now * 1.7) * Math.sin(frac * 7 - now * 0.9);
+    for (let y = y0; y < y1; y++) {
+      const v = (y + 0.5 - top) / (bot - top);
+      let r, g, b;
+      if (edge || v < 0.06) {
+        r = 206 * a; g = 108 * a; b = 56 * a;          // πλαίσιο από πηλό
+      } else {
+        const k = a * ray * (0.75 + 0.25 * v);
+        r = RC_DAY[0] * k; g = RC_DAY[1] * k; b = RC_DAY[2] * k;
+      }
+      buf[y * W + x] = 0xff000000 | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+    }
+  },
+
+  // ---- Billboards: sprites που κοιτάνε πάντα την κάμερα ----
+  // frame = { c, f, w, h } (καρέ του Sprites, ή δικός μας καμβάς) ή null (μόνο λάμψη).
+  // o: { x, y } θέση (μονάδες) · h ύψος σε μονάδες (αλλιώς frame.h × RC_SPX × scale) · z πόσο πάνω
+  //    από το δάπεδο · flip · alpha · add (προσθετικό φως, π.χ. φλόγα) · fog (false = χωρίς σβήσιμο
+  //    με την απόσταση) · glow { r (μονάδες), color, a, cy (0 = κορυφή .. 1 = βάση) } ·
+  //    bias (ζωγραφίζεται λίγο πιο μπροστά) · after(pc, box): για επιπλέον ζωγραφική (μάτια, εικονίδια) — box = { left, top, w, h, k, sx, depth }.
+  sprite(frame, o) {
+    const p = this.project(o.x, o.y);
+    if (!p || p.depth > RC_MAX) return null;
+    this.sprites.push({ frame, o, p });
+    return p;
+  },
+
+  // Είναι ορατό (όχι πίσω από τοίχο) ένα σημείο σε απόσταση depth στη στήλη x;
+  visible(x, depth) {
+    const i = Math.round(x);
+    return i >= 0 && i < this.W && this.zbuf[i] > depth;
+  },
+
+  flushSprites(pc) {
+    const list = this.sprites;
+    // Από τα πιο μακρινά στα πιο κοντινά (bias: για μορφές στην ίδια θέση, π.χ. ο Χάροντας μπροστά από τη βάρκα).
+    list.sort((a, b) => (b.p.depth - (b.o.bias || 0)) - (a.p.depth - (a.o.bias || 0)));
+    pc.save();
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.imageSmoothingEnabled = false;
+    for (const { frame, o, p } of list) {
+      const k = this.focal / (p.depth * TILE);    // art px ανά μονάδα κόσμου
+      const fog = o.fog === false ? 1 : Math.max(0.35, 1 - (p.depth * TILE) / RC_FOG);
+      const alpha = Math.max(0, Math.min(1, (o.alpha === undefined ? 1 : o.alpha) * fog));
+      if (alpha < 0.01) continue;
+      const fh = frame ? frame.h : 1, fw = frame ? frame.w : 1;
+      const h = (o.h || fh * RC_SPX * (o.scale || 1)) * k;
+      const w = (h * fw) / fh;
+      const bottom = this.horizon + (this.focal * (RC_EYE - (o.z || 0) / TILE)) / p.depth;
+      const top = Math.round(bottom - h), left = Math.round(p.sx - w / 2);
+
+      if (o.glow) {
+        const g = o.glow;
+        const cy = top + h * (g.cy === undefined ? 0.5 : g.cy);
+        if (this.visible(p.sx, p.depth - 0.3)) {
+          const R = Math.max(1, g.r * k);
+          const gr = pc.createRadialGradient(p.sx, cy, 0, p.sx, cy, R);
+          gr.addColorStop(0, 'rgba(' + g.color + ',' + (g.a * fog).toFixed(3) + ')');
+          gr.addColorStop(1, 'rgba(' + g.color + ',0)');
+          pc.globalAlpha = 1;
+          pc.globalCompositeOperation = 'lighter';
+          pc.fillStyle = gr;
+          pc.fillRect(p.sx - R, cy - R, R * 2, R * 2);
+        }
+      }
+      if (frame) {
+        pc.globalAlpha = alpha;
+        pc.globalCompositeOperation = o.add ? 'lighter' : 'source-over';
+        const img = o.flip ? frame.f : frame.c;
+        // Στήλη-στήλη: μόνο όπου δεν το κρύβει τοίχος (συνεχόμενα κομμάτια με ένα drawImage).
+        const x0 = Math.max(0, left), x1 = Math.min(this.W, Math.ceil(left + w));
+        let run = -1;
+        for (let x = x0; x <= x1; x++) {
+          const vis = x < x1 && this.zbuf[x] > p.depth;
+          if (vis && run < 0) run = x;
+          else if (!vis && run >= 0) {
+            const sx0 = ((run - left) / w) * fw, sw = Math.min(fw - sx0, ((x - run) / w) * fw);
+            if (sw > 0) pc.drawImage(img, sx0, 0, sw, fh, run, top, x - run, h);
+            run = -1;
+          }
+        }
+      }
+      if (o.after) {
+        pc.globalAlpha = 1;
+        pc.globalCompositeOperation = 'source-over';
+        o.after(pc, { left, top, w, h, k, sx: p.sx, depth: p.depth, alpha });
+      }
+    }
+    pc.restore();
+    list.length = 0;
   },
 
   // Τοίχος γεμίσματος (region -1): πάρε το θέμα του διπλανού κεφαλαίου.

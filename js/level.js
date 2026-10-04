@@ -27,6 +27,7 @@ const Level = {
   gates: [],           // { tx, ty, x, y, open } — η βάρκα του Χάροντα
   souls: [],           // { n, x, y } — μηνύματα χαμένων ψυχών (1..6)
   eggs: {},            // easter eggs: { stuck: { x, y }, cerberus: { x, y } }
+  decor: [],           // ακίνητες μορφές του 3D κόσμου: { kind: 'snake' | 'hades' | 'persephone', x, y }
   quiet: null,         // Uint8Array: κελιά όπου οι σκιές δεν πάνε ποτέ να περιπλανηθούν
   seen: null,          // Uint8Array: κελιά που έχει ήδη "δει" ο παίκτης (φωτίστηκαν από κύμα ή πέρασε από εκεί) — για τον χάρτη
   exit: { tx: 0, ty: 0, x: 0, y: 0 },
@@ -67,6 +68,7 @@ const Level = {
     this.gates = [];
     this.souls = [];
     this.eggs = {};
+    this.decor = [];
 
     let top = 0;
     chapters.forEach((ch, r) => {
@@ -92,6 +94,9 @@ const Level = {
           if (c >= '1' && c <= '9') this.souls.push({ n: Number(c), x: cx, y: cy });
           if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
           if (c === 'D') this.eggs.cerberus = { x: cx, y: cy };
+          // Φίδι / θρόνοι: δεν περπατιούνται (ούτε οι σκιές), αλλά ο ήχος περνάει.
+          const deco = { Z: 'snake', H: 'hades', P: 'persephone' }[c];
+          if (deco) { this.decor.push({ kind: deco, x: cx, y: cy }); this.grid[i] = 1; }
         }
       });
       top += ch.map.length;
