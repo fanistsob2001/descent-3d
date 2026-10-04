@@ -66,11 +66,13 @@ const Save = {
   },
 };
 
-// Ρυθμίσεις: ήχος και δόνηση.
+// Ρυθμίσεις: ήχος, δόνηση, και (PC) ευαισθησία ποντικιού.
+const MOUSE_SENS = [0.5, 0.75, 1, 1.5, 2, 3];
 const Settings = {
   KEY: 'descent-settings',
   sound: true,
   vibration: true,
+  mouse: 1,          // πολλαπλασιαστής του βλέμματος με το ποντίκι (ένα από τα MOUSE_SENS)
 
   load() {
     try {
@@ -78,13 +80,14 @@ const Settings = {
       if (d) {
         this.sound = d.sound !== false;
         this.vibration = d.vibration !== false;
+        if (MOUSE_SENS.includes(d.mouse)) this.mouse = d.mouse;
       }
     } catch (_) { /* - */ }
   },
 
   store() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration }));
+      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse }));
     } catch (_) { /* - */ }
   },
 };

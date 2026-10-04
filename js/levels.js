@@ -32,9 +32,9 @@ const CHAPTERS = [
     fade: 1.5,
     hints: [
       { touch: 'Drag on the left side of the screen to move. Drag on the right side to look around.',
-        keys: 'Move with WASD. Look around with the mouse (click to lock it) or the arrow keys.', until: 'move' },
+        keys: 'Move with WASD. Look around with the mouse.', until: 'move' },
       { touch: 'Hold the lyre button to make a sound. Hold longer for a bigger wave.',
-        keys: 'Press Space (or hold the mouse button) to make a sound. Hold it longer for a bigger wave.', until: 'call' },
+        keys: 'Click (or press Space) to make a sound. Hold it longer for a bigger wave.', until: 'call' },
       { touch: 'Push the stick only a little to walk silently. Running makes noise.',
         keys: 'Hold Shift to walk silently. Running makes noise.', until: 'sneak', time: 14 },
     ],

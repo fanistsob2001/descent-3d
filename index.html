@@ -39,6 +39,8 @@
     </div>
   </div>
   <div id="hint"></div>
+  <!-- PC: όταν το ποντίκι δεν είναι "πιασμένο" ενώ παίζεις -->
+  <div id="click-play">Click to play</div>
   <div id="notice"></div>
   <div id="level-intro"><p id="intro-number"></p><p id="intro-name"></p><p id="intro-line"></p></div>
 
@@ -56,7 +58,7 @@
       Wear headphones
     </p>
     <p class="controls touch-only">Left side: move &middot; Right side: look &middot; Lyre button: sound</p>
-    <p class="controls keys-only">WASD move &middot; Mouse / &larr;&rarr; look &middot; Shift sneak &middot; Space / click sound &middot; E jar &middot; Q lyre &middot; M map &middot; Esc pause</p>
+    <p class="controls keys-only">WASD move &middot; Mouse look &middot; Left click / Space sound &middot; Right click / X cancel &middot; Shift sneak &middot; E jar &middot; Q lyre &middot; M map &middot; Esc pause</p>
   </div>
 
   <div id="settings" class="overlay hidden">
@@ -64,6 +66,7 @@
     <div class="meander"></div>
     <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
     <button class="btn vibration-toggle" type="button" data-action="vibration">Vibration: on</button>
+    <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
     <button class="btn primary" type="button" data-action="back">Back</button>
   </div>
 
@@ -75,6 +78,7 @@
     <button class="btn primary" type="button" data-action="resume">Resume</button>
     <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
     <button class="btn vibration-toggle" type="button" data-action="vibration">Vibration: on</button>
+    <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
     <button class="btn" type="button" data-action="menu">Main menu</button>
   </div>
 

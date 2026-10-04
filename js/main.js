@@ -10,6 +10,8 @@ const STEP_LENGTH = 32;            // απόσταση ανάμεσα σε δύ�
 const LOOK_TOUCH = 0.0065;
 const LOOK_MOUSE = 0.0026;
 const TURN_SPEED = 2.4;
+// Βλέμμα πάνω / κάτω με το ποντίκι (σαν τα παλιά FPS: ο ορίζοντας μετακινείται), ως τόσα ακτίνια.
+const PITCH_MAX = 0.42;
 
 const STEP_WAVE = { radius: 65, strength: 0.22 };                   // αχνά βήματα (μόνο όταν τρέχεις)
 const CALL_WAVE = { minR: 110, maxR: 560, minS: 0.5, maxS: 1.0 };   // το "κύμα" του παίκτη
@@ -69,6 +71,7 @@ const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
 // fx, fy = το ίδιο ως διάνυσμα — εκεί πετιέται το αγγείο.
 const player = {
   x: 0, y: 0, r: PLAYER_RADIUS, stepDist: 0, foot: 1, fx: 0, fy: 1, angle: Math.PI / 2,
+  pitch: 0,        // βλέμμα πάνω (+) / κάτω (-), ακτίνια (μόνο ποντίκι)
   dir: 1,          // προς ποια πλευρά κοιτάει η μορφή (1 = δεξιά)
   walkPhase: 0,    // φάση του βηματισμού (ακτίνια)
   walkSpeed: 0,    // 0..1, εξομαλυμένη ταχύτητα για την κίνηση των ποδιών
@@ -98,8 +101,10 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 // ---- Παίκτης ----
 function updatePlayer(dt) {
   // Το βλέμμα: σύρσιμο στο δεξί μισό, ποντίκι, ή ←/→.
-  let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * LOOK_MOUSE + Input.turn * TURN_SPEED * dt;
-  Input.lookDX = Input.mouseDX = 0;
+  const sens = LOOK_MOUSE * Settings.mouse;
+  let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
+  player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens));
+  Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
   if (a > Math.PI) a -= Math.PI * 2;
   if (a <= -Math.PI) a += Math.PI * 2;
   player.angle = a;
@@ -411,7 +416,8 @@ function draw() {
 // Ο κόσμος από τα μάτια του Ορφέα (js/raycast.js), στον μικρό καμβά του Pixel.
 function draw3D(pc, W, H) {
   // Το βλέμμα "κουνιέται" λίγο με τα βήματα.
-  const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6;
+  // Το βλέμμα "κουνιέται" λίγο με τα βήματα, και ο ορίζοντας ανεβοκατεβαίνει με το βλέμμα πάνω / κάτω.
+  const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6 + Raycast.focal * Math.tan(player.pitch);
   Raycast.exitA = World3D.exitAlpha(gameTime, player);
   const t0 = performance.now();
   Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
@@ -926,9 +932,14 @@ function frame(t) {
   Sound.updateListener();
   Dread.update(dt, gameTime, player, monsters, state === 'play');
 
+  // PC: "Click to play" όσο παίζεις χωρίς πιασμένο ποντίκι.
+  const clickPlay = state === 'play' && !IS_TOUCH && !Input.locked && !Input.lockFailed;
+  if (clickPlay !== clickPlayShown) { clickPlayShown = clickPlay; $('click-play').classList.toggle('visible', clickPlay); }
+
   draw();
   requestAnimationFrame(frame);
 }
+let clickPlayShown = false;
 
 // ---- Οθόνες ----
 function showScreen(name) {
@@ -952,6 +963,7 @@ function updateToggleLabels() {
   for (const b of document.querySelectorAll('.sound-toggle')) {
     b.textContent = Settings.sound ? 'Sound: on' : 'Sound: off';
   }
+  for (const b of document.querySelectorAll('.mouse-toggle')) b.textContent = `Mouse: ${Settings.mouse}x`;
   for (const b of document.querySelectorAll('.vibration-toggle')) {
     b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
   }
@@ -1014,13 +1026,16 @@ function stopInput() {
   Input.cancelCharge();
   Input.joy.id = null;
   Input.look.id = null;
-  Input.lookDX = Input.mouseDX = 0;
+  Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
 }
 
 function setState(s) {
   state = s;
   // Το ποντίκι μένει "κλειδωμένο" μόνο όσο παίζεις (αλλιώς δεν πατιούνται τα κουμπιά).
   if (s !== 'play' && s !== 'dead' && document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+  // PC: μόλις παίζεις (New Game, Continue, Resume...), το ποντίκι "πιάνεται" — όπως σε κάθε FPS.
+  // (Πετυχαίνει όταν γίνεται μέσα σε κλικ / πλήκτρο· αλλιώς φαίνεται το "Click to play".)
+  if (s === 'play' && !IS_TOUCH) Input.requestLock(false);
   if (s !== 'play' && warnOn) { warnOn = false; Sound.tension(false); }
   Sound.setAmbient(AMBIENT[s]);
 }
@@ -1081,6 +1096,7 @@ function spawn(saved) {
   const open = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
   [player.fx, player.fy] = open || [0, 1];
   player.angle = Math.atan2(player.fy, player.fx);
+  player.pitch = 0;
 
   stopInput();
   Dread.reset();
@@ -1202,6 +1218,12 @@ function doAction(action) {
   else if (action === 'map-close') closeMap();
   else if (action === 'menu') goToMenu();
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
+  else if (action === 'mouse') {
+    // Ευαισθησία ποντικιού: 0.5x → 3x και πάλι από την αρχή.
+    Settings.mouse = MOUSE_SENS[(MOUSE_SENS.indexOf(Settings.mouse) + 1) % MOUSE_SENS.length];
+    Settings.store();
+    updateToggleLabels();
+  }
   else if (action === 'vibration') {
     Settings.vibration = !Settings.vibration;
     Settings.store();
