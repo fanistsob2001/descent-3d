@@ -384,7 +384,10 @@
 
 ## 3D πρώτου προσώπου (branch `raycaster`)
 Μετατροπή σε raycaster σαν το Wolfenstein 3D (καθαρό Canvas 2D, χωρίς WebGL). Γίνεται στο branch
-`raycaster` — το `main` (και η σελίδα του game jam) μένει 2D μέχρι να πει ο χρήστης. Κρατάμε τα
+`raycaster` — το `main` (και η σελίδα του game jam) μένει 2D μέχρι να πει ο χρήστης.
+**Δοκιμαστική σελίδα:** ξεχωριστό repo `fanistsob2001/descent-3d` (remote `test3d`), GitHub Pages από το
+`main` του → https://fanistsob2001.github.io/descent-3d/ . Ενημέρωση: `git push test3d raycaster:main`
+(μόνο όταν το ζητήσει ο χρήστης, όπως κάθε push). Κρατάμε τα
 8 κεφάλαια του STORY.md. Ό,τι το spec του χρήστη λέει για το "κεφ. V" (Ευρυδίκη) ισχύει για το VIII,
 για το "IV" (παλάτι, Άδης/Περσεφόνη, Κέρβερος) για το VII. Άδης/Περσεφόνη και φίδι: και στις
 cutscenes και ως ακίνητα sprites στον κόσμο (χωρίς νέα κείμενα).
