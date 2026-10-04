@@ -23,7 +23,7 @@ const Sound = {
   growls: [],        // μία "φωνή" ανά τέρας
   listenerX: 0,      // θέση του παίκτη, για panning / απόσταση
   listenerY: 0,
-  listenerAngle: 0,  // προς τα πού κοιτάει ο παίκτης (πρώτο πρόσωπο): το panning γυρίζει μαζί του
+  listenerAngle: 0,  // προς τα πού κοιτάει ο παίκτης (πρώτο πρόσωπο): ο ακροατής γυρίζει μαζί του
 
   loadSettings() {
     this.muted = !Settings.sound;
@@ -121,11 +121,61 @@ const Sound = {
     return src;
   },
 
-  panner(pan) {
-    if (!this.ctx.createStereoPanner) return null;   // πολύ παλιοί browsers: χωρίς panning
-    const p = this.ctx.createStereoPanner();
-    p.pan.value = Math.max(-1, Math.min(1, pan));
+  // ---- Ήχος στον χώρο (πρώτο πρόσωπο) ----
+  // Ο ακροατής (ctx.listener) στέκεται στη θέση του Ορφέα, γυρισμένος προς το βλέμμα του. Κάθε
+  // ήχος με θέση περνάει από PannerNode, οπότε γυρίζει μαζί με το κεφάλι (με HRTF ακούγεται και
+  // μπρος / πίσω). Χάρτης (x, y) → ήχος (x, 0, y), με τον άξονα y του ήχου προς τα πάνω.
+  // Την ένταση με την απόσταση τη ρυθμίζουμε εμείς (όπως πριν): rolloffFactor = 0.
+  SPACE: 1 / TILE,   // μονάδες κόσμου → μονάδες ήχου (κελιά)
+
+  // Κάθε καρέ: θέση και προσανατολισμός του ακροατή.
+  updateListener() {
+    if (!this.ctx) return;
+    const L = this.ctx.listener;
+    const x = this.listenerX * this.SPACE, z = this.listenerY * this.SPACE;
+    const fx = Math.cos(this.listenerAngle), fz = Math.sin(this.listenerAngle);
+    if (L.positionX) {
+      L.positionX.value = x; L.positionY.value = 0; L.positionZ.value = z;
+      L.forwardX.value = fx; L.forwardY.value = 0; L.forwardZ.value = fz;
+      L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    } else {
+      L.setPosition(x, 0, z);
+      L.setOrientation(fx, 0, fz, 0, 1, 0);
+    }
+  },
+
+  // Ένας PannerNode στο σημείο (x, y) του κόσμου. model: 'HRTF' (μπρος/πίσω) ή 'equalpower' (φθηνός).
+  placeNode(x, y, model = 'HRTF') {
+    const p = this.ctx.createPanner();
+    p.panningModel = model;
+    p.distanceModel = 'linear';
+    p.rolloffFactor = 0;
+    this.setPlace(p, x, y);
     return p;
+  },
+
+  setPlace(p, x, y) {
+    const px = x * this.SPACE, pz = y * this.SPACE;
+    if (p.positionX) { p.positionX.value = px; p.positionY.value = 0; p.positionZ.value = pz; }
+    else p.setPosition(px, 0, pz);
+  },
+
+  // Πόσο πίσω από τον παίκτη είναι ένα σημείο: 0 = μπροστά ή στο πλάι, 1 = ακριβώς πίσω.
+  behind(x, y) {
+    const dx = x - this.listenerX, dy = y - this.listenerY;
+    const d = Math.hypot(dx, dy);
+    if (d < 4) return 0;
+    return Math.max(0, -(Math.cos(this.listenerAngle) * dx + Math.sin(this.listenerAngle) * dy) / d);
+  },
+
+  // Ό,τι έρχεται από πίσω ακούγεται πιο πνιχτό (σαν να το κρύβει το κεφάλι): χαμηλοπερατό φίλτρο.
+  // Επιστρέφει { input, output } για να μπει στην αλυσίδα.
+  headShadow(x, y) {
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 18000 - this.behind(x, y) * 15200;   // ακριβώς πίσω: ~2.8 kHz
+    lp.Q.value = 0.5;
+    return lp;
   },
 
   // Περιβάλλουσα έντασης: γρήγορη άνοδος, εκθετικό σβήσιμο.
@@ -332,19 +382,18 @@ const Sound = {
 
   // Πόσο δεξιά (θετικό) ή αριστερά (αρνητικό) βρίσκεται ένα σημείο (dx, dy από τον παίκτη)
   // σε σχέση με το πού κοιτάει.
-  lateral(dx, dy) {
-    return -Math.sin(this.listenerAngle) * dx + Math.cos(this.listenerAngle) * dy;
-  },
-
   // Ένας ήχος από τη θέση (x, y) του κόσμου: ένταση και panning ανάλογα με
   // το πού είναι σε σχέση με τον παίκτη. Επιστρέφει τον κόμβο εξόδου.
   spatial(x, y, baseVol, falloff) {
     const dx = x - this.listenerX, dy = y - this.listenerY;
     const g = this.ctx.createGain();
     g.gain.value = baseVol * Math.max(0.15, 1 - Math.hypot(dx, dy) / falloff);
-    const pan = this.panner(this.lateral(dx, dy) / 300);
-    if (pan) { g.connect(pan); pan.connect(this.sfx); pan.connect(this.echoSend); }
-    else { g.connect(this.sfx); g.connect(this.echoSend); }
+    const lp = this.headShadow(x, y);
+    const pan = this.placeNode(x, y);
+    g.connect(lp);
+    lp.connect(pan);
+    pan.connect(this.sfx);
+    pan.connect(this.echoSend);
     return g;
   },
 
@@ -494,7 +543,6 @@ const Sound = {
   softStep(x, y) {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
-    const dx = this.lateral(x - this.listenerX, y - this.listenerY);
     const src = this.noiseSource();
     const bp = ac.createBiquadFilter();
     bp.type = 'bandpass';
@@ -504,8 +552,12 @@ const Sound = {
     this.envelope(g.gain, t, 0.05 + Math.random() * 0.015, 0.006, 0.09);
     src.connect(bp);
     bp.connect(g);
-    const pan = this.panner(dx / 120);
-    if (pan) { g.connect(pan); pan.connect(this.sfx); } else g.connect(this.sfx);
+    // Από τη θέση της (πίσω σου): πνιχτά και από πίσω, μέσα από τον panner.
+    const lp = this.headShadow(x, y);
+    const pan = this.placeNode(x, y);
+    g.connect(lp);
+    lp.connect(pan);
+    pan.connect(this.sfx);
     src.start(t, Math.random() * 1.5);
     src.stop(t + 0.14);
   },
@@ -901,8 +953,10 @@ const Sound = {
 
     v.out = ac.createGain();
     v.out.gain.value = 0;
-    v.pan = this.panner(0);
-    if (v.pan) { v.out.connect(v.pan); v.pan.connect(this.sfx); } else v.out.connect(this.sfx);
+    // Φθηνός panner (equalpower): τα γρυλίσματα είναι πολλά και παίζουν συνέχεια.
+    v.pan = this.placeNode(0, 0, 'equalpower');
+    v.out.connect(v.pan);
+    v.pan.connect(this.sfx);
 
     // Φίλτρο: ανοιχτό όταν το "βλέπεις", κλειστό (πνιχτό) πίσω από τοίχο.
     v.filter = ac.createBiquadFilter();
@@ -958,17 +1012,17 @@ const Sound = {
     const t = this.ctx.currentTime;
     this.growls.forEach((g, i) => {
       const m = voices[i];
-      let vol = 0, pan = 0, cutoff = 280;
+      let vol = 0, cutoff = 280;
       if (m) {
         const dx = m.x - this.listenerX, dy = m.y - this.listenerY;
         const p = Math.max(0, 1 - Math.hypot(dx, dy) / 380);
         vol = p * p * 0.55;
-        pan = Math.max(-1, Math.min(1, this.lateral(dx, dy) / 220));
-        cutoff = m.los ? 300 : 150;
+        // Πίσω από τοίχο: πνιχτό. Πίσω από την πλάτη σου: λίγο πιο πνιχτό.
+        cutoff = (m.los ? 300 : 150) * (1 - 0.35 * this.behind(m.x, m.y));
+        if (vol > 0.001) this.setPlace(g.pan, m.x, m.y);
       }
       g.out.gain.setTargetAtTime(vol, t, 0.15);
       g.filter.frequency.setTargetAtTime(cutoff, t, 0.2);
-      if (g.pan) g.pan.pan.setTargetAtTime(pan, t, 0.1);
     });
   },
 };

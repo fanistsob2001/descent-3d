@@ -413,7 +413,9 @@ function draw3D(pc, W, H) {
   // Το βλέμμα "κουνιέται" λίγο με τα βήματα.
   const bob = Math.sin(player.walkPhase * 2) * player.walkSpeed * 1.6;
   Raycast.exitA = World3D.exitAlpha(gameTime, player);
+  const t0 = performance.now();
   Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
+  if (state === 'play') Raycast.measure(performance.now() - t0);
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
 
@@ -803,6 +805,23 @@ function drawMap(pc, W, H) {
   pc.beginPath();
   pc.arc(px + 0.5, py + 0.5, 2 + ring * cell * 2.5, 0, Math.PI * 2);
   pc.stroke();
+  // Προς τα πού κοιτάς: αχνή δέσμη (το οπτικό πεδίο) και μια γραμμή μπροστά από την κουκκίδα.
+  const reach = cell * 3 + 6, half = RC_FOV / 2;
+  pc.globalCompositeOperation = 'lighter';
+  pc.fillStyle = `rgba(${POT.light},0.16)`;
+  pc.beginPath();
+  pc.moveTo(px + 0.5, py + 0.5);
+  pc.lineTo(px + 0.5 + Math.cos(player.angle - half) * reach, py + 0.5 + Math.sin(player.angle - half) * reach);
+  pc.lineTo(px + 0.5 + Math.cos(player.angle + half) * reach, py + 0.5 + Math.sin(player.angle + half) * reach);
+  pc.closePath();
+  pc.fill();
+  pc.globalCompositeOperation = 'source-over';
+  pc.strokeStyle = `rgba(${POT.cream},0.9)`;
+  pc.lineWidth = 1;
+  pc.beginPath();
+  pc.moveTo(px + 0.5, py + 0.5);
+  pc.lineTo(px + 0.5 + player.fx * (cell + 4), py + 0.5 + player.fy * (cell + 4));
+  pc.stroke();
   pc.fillStyle = Math.floor(now * 3) % 2 ? `rgb(${POT.cream})` : `rgb(${POT.light})`;
   pc.fillRect(px - 1, py - 1, 3, 3);
 
@@ -904,6 +923,7 @@ function frame(t) {
   Sound.listenerX = player.x;
   Sound.listenerY = player.y;
   Sound.listenerAngle = player.angle;
+  Sound.updateListener();
   Dread.update(dt, gameTime, player, monsters, state === 'play');
 
   draw();

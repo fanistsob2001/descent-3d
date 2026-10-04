@@ -61,6 +61,12 @@ const Raycast = {
   exitCells: [],      // τα κελιά μπροστά στην έξοδο που φωτίζει το φως της ημέρας: [κελί, ένταση, ...]
   exitA: 0,           // πόσο φαίνεται τώρα η έξοδος (το βάζει το main πριν το render)
   sprites: [],        // τα billboards αυτού του καρέ (sprite → flushSprites)
+  // Ποιότητα: 'auto' | 'high' | 'low'. Στο 'low' (ή στο 'auto' αν το render αργεί, π.χ. σε
+  // αδύναμο κινητό) το δάπεδο/ταβάνι ζωγραφίζεται με μισή οριζόντια ανάλυση (ο ακριβότερος βρόχος).
+  quality: 'auto',
+  coarse: false,
+  _avg: 0,
+  _frames: 0,
 
   // Μία φορά, αφού φορτωθεί ο κόσμος.
   init() {
@@ -246,6 +252,18 @@ const Raycast = {
     this.focal = Math.max((W / 2) / Math.tan(RC_FOV / 2), H * 0.4);
   },
 
+  // Μετά από κάθε render (ms): μέσος όρος, και στο 'auto' γυρίζει σε χαμηλή ποιότητα αν
+  // ξεπεράσει τα 7 ms (μένει χαμηλή — αλλιώς θα "αναβόσβηνε" η ανάλυση).
+  measure(ms) {
+    this._frames++;
+    this._avg += (ms - this._avg) * 0.05;
+    if (this.quality === 'auto') {
+      if (this._frames > 90 && this._avg > 7) this.coarse = true;
+    } else {
+      this.coarse = this.quality === 'low';
+    }
+  },
+
   // Το φως ενός κομματιού τοίχου τώρα (ίδιος τύπος με το παλιό Echoes.draw).
   segLight(i, now) {
     const age = now - Echoes.litTime[i];
@@ -429,6 +447,7 @@ const Raycast = {
 
     // ---- Δάπεδο και ταβάνι (γραμμή-γραμμή) ----
     const fl = this.tex.floor, ceil = this.tex.ceil;
+    const coarse = this.coarse;
     const ripple = now * 1.3;
     for (let y = 0; y < H; y++) {
       const below = y + 0.5 > hz;
@@ -441,6 +460,8 @@ const Raycast = {
       let wy = posY + rd * (dirY - planeY) + stY * 0.5;
       for (let x = 0; x < W; x++, wx += stX, wy += stY) {
         if (below ? y < this.wallBot[x] : y >= this.wallTop[x]) continue;
+        // Χαμηλή ποιότητα: κάθε δεύτερο pixel αντιγράφει το διπλανό του.
+        if (coarse && (x & 1)) { buf[y * W + x] = buf[y * W + x - 1]; continue; }
         const tx = Math.floor(wx), ty = Math.floor(wy);
         if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) continue;
         const c = ty * cols + tx;

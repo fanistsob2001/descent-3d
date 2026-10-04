@@ -285,6 +285,7 @@ const World3D = {
     }
 
     R.flushSprites(pc);
+    this.drawMotes(pc, now);
 
     // ---- Η Μελωδία: χρυσή λάμψη σε όλη την οθόνη (δεν είναι κύμα ήχου) ----
     for (const r of Melody.rings) {
@@ -337,6 +338,29 @@ const World3D = {
         }
       },
     });
+  },
+
+  // Σκόνη στον αέρα (τα σωματίδια του Fx, γύρω από τον παίκτη): φαίνεται μόνο όπου φτάνει
+  // φως — κύμα ή αναμμένος βωμός. Κάθε κόκκος αιωρείται σε δικό του ύψος.
+  drawMotes(pc, now) {
+    const R = Raycast;
+    pc.save();
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.globalCompositeOperation = 'lighter';
+    for (const m of Fx.motes) {
+      if (m.z === undefined) m.z = 4 + Math.random() * 32;
+      const p = R.project(m.x, m.y);
+      if (!p || p.depth > 10 || !R.visible(p.sx, p.depth)) continue;
+      const l = Fx.light(m.x, m.y);
+      if (l < 0.03) continue;
+      const z = m.z + Math.sin(now * 0.7 + m.ph) * 2;
+      const y = R.horizon + (R.focal * (RC_EYE - z / TILE)) / p.depth;
+      const s = p.depth < 1.5 ? 2 : 1;
+      const tw = 0.6 + 0.4 * Math.sin(now * 3 + m.ph * 4);
+      pc.fillStyle = `rgba(${POT.light},${Math.min(0.85, l * 0.9 * tw).toFixed(3)})`;
+      pc.fillRect(Math.round(p.sx), Math.round(y), s, s);
+    }
+    pc.restore();
   },
 
   // Η φλόγα του βωμού στον δικό της μικρό καμβά (ίδια με της κάτοψης).
