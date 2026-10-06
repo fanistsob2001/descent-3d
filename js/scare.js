@@ -9,143 +9,116 @@
 const SCARE_TIME = 0.65;    // συνολική διάρκεια (δευτ.)
 const SCARE_LUNGE = 0.3;    // ώσπου να γεμίσει την οθόνη το πρόσωπο
 
-// Το πρόσωπο, από μπροστά. Γράφεται μόνο το αριστερό μισό· το δεξί είναι καθρέφτης.
-// k/K = κάρβουνο, p = λάμψη γύρω από τα μάτια, E = λευκά μάτια, R/r = το στόμα, P = δόντια.
-const SCARE_HEAD = [
-  '..........kkkkk',
-  '.......kkkkkkkk',
-  '.....kkkkkkkkkk',
-  '....Kkkkkkkkkkk',
-  '...Kkkkkkkkkkkk',
-  '...KkkkkkkkkkKk',
-  '..KkkKKKKKKkkKk',
-  '..KkKKKKKKKKkkk',
-  '..KKKKpEEpKKkkk',
-  '..KKKpEEEEpKkkk',
-  '..KKKpEEEEpKkkk',
-  '..KkKKpEEpKKkkk',
-  '..KkKKKKKKKKkkk',
-  '...KkkKKKKkkkkk',
-  '...KKkkKkkkkKkk',
-  '...KKkkKkkkkKkk',
-  '....KkkKkkkkkkk',
-];
-// Το στόμα σε τρία καρέ: κλειστό, μισάνοιχτο, ορθάνοιχτο με κοφτερά δόντια (8 γραμμές).
-const SCARE_MOUTH = [
-  ['....Kkkkkkkkkkk', '....Kkkkkkkkkkk', '....KkkkkkkkKKK', '....KkKKKKKKkkk',
-   '....Kkkkkkkkkkk', '.....Kkkkkkkkkk', '.....Kkkkkkkkkk', '.....kkkkkkkkkk'],
-  ['....Kkkkkkkkkkk', '....Kkkkkkkkkkk', '....KkKRRRRRRRR', '....KKPRPRPRPRP',
-   '....KKPRPRPRPRP', '.....KRRRRRRRRR', '.....Kkkkkkkkkk', '.....kkkkkkkkkk'],
-  ['....KkKRRRRRRRR', '....KKPRPRPRPRP', '....KKRPRRRPRRR', '....KKRrrrrrrrr',
-   '....KKRrrrrrrrr', '....KKRRPRRRPRR', '....KKPRPRPRPRP', '.....KKRRRRRRRR'],
-];
-const SCARE_CHIN = [
-  '.....kkkkkkkkkk',
-  '......kkkkkkkkk',
-  '........kkkkkkk',
-  '..........kkkkk',
-];
-// Χέρι σκιάς με νύχια, που ανεβαίνει από κάτω (το δεξί είναι καθρέφτης του).
-const SCARE_HAND = [
-  '.PP..PP..PP.....',
-  '.kk..kk..kk.....',
-  '.kk..kk..kk..PP.',
-  '.kk..kk..kk..kk.',
-  '.kkk.kkk.kkk.kk.',
-  '..kk..kk..kk.kk.',
-  '..kkkkkkkkkkkkk.',
-  '..kkkkkkkkkkkkk.',
-  '..kkkkkkkkkkkk..',
-  '...kkkkkkkkkkk..',
-  '...kkkkkkkkkk...',
-  '....kkkkkkkk....',
-  '....kkkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-  '.....kkkkkk.....',
-];
-// ---- Ερινύα: σκούρο κόκκινο πρόσωπο, κίτρινα μάτια, φίδια αντί για μαλλιά (που
-// σφαδάζουν σε 2 καρέ), στόμα που ουρλιάζει με κοφτερά δόντια, και μεγάλα φτερά πίσω της.
-const ERINYS_HAIR = [
-  [
-    '..t....t....t..',
-    '.gge..gge..gge.',
-    '.gG..gG...gG..g',
-    'gGdGgGdggGdGgGd',
-    'Gd.gGdGgGdGgdGg',
-  ],
-  [
-    '...t....t....t.',
-    '..gge..gge..gge',
-    '..gG..Gg..gG..G',
-    'GdGgGdgGgdGgGdG',
-    'dG.GgdGgdGgGdgG',
-  ],
-];
-const ERINYS_HEAD = [
-  'g.gGdkkkkkkkkkk',
-  '.gGkkRRRRRRRRRR',
-  'gGkRRRRRRRRRRRR',
-  'GkRRKKKKRRRRRRR',
-  'gkRKKYyyYKRRRRR',
-  'GkRKYyyyyYKRRRR',
-  'gkRKKYyyYKKRRRR',
-  '.kRRKKKKKKRRRRR',
-  '.kRRRRRRRRRRKRR',
-  '.gkRRRRRRRRRKRR',
-  '..kRRRRRRRRRRRR',
-];
-const ERINYS_MOUTH = [
-  ['..gkRRRRRRRRRRR', '...kRRRRRRRRRRR', '...kRRKKKKKKKKK', '...gkRRRRRRRRRR',
-   '....kRRRRRRRRRR', '....gkRRRRRRRRR', '.....kRRRRRRRRR'],
-  ['..gkRRRRRRRRRRR', '...kRRKKKKKKKKK', '...kRKPKPKKPKPK', '...gkRKPKPKKPKP',
-   '....kRRKKKKKKKK', '....gkRRRRRRRRR', '.....kRRRRRRRRR'],
-  ['..gkRRKKKKKKKKK', '...kRKPKPKKPKPK', '...kRKKKKKKKKKK', '...gkRKKKKKtttt',
-   '....kRKPKPKKPKP', '....gkRKKKKKKKK', '.....kRRRRRRRRR'],
-];
-const ERINYS_CHIN = [
-  '......kRRRRRRRR',
-  '.......kkRRRRRR',
-  '.........kkkkkk',
-];
-// Το αριστερό φτερό (το δεξί είναι καθρέφτης): μαύρα φτερά με περίγραμμα πηλού.
-const ERINYS_WING = [
-  '...............K',
-  '.............KKk',
-  '...........KKkkk',
-  '.........KKkkkkk',
-  '.......KKkkkkkkk',
-  '.....KKkkkkkkkkk',
-  '...KKkkkKkkkkkkk',
-  '.KKkkkKkkkKkkkkk',
-  'KkkkKkkkKkkkkkkk',
-  '.KkKkkKkkKkkkkkk',
-  '..K.KkK.kKkkkkkk',
-  '....K.K..KkKkkkk',
-  '.........K.KkKkk',
-  '...........K.KkK',
-  '.............K.K',
-];
+// Τα πρόσωπα "ζωγραφίζονται" με το paintGrid (js/sprites.js) σε μεγάλη λεπτομέρεια και μετά
+// περνάνε από Sprites.hdify (διπλή ανάλυση με σκίαση) — στο ίδιο στυλ με τις μορφές του 3D.
+// m = στόμα: 0 κλειστό, 1 μισάνοιχτο, 2 ορθάνοιχτο. Τα μάτια = 'E' (σκιά) / 'y' (Ερινύα).
 
-// Τα jump scares ανά είδος τέρατος.
-//   hair: καρέ που εναλλάσσονται συνέχεια (φίδια), mouths: κλειστό / μισάνοιχτο / ανοιχτό,
-//   eye: ο χαρακτήρας των ματιών (για να βρεθούν τα κέντρα τους), eyeColor: χρώμα της λάμψης,
-//   hand: τα χέρια που ανεβαίνουν από κάτω, wing: φτερά πίσω από το πρόσωπο (ή null),
-//   halo: το χρώμα της λάμψης πίσω από το κεφάλι, size: πόσο μεγαλώνει το πρόσωπο (1 = όσο η οθόνη).
+// Η σκιά: κρανίο μέσα σε κουκούλα, κόγχες με λευκά μάτια, μαύρα "δάκρυα", ρωγμές· το σαγόνι
+// κατεβαίνει και αποκαλύπτει κόκκινο φως και μακριά δόντια.
+function scareShadeFace(m) {
+  return paintGrid(46, 56, (p) => {
+    p.ellipse(23, 25, 22, 26, 'k');                     // κουκούλα
+    p.ellipse(23, 28, 17, 21, 'K');                     // σκοτάδι μέσα της
+    p.ellipse(23, 27, 12.5, 14, 'I');                   // κρανίο (σκιά στο περίγραμμα)
+    p.ellipse(22.5, 26, 11, 12.5, 'i');
+    p.ellipse(17.5, 25, 3.8, 3.4, 'N');                 // κόγχη
+    p.ellipse(17.5, 25, 1.3, 1.3, 'E');                 // μάτι
+    p.line(13, 20.5, 20, 21.5, 1, 'I');                 // φρύδι
+    p.line(17.5, 28.5, 16.5, 36, 1, 'N');               // μαύρο δάκρυ
+    p.line(14, 14, 17, 18, 1, 'I'); p.line(17, 18, 16, 21, 1, 'I');   // ρωγμή
+    p.line(12, 27, 14, 31, 1, 'I');                     // ζυγωματικό
+    p.mirror();
+    p.poly([[21.5, 30], [24.5, 30], [23, 33.5]], 'N');  // μύτη
+    if (m === 0) {
+      p.line(15, 36, 31, 36, 1, 'N');
+      for (let x = 15; x <= 31; x += 2) p.line(x, 34.5, x, 37.5, 1, 'I');
+    } else if (m === 1) {
+      p.poly([[15, 35], [31, 35], [29, 41], [17, 41]], 'N');
+      p.ellipse(23, 40, 4, 1.5, 'r');
+      for (let x = 16; x <= 30; x += 2) { p.px(x, 35, 'i'); p.px(x, 36, 'i'); p.px(x + 1, 40, 'i'); }
+    } else {
+      p.poly([[13, 34], [33, 34], [31, 48], [15, 48]], 'N');                    // ορθάνοιχτο
+      p.ellipse(23, 42, 6, 4, 'R'); p.ellipse(23, 42, 3.5, 2.2, 'r');            // κόκκινο φως
+      for (let x = 14; x <= 31; x += 3) { p.line(x, 34, x + 1, 38.5, 1, 'i'); p.line(x + 1, 48, x + 1.5, 43.5, 1, 'i'); }
+      p.poly([[14, 48], [32, 48], [29, 53], [17, 53]], 'i');                    // κάτω σαγόνι
+      p.line(17, 53, 29, 53, 1, 'I');
+    }
+  });
+}
+
+// Η Ερινύα: χλωμό, άγριο γυναικείο πρόσωπο, κίτρινα μάτια, φίδια αντί για μαλλιά (f = καρέ
+// που σφαδάζουν), στόμα με κυνόδοντες που ουρλιάζει.
+function scareErinysFace(m, f) {
+  return paintGrid(48, 60, (p) => {
+    // Φίδια-μαλλιά (αριστερά, μετά καθρέφτισμα).
+    const snakes = [[20, 14, 12, 2], [17, 16, 5, 8], [15, 20, 2, 20], [16, 26, 3, 34], [22, 12, 20, 0], [18, 13, 9, 0]];
+    snakes.forEach(([x0, y0, x1, y1], i) => {
+      const w = (i + f) % 2 ? 2 : -2;
+      const mx = (x0 + x1) / 2 + w, my = (y0 + y1) / 2 - w;
+      p.line(x0, y0, mx, my, 2, 'g'); p.line(mx, my, x1, y1, 2, 'G');
+      p.ellipse(x1, y1, 1.8, 1.4, 'g'); p.px(x1, y1 - 0.5, 'y'); p.px(x1 - 2, y1 + 1, 't');
+    });
+    p.ellipse(24, 30, 13, 17, 'P');                     // πρόσωπο
+    p.ellipse(18, 37, 3, 4, 'S');                       // βυθισμένο μάγουλο
+    p.line(13, 22, 21, 25.5, 2, 'N');                   // θυμωμένο φρύδι
+    p.ellipse(18.5, 28, 3.6, 2.4, 'N');                 // μάτι
+    p.ellipse(18.5, 28, 1.6, 1.4, 'y'); p.px(18.5, 28, 'Y');
+    p.line(16, 31.5, 20, 31, 1, 'S');                   // σακούλες κάτω από τα μάτια
+    p.mirror();
+    p.line(24, 30, 23, 36, 1, 'S'); p.line(22, 36.5, 26, 36.5, 1, 'S');   // μύτη
+    if (m === 0) {
+      p.line(18, 41, 30, 41, 1, 'R'); p.px(20, 42, 'i'); p.px(28, 42, 'i');
+    } else if (m === 1) {
+      p.poly([[17, 40], [31, 40], [29, 45], [19, 45]], 'N');
+      p.px(19, 40.5, 'i'); p.px(29, 40.5, 'i'); p.line(19, 41, 19, 43, 1, 'i'); p.line(29, 41, 29, 43, 1, 'i');
+      p.ellipse(24, 44, 3, 1, 'R');
+    } else {
+      p.poly([[15, 38], [33, 38], [30, 51], [18, 51]], 'N');
+      p.ellipse(24, 47, 4, 2.5, 'R');
+      p.line(17.5, 38, 18.5, 44, 2, 'i'); p.line(30.5, 38, 29.5, 44, 2, 'i');  // κυνόδοντες
+      for (let x = 20; x <= 28; x += 2) p.px(x, 38.5, 'i');
+      p.line(26, 46, 31, 47, 1, 't'); p.px(32, 46, 't'); p.px(32, 48, 't');    // γλώσσα φιδιού
+      p.poly([[16, 51], [32, 51], [28, 55], [20, 55]], 'P');                   // σαγόνι
+    }
+  });
+}
+
+// Χέρια με νύχια που ανεβαίνουν από κάτω: της σκιάς σκελετωμένο (κόκαλα μέσα σε σάβανο), της
+// Ερινύας χλωμό με μακριά μαύρα νύχια.
+function scareHand(erinys) {
+  const skin = erinys ? 'P' : 'i', joint = erinys ? 'S' : 'I', nail = erinys ? 'N' : 'i';
+  return paintGrid(24, 40, (p) => {
+    p.poly([[5, 22], [19, 22], [21, 40], [3, 40]], erinys ? 'K' : 'k');      // μανίκι / σάβανο
+    p.ellipse(12, 19, 7, 5, skin);                                           // παλάμη
+    const fingers = [[5, 16, 2, 4], [9, 15, 7, 1], [13, 15, 13, 0], [17, 16, 19, 2], [19, 19, 23, 13]];
+    for (const [x0, y0, x1, y1] of fingers) {
+      p.line(x0, y0, x1, y1, 2, skin);
+      p.px((x0 + x1) / 2, (y0 + y1) / 2, joint);
+      p.line(x1, y1, x1 + (x1 - x0) * 0.25, y1 - 3, 1, nail);               // νύχι
+    }
+    if (!erinys) for (const y of [24, 28, 32]) p.line(7, y, 17, y + 1, 1, 'K');   // πτυχές του σάβανου
+  });
+}
+
+// Το αριστερό φτερό της Ερινύας (το δεξί = καθρέφτης): κόκκινη μεμβράνη με μαύρα κόκαλα.
+function scareWing() {
+  return paintGrid(34, 40, (p) => {
+    const tips = [[1, 4], [0, 16], [3, 28], [10, 38]];
+    p.poly([[33, 10], ...tips, [30, 30]], 'R');
+    for (const [tx, ty] of tips) p.line(33, 10, tx, ty, 1, 'K');
+    for (let k = 0; k < tips.length - 1; k++) {
+      const [ax, ay] = tips[k], [bx, by] = tips[k + 1];
+      p.line(ax, ay, (ax + bx) / 2 + 3, (ay + by) / 2, 1, 'K');
+      p.line((ax + bx) / 2 + 3, (ay + by) / 2, bx, by, 1, 'K');
+    }
+  });
+}
+
+// Τα jump scares ανά είδος τέρατος (eyeColor: χρώμα της λάμψης των ματιών, halo: λάμψη πίσω από
+// το κεφάλι, size: πόσο μεγαλώνει το πρόσωπο — 1 = όσο η οθόνη).
 const SCARE_KINDS = {
-  shade: {
-    hair: [[]], head: SCARE_HEAD, mouths: SCARE_MOUTH, chin: SCARE_CHIN, eye: 'E',
-    eyeColor: '255,250,235', hand: SCARE_HAND, wing: null, halo: POT.red, size: 1.05,
-  },
-  erinys: {
-    hair: ERINYS_HAIR, head: ERINYS_HEAD, mouths: ERINYS_MOUTH, chin: ERINYS_CHIN, eye: 'y',
-    eyeColor: '255,214,90', hand: SCARE_HAND.map((r) => r.replace(/k/g, 'R')), wing: ERINYS_WING,
-    halo: '190,40,20', size: 0.78,   // μικρότερο, για να φαίνονται τα φτερά γύρω του
-  },
+  shade: { face: (m) => [scareShadeFace(m)], eye: 'E', eyeColor: '255,250,235', erinys: false, wing: false, halo: POT.red, size: 1.05 },
+  erinys: { face: (m) => [0, 1].map((f) => scareErinysFace(m, f)), eye: 'y', eyeColor: '255,214,90', erinys: true, wing: true, halo: '190,40,20', size: 0.8 },
 };
 
 const Scare = {
@@ -155,25 +128,28 @@ const Scare = {
   seed: 0,
 
   build() {
-    const mirror = (r) => r + [...r].reverse().join('');
+    // Σε διπλή ανάλυση (Sprites.hdify): { c, f, w, h }.
+    const hd = (fr) => {
+      const c = Sprites.hdify(fr.c), f = Sprites.hdify(fr.f);
+      return { c, f, w: c.width, h: c.height };
+    };
     this.kinds = {};
     for (const name in SCARE_KINDS) {
       const d = SCARE_KINDS[name];
-      const rows = (hair, mouth) => [...hair, ...d.head, ...mouth, ...d.chin].map(mirror);
-      // Κέντρα των ματιών: ο μέσος όρος των pixels των ματιών σε κάθε μισό (+1 για το περίγραμμα).
-      const grid = rows(d.hair[0], d.mouths[0]);
+      // Κέντρα των ματιών (σε pixels του HD καρέ): ο μέσος όρος των pixels τους σε κάθε μισό.
+      const grid = d.face(0)[0];
       const eyes = [0, 1].map((side) => {
         let sx = 0, sy = 0, n = 0;
         grid.forEach((r, y) => [...r].forEach((c, x) => {
           if (c === d.eye && (x < r.length / 2) === (side === 0)) { sx += x; sy += y; n++; }
         }));
-        return [sx / n + 1.5, sy / n + 1.5];
+        return [(sx / n + 1.5) * 2, (sy / n + 1.5) * 2];
       });
       this.kinds[name] = {
-        faces: d.mouths.map((m) => d.hair.map((hr) => Sprites.build(rows(hr, m), POT.terra))),
+        faces: [0, 1, 2].map((m) => d.face(m).map((g) => hd(Sprites.build(g, POT.terra)))),
         eyes,
-        hand: Sprites.build(d.hand, POT.terra),
-        wing: d.wing ? Sprites.build(d.wing, POT.terra) : null,
+        hand: hd(Sprites.build(scareHand(d.erinys), POT.terra)),
+        wing: d.wing ? hd(Sprites.build(scareWing(), POT.terra)) : null,
         eyeColor: d.eyeColor,
         halo: d.halo,
         size: d.size,
@@ -277,7 +253,7 @@ const Scare = {
     ctx.restore();
 
     // Χέρια με νύχια που ανεβαίνουν από κάτω και σε αρπάζουν.
-    const hk = Math.max(2, Math.round(k * 0.6));
+    const hk = Math.max(1, k * 0.62);
     const hw = K.hand.w * hk, hh = K.hand.h * hk;
     for (const hd of this.hands) {
       const p = Math.max(0, Math.min(1, (t - hd.delay) / 0.14));

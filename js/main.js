@@ -343,7 +343,7 @@ function draw() {
   if (state === 'dead' && gameTime - endTime < SCARE_TIME) {
     Scare.draw(pc, W, H, gameTime - endTime);
     const k = 1 - (gameTime - endTime) / SCARE_TIME;
-    Pixel.present(ctx, dpr, (Math.random() - 0.5) * 6 * k, (Math.random() - 0.5) * 6 * k);
+    Pixel.present(ctx, dpr, (Math.random() - 0.5) * 6 * k, (Math.random() - 0.5) * 6 * k, view2d ? true : 'palette');
     return;
   }
 
