@@ -283,7 +283,7 @@ function pickUp(it) {
   if (it.kind === 'jar') {
     Jars.left++;
     Sound.jarPickup();
-    Notice.show(STORY.jar, gameTime, Math.max(6, Voice.say(STORY.jar, 'narrator') + 1));
+    Notice.show(STORY.jar, gameTime, 6);   // χωρίς φωνή (μόνο κείμενο)
     if (!jarsFound) Hints.push(JAR_HINTS);
     jarsFound = true;
   } else if (it.kind === 'obol') {
@@ -295,7 +295,7 @@ function pickUp(it) {
     if (strings < 3) {
       Notice.show(STORY.string(strings), gameTime, 4);
     } else {
-      Notice.show(STORY.lyreWhole, gameTime, Math.max(7, Voice.say(STORY.lyreWhole, 'narrator', { delay: 0.6 }) + 1.5));
+      Notice.show(STORY.lyreWhole, gameTime, 7);   // χωρίς φωνή (μόνο κείμενο)
       Melody.uses = MELODY_USES;
       Hints.push(MELODY_HINTS);
     }

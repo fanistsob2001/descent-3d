@@ -202,7 +202,7 @@ Every line of dialogue is voiced, always with subtitles (except the chapter line
 
 | Speaker | Voice | Lines |
 |---|---|---|
-| Narrator | warm, calm (male) | In the game: "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
+| Narrator | warm, calm (male) | In the game: "The footsteps behind you stop." |
 | Orpheus | young man, warm, melodic | "Good boy. Good boy. Good boy." (to Cerberus) |
 | Charon | very deep, slow, gravelly (old man) | Both Charon lines |
 | Eurydice | soft, high, breathy whisper (female) | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) |
@@ -218,7 +218,7 @@ The player can turn the voices off in Settings (the subtitles stay).
 
 First-person version: the cutscenes are not voiced (text only, under the pictures). In the middle cutscene Persephone has no line: she is only described.
 
-Not voiced (they are interface text, not something a character says): the cutscenes, the chapter title and line at the start of each chapter, the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
+Not voiced (they are interface text, not something a character says): the cutscenes, the chapter title and line at the start of each chapter, the item messages (the libation jar message, "Your lyre is whole again..."), the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
 
 ---
 
