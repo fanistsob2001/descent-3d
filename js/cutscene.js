@@ -29,7 +29,7 @@ const Cutscene = {
 
   // style: '' | 'good' | 'bad' (λίγο διαφορετικό φόντο για τα τέλη)
   // art: 'intro' | 'middle' | 'good' | 'bad' — οι ζωγραφιές (js/cutart.js), μία για κάθε γραμμή
-  // who: ποιος λέει κάθε γραμμή (π.χ. STORY.middleWho) — βλ. js/voice.js.
+  // who: ποιος λέει κάθε γραμμή (π.χ. STORY.middleWho) — δεν χρησιμοποιείται πια (χωρίς φωνές).
   play(lines, style, onEnd, art, who) {
     this.lines = lines;
     this.who = who || [];
@@ -54,9 +54,8 @@ const Cutscene = {
     if (panels) CutArt.show(panels[Math.min(this.shown, panels.length - 1)]);
     this.shown++;
     this.el.classList.toggle('last', this.shown >= this.lines.length);
-    // Η προηγούμενη φωνή σταματάει αν πατήσεις "επόμενη" πριν τελειώσει.
+    // Οι cutscenes δεν έχουν φωνές (μόνο κείμενο): σταματάει ό,τι μιλούσε πριν.
     Voice.stop();
-    Voice.say(this.lines[this.shown - 1], this.who[this.shown - 1] || 'narrator');
   },
 
   advance() {

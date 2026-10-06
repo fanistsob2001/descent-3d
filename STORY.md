@@ -202,11 +202,10 @@ Every line of dialogue is voiced, always with subtitles (except the chapter line
 
 | Speaker | Voice | Lines |
 |---|---|---|
-| Narrator | warm, calm (male) | Intro cutscene; the narration lines of the middle cutscene and of both endings; in the game: "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
+| Narrator | warm, calm (male) | In the game: "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
 | Orpheus | young man, warm, melodic | "Good boy. Good boy. Good boy." (to Cerberus) |
 | Charon | very deep, slow, gravelly (old man) | Both Charon lines |
-| Hades | deep, heavy (male) | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
-| Eurydice | soft, high, breathy whisper (female) | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) · Good ending: "You didn't look..." |
+| Eurydice | soft, high, breathy whisper (female) | "Orpheus... I am right behind you." · "Orpheus..." (big wave, fades into silence) |
 | Shades | distorted, eerie whisper/moan, from where the shade is; half of the shades male, half female | "Who is there?" · "I hear life..." |
 | Erinyes | female, harsh shriek with hissing snakes, from where the Erinys is | "Who dares to sing here?" · "We hear you, living one." |
 | Lost souls | whispered, from where the inscription is: souls 1, 4 and 7 a man, souls 2 and 9 an old man, souls 3, 5, 6 and 8 a woman | Each inscription is spoken when a wave touches it |
@@ -217,9 +216,9 @@ Every line of dialogue is voiced, always with subtitles (except the chapter line
 
 The player can turn the voices off in Settings (the subtitles stay).
 
-In the cutscenes Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
+First-person version: the cutscenes are not voiced (text only, under the pictures). In the middle cutscene Persephone has no line: she is only described.
 
-Not voiced (they are interface text, not something a character says): the chapter lines (shown with the chapter title), the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
+Not voiced (they are interface text, not something a character says): the cutscenes, the chapter title and line at the start of each chapter, the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
 
 ---
 
