@@ -48,6 +48,22 @@ const SPR_PAL = {
   B: '210,196,172',  // γκριζωπά μαλλιά και γένια (Χάροντας)
   z: '110,74,48',    // χιτώνας του Χάροντα
   Z: '70,46,30',
+  // Διακοσμητικά του 3D κόσμου:
+  i: '222,204,168',  // κόκαλο
+  I: '150,128,96',
+  l: '150,62,40',    // πέτρα (σταλαγμίτες, πέτρες)
+  L: '92,34,24',
+  j: '128,84,52',    // σκουριασμένο σίδερο (αλυσίδες)
+  J: '74,46,30',
+  f: '240,228,204',  // άνθος ασφόδελου
+  F: '124,104,52',   // μίσχος / ξερό χορτάρι
+  x: '160,126,62',   // καλάμι
+  X: '104,80,38',
+  A: '184,94,50',    // πηλός αμφορέα
+  C: '122,56,30',
+  N: '30,18,12',     // μαύρο γάνωμα
+  V: '176,142,96',   // μπρούντζος / πέτρα αγάλματος
+  D: '108,84,56',
 };
 
 // ---- Ορφέας: σύνθεση από πάνω μέρος (γραμμές 0-12) και πόδια (13-15) ----
@@ -340,8 +356,284 @@ const ICON_SEARCH = [
   '..y.',
 ];
 
+// ---- Διακοσμητικά του 3D κόσμου (φαίνονται μόνο όταν τα φωτίζει ο ήχος) ----
+const STALAGMITE = [
+  '....l.....',
+  '....l.....',
+  '...lL.....',
+  '...llL....',
+  '...llL....',
+  '..lllLL...',
+  '..lllLL...',
+  '..llllL...',
+  '.lllllLL..',
+  '.lllllLL..',
+  '.llllllLL.',
+  'lllllllLL.',
+  'llllllllLL',
+  'LLLLLLLLLL',
+];
+const ROCKS = [
+  '...lll.......',
+  '..llllL...l..',
+  '.lllllLL.llL.',
+  'llllllLLlllLL',
+  'LLLLLLLLLLLLL',
+];
+const SKULL = [
+  '..iiiii..',
+  '.iiiiiiI.',
+  'iiiiiiiiI',
+  'iNNiiNNiI',
+  'iNNiiNNiI',
+  'iiiiNiiiI',
+  '.IiiiiiI.',
+  '.iNiNiNi.',
+  '..IiIiI..',
+];
+const BONES = [
+  'ii.........ii.',
+  'iiiiiiiiiiiiI.',
+  '.IiiiiiiiiiI..',
+  'ii.........II.',
+  '...ii..ii.....',
+  '..iIiiiiIi....',
+];
+const SKULLPILE = [
+  '.....iiii.......',
+  '....iNiiNi......',
+  '...iiiiiiiiii...',
+  '..iiNiiNiiNiNi..',
+  '.iiiiiiiiiiiiii.',
+  'iiNiiNiiiNiiNiiI',
+  'iIiiiiIiiiiiIiiI',
+  'IIIIiIIIiIIIIIII',
+];
+const AMPHORA = [
+  '...NNNNN...',
+  '....AAA....',
+  '..A.AAA.A..',
+  '..AAAAAAA..',
+  '.AAAAAAAAC.',
+  'AAAAAAAAAAC',
+  'NNNNNNNNNNN',
+  'AANNAANNAAC',
+  'NNNNNNNNNNN',
+  'AAAAAAAAAAC',
+  '.AAAAAAAAC.',
+  '..AAAAAAC..',
+  '...AAAAC...',
+  '....AAC....',
+  '...NNNNN...',
+];
+const AMPHORA_BROKEN = [
+  '..A......A..',
+  '..AA..A.AA..',
+  '.AAAAAAAAAC.',
+  'NNNNNNNNNNNN',
+  'AAAAAAAAAAAC',
+  '.AAAAAAAAAC.',
+  '..AAAAAAAC..',
+  '...AAAAAC.A.',
+  '....AAAC.AC.',
+];
+const ASPHODEL = [
+  '.f.....f...',
+  'fff...fff.f',
+  '.f.f...f.ff',
+  '.F.fff.F.f.',
+  '.F..f..F.F.',
+  '..F.F.F..F.',
+  '..F.F.F.F..',
+  '...FFFF.F..',
+  '....FFFF...',
+  '....FF.....',
+];
+const REEDS = [
+  '.x......x..',
+  '.x...x..x..',
+  '.X...x..X..',
+  '.x...X..x.x',
+  '.x...x..x.x',
+  'xX...x..X.X',
+  'x.x..x.x..x',
+  'x.x..X.x..x',
+  'X.x..x.X..X',
+  'x.X..x.x.x.',
+  '.xx.xX.x.x.',
+  '.x..x..xx..',
+  '.X.xX..X...',
+  '.xxx...x...',
+  '..xX.xX....',
+  '..XXXX.....',
+];
+const CHAIN_LINK = ['.j.', 'j.j', 'j.J', '.J.'];
+const CHAIN = [].concat(...Array.from({ length: 8 }, () => CHAIN_LINK));
+const ROOTS = [
+  'FFFFFFFFFFFF',
+  '.F.F..F.FF.F',
+  '.F.F..F..F.F',
+  '.F..F.F..F..',
+  'F...F..F.F..',
+  'F...F..F..F.',
+  '.F..F..F..F.',
+  '.F.F...F..F.',
+  '.F.F..F...F.',
+  '..F...F...F.',
+  '..F...F....F',
+  '..F..F.....F',
+  '...F.F.....F',
+  '...F.F......',
+  '...F........',
+  '....F.......',
+];
+// Άγαλμα (κούρος) σε βάθρο: μπρούντζος/πέτρα, στο παλάτι.
+const STATUE = [
+  '....VVV.....',
+  '...VVVVV....',
+  '...VDVDV....',
+  '...VVVVV....',
+  '....VVV.....',
+  '..VVVVVVV...',
+  '.VVVVVVVVV..',
+  '.VV.VVVV.VV.',
+  '.VV.VVVV.VV.',
+  '.VD.VVVV.DV.',
+  '.V..VVVV..V.',
+  '....VVVV....',
+  '....VDDV....',
+  '....VV.VV...',
+  '....VV.VV...',
+  '....VV.VV...',
+  '...VVV.VVV..',
+  '..DDDDDDDD..',
+  '.VVVVVVVVVV.',
+  '.VDVDVDVDVV.',
+  '.VVVVVVVVVV.',
+  'DDDDDDDDDDDD',
+];
+
+// ---- "Ζωγραφική" σε πλέγμα χαρακτήρων (για τα μεγάλα, λεπτομερή sprites του 3D) ----
+// ops πάνω σε ένα πλέγμα w×h γεμάτο '.': ellipse(cx, cy, rx, ry, ch), line(x0, y0, x1, y1, w, ch),
+// poly([[x, y], ...], ch), px(x, y, ch). Επιστρέφει πίνακα από strings (όπως τα χειροποίητα).
+function paintGrid(w, h, draw) {
+  const g = Array.from({ length: h }, () => new Array(w).fill('.'));
+  const set = (x, y, ch) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < w && y < h) g[y][x] = ch; };
+  const api = {
+    px: set,
+    ellipse(cx, cy, rx, ry, ch) {
+      for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+        for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+          if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) set(x, y, ch);
+        }
+      }
+    },
+    line(x0, y0, x1, y1, lw, ch) {
+      const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2) + 1;
+      for (let i = 0; i <= n; i++) {
+        const x = x0 + ((x1 - x0) * i) / n, y = y0 + ((y1 - y0) * i) / n;
+        for (let a = -(lw - 1) / 2; a <= (lw - 1) / 2; a += 0.5) for (let b = -(lw - 1) / 2; b <= (lw - 1) / 2; b += 0.5) set(x + a, y + b, ch);
+      }
+    },
+    poly(pts, ch) {
+      const ys = pts.map((p) => p[1]);
+      for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
+        const xs = [];
+        for (let i = 0; i < pts.length; i++) {
+          const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % pts.length];
+          if ((y0 <= y + 0.5 && y1 > y + 0.5) || (y1 <= y + 0.5 && y0 > y + 0.5)) xs.push(x0 + ((y + 0.5 - y0) * (x1 - x0)) / (y1 - y0));
+        }
+        xs.sort((a, b) => a - b);
+        for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.ceil(xs[k] - 0.5); x <= Math.floor(xs[k + 1] - 0.5); x++) set(x, y, ch);
+      }
+    },
+  };
+  draw(api);
+  return g.map((r) => r.join(''));
+}
+
+// Η σκιά (3D): σκυφτό, σκελετωμένο πλάσμα με κουκούλα, κρανίο με μάτια που λάμπουν και κόκκινο
+// στόμα, πλευρά που φαίνονται, μακριά χέρια με νύχια, κουρελιασμένο σάβανο. Κοιτάζει δεξιά.
+// f = καρέ (0 / 1): τα πόδια, το κρεμασμένο χέρι και ο ποδόγυρος αλλάζουν.
+function ghoulGrid(f) {
+  return paintGrid(30, 38, (p) => {
+    const sw = f ? 1 : -1;
+    // Σάβανο: φαρδαίνει προς τα κάτω, με κουρελιασμένο ποδόγυρο.
+    const hem = [];
+    for (let x = 22; x >= 4; x -= 2) hem.push([x, 32 + ((x / 2 + f) % 2 ? 2 : 0)]);
+    p.poly([[8, 13], [19, 13], [23, 31], ...hem, [4, 31]], 'k');
+    for (let x = 7; x <= 20; x += 3) p.line(x, 20, x - 1 + (x > 13 ? 2 : 0), 31, 1, 'K');   // πτυχώσεις
+    // Πόδια (σκελετωμένα) κάτω από τον ποδόγυρο.
+    p.line(10 + sw, 32, 9 + sw, 37, 1, 'I');
+    p.line(16 - sw, 32, 17 - sw, 37, 1, 'I');
+    p.px(8 + sw, 37, 'I'); p.px(18 - sw, 37, 'I');
+    // Θώρακας: σκοτεινή κοιλότητα με πλευρά.
+    p.ellipse(14, 18, 5.5, 5, 'K');
+    for (const y of [15, 17, 19, 21]) { p.line(10, y, 13, y + 0.5, 1, 'I'); p.line(15, y + 0.5, 18, y, 1, 'I'); }
+    p.line(14, 14, 14, 22, 1, 'i');        // σπονδυλική στήλη / στέρνο
+    // Σκυφτοί ώμοι.
+    p.ellipse(14, 12.5, 8, 3, 'k');
+    // Κουκούλα και κρανίο (μπροστά και ψηλά, δεξιά).
+    p.ellipse(20, 7, 6, 6, 'k');
+    p.ellipse(21, 7.5, 4, 4.5, 'i');
+    p.ellipse(19.5, 6.5, 1.3, 1.3, 'K'); p.ellipse(23, 6.5, 1.3, 1.3, 'K');   // κόγχες
+    p.px(19.5, 6.5, 'E'); p.px(23, 6.5, 'E');                                 // μάτια
+    p.px(21.5, 8.5, 'I');                                                      // μύτη
+    p.line(18.5, 10.5, 24, 10.5, 1, 'r');                                      // στόμα
+    for (let x = 19; x <= 23; x += 2) p.px(x, 10, 'i');                        // δόντια
+    p.line(19, 11.5, 23, 11.5, 1, 'I');                                        // σαγόνι
+    // Χέρι που απλώνεται μπροστά (δεξιά), με νύχια.
+    p.line(19, 13, 24, 17 + sw * 0.5, 2, 'k');
+    p.line(24, 17 + sw * 0.5, 27, 22, 2, 'k');
+    p.line(27, 22, 29, 25, 1, 'i'); p.line(27, 22, 27, 26, 1, 'i'); p.line(27, 22, 25, 25, 1, 'i');
+    // Χέρι που κρέμεται (αριστερά), με νύχια.
+    p.line(9, 13, 5, 20, 2, 'k');
+    p.line(5, 20, 5 + sw, 27, 2, 'k');
+    p.line(5 + sw, 27, 4 + sw, 30, 1, 'i'); p.line(5 + sw, 27, 6 + sw, 30, 1, 'i');
+  });
+}
+
+// Ο Κέρβερος (3D): μαύρο τρικέφαλο σκυλί ξαπλωμένο, κοιτάζει δεξιά, με ουρά-φίδι και χρυσό κολάρο
+// με καρφιά. barking[i] = το κεφάλι i (0 = μπροστινό/χαμηλό, 2 = πίσω/ψηλό) γαβγίζει: ανοιχτό στόμα
+// με δόντια και κόκκινο μάτι· αλλιώς κοιμάται (κλειστό μάτι). breath = 0 / 1 (ανάσα στον ύπνο).
+function cerberusGrid(barking, breath) {
+  return paintGrid(50, 30, (p) => {
+    // Ουρά-φίδι.
+    p.line(8, 19, 4, 14, 2, 'g'); p.line(4, 14, 5, 8, 2, 'g'); p.line(5, 8, 2, 5, 2, 'g');
+    p.ellipse(2, 4, 1.6, 1.3, 'G'); p.px(0, 4, 't');
+    // Σώμα και πίσω πόδια.
+    p.ellipse(19, 20, 13, 6 + breath * 0.6, 'k');
+    p.line(9, 23, 12, 26, 1, 'K'); p.line(11, 25, 8, 29, 3, 'k'); p.line(17, 25, 16, 29, 3, 'k');
+    p.line(9, 22, 28, 22, 1, 'K');
+    // Μπροστινά πόδια απλωμένα μπροστά, με νύχια.
+    p.line(27, 23, 39, 27, 3, 'k'); p.line(26, 25, 36, 29, 3, 'k');
+    p.px(41, 27, 'i'); p.px(40, 28, 'i'); p.px(38, 29, 'i'); p.px(37, 29, 'i');
+    // Τρία κεφάλια: [κέντρο x, y] από το μπροστινό (χαμηλό) στο πίσω (ψηλό).
+    const heads = [[41, 18], [37, 11], [31, 5]];
+    heads.forEach(([hx, hy], i) => p.line(26, 16, hx - 2, hy + 1, 4, 'k'));   // λαιμοί
+    p.line(24, 12, 26, 19, 2, 'Y');                                          // κολάρο
+    for (const [x, y] of [[24, 12], [25, 15], [26, 18]]) p.px(x - 1, y, 'y');
+    heads.forEach(([hx, hy], i) => {
+      const open = barking[i];
+      p.ellipse(hx, hy, 4.2, 3.3, 'k');
+      p.ellipse(hx + 4, hy + (open ? 0 : 1), 2.8, 1.8, 'k');                  // ρύγχος
+      p.line(hx - 2, hy - 3, hx - 3, hy - 6, 2, 'K');                         // αυτί
+      p.px(hx + 7, hy + (open ? 0 : 1), 'K');                                 // μύτη
+      if (open) {
+        p.line(hx + 2, hy + 2, hx + 7, hy + 2.5, 1, 'r');                     // στόμα
+        p.line(hx + 2, hy + 3.5, hx + 6, hy + 4, 1, 'k');                     // κάτω σαγόνι
+        p.px(hx + 3, hy + 2, 'i'); p.px(hx + 5, hy + 2, 'i'); p.px(hx + 4, hy + 3, 'i');   // δόντια
+        p.px(hx + 1, hy - 1, 'r');                                            // μάτι
+      } else {
+        p.line(hx, hy - 0.5, hx + 1.5, hy - 0.5, 1, 'K');                     // κλειστό μάτι
+      }
+    });
+  });
+}
+
 const Sprites = {
   frames: {},   // name → [{ c: canvas (δεξιά), f: canvas (αριστερά), w, h }]
+  hdFrames: {}, // name → τα ίδια καρέ σε διπλή ανάλυση με σκίαση (για το 3D), hd = 2
 
   init() {
     // Ορφέας: κάθε καρέ σε 4 εκδοχές (0..3 χορδές στη λύρα).
@@ -372,6 +664,25 @@ const Sprites = {
     this.frames.boat = [this.build(BOAT, POT.terra)];
     this.frames.iconHear = [this.build(ICON_HEAR, null)];
     this.frames.iconSearch = [this.build(ICON_SEARCH, null)];
+    // Διακοσμητικά (3D).
+    const dk = '20,10,6';
+    // Σταλαγμίτες / σταλακτίτες με κάθετες ραβδώσεις (σαν σταλαγματική πέτρα).
+    const streak = (rows) => rows.map((r) => [...r].map((ch, x) => (ch === 'l' && x % 3 === 1 ? 'L' : ch)).join(''));
+    this.frames.stalagmite = [this.build(streak(STALAGMITE), dk)];
+    this.frames.stalactite = [this.build(streak([...STALAGMITE].reverse()), dk)];
+    this.frames.rocks = [this.build(ROCKS, dk)];
+    this.frames.skull = [this.build(SKULL, dk)];
+    this.frames.bones = [this.build(BONES, dk)];
+    this.frames.skullpile = [this.build(SKULLPILE, dk)];
+    this.frames.amphora = [this.build(AMPHORA, dk)];
+    this.frames.amphoraBroken = [this.build(AMPHORA_BROKEN, dk)];
+    this.frames.asphodel = [this.build(ASPHODEL, null)];
+    this.frames.reeds = [this.build(REEDS, null)];
+    this.frames.chain = [this.build(CHAIN, null)];
+    this.frames.roots = [this.build(ROOTS, null)];
+    this.frames.statue = [this.build(STATUE, dk)];
+    // Η λεπτομερής σκιά του 3D (με περίγραμμα πηλού, όπως η απλή).
+    this.frames.ghoul = [0, 1].map((f) => this.build(ghoulGrid(f), POT.terra));
   },
 
   // Φτιάχνει τον καμβά ενός sprite. outline = χρώμα του περιγράμματος (1 pixel γύρω
@@ -406,6 +717,88 @@ const Sprites = {
       return cv;
     };
     return { c: make(false), f: make(true), w: W, h: H };
+  },
+
+  // Διπλή ανάλυση με σκίαση, για τα billboards του 3D: Scale2x (λείες διαγώνιες αντί για
+  // "σκαλοπάτια") και μετά φως από πάνω-αριστερά / σκιά κάτω-δεξιά στη σειρά pixels μέσα από το
+  // περίγραμμα — οι μορφές αποκτούν όγκο, σαν ζωγραφισμένες σε περισσότερους τόνους.
+  getHD(name, i = 0) {
+    let list = this.hdFrames[name];
+    if (!list) {
+      list = this.hdFrames[name] = this.frames[name].map((fr) => {
+        const c = this.hdify(fr.c);
+        const f = document.createElement('canvas');
+        f.width = c.width;
+        f.height = c.height;
+        const fc = f.getContext('2d');
+        fc.translate(c.width, 0);
+        fc.scale(-1, 1);
+        fc.drawImage(c, 0, 0);
+        return { c, f, w: c.width, h: c.height, hd: 2 };
+      });
+    }
+    return list[((i % list.length) + list.length) % list.length];
+  },
+
+  hdify(src) {
+    const w = src.width, h = src.height, W = w * 2, H = h * 2;
+    const s = new Uint32Array(src.getContext('2d').getImageData(0, 0, w, h).data.buffer);
+    const out = document.createElement('canvas');
+    out.width = W;
+    out.height = H;
+    const oc = out.getContext('2d');
+    const img = oc.createImageData(W, H);
+    const d = new Uint32Array(img.data.buffer);
+    const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : s[y * w + x]);
+    // Scale2x (EPX).
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+        d[(2 * y) * W + 2 * x] = C === A && C !== D && A !== B ? A : P;
+        d[(2 * y) * W + 2 * x + 1] = A === B && A !== C && B !== D ? B : P;
+        d[(2 * y + 1) * W + 2 * x] = D === C && D !== B && C !== A ? C : P;
+        d[(2 * y + 1) * W + 2 * x + 1] = B === D && B !== A && D !== C ? D : P;
+      }
+    }
+    // Σκίαση: μόνο στα pixels ΜΕΣΑ από το περίγραμμα (όχι στο ίδιο το περίγραμμα).
+    const alpha = (x, y) => x >= 0 && y >= 0 && x < W && y < H && (d[y * W + x] >>> 24) > 128;
+    const edge = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (!alpha(x, y)) continue;
+        if (!alpha(x - 1, y) || !alpha(x + 1, y) || !alpha(x, y - 1) || !alpha(x, y + 1)) edge[y * W + x] = 1;
+      }
+    }
+    const tone = (p, k) => {
+      const r = Math.min(255, (p & 255) * k), g = Math.min(255, ((p >> 8) & 255) * k), b = Math.min(255, ((p >> 16) & 255) * k);
+      return (p & 0xff000000) | (b << 16) | (g << 8) | r;
+    };
+    const res = d.slice();
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!alpha(x, y) || edge[i]) continue;
+        const up = edge[(y - 1) * W + x] || (x > 0 && edge[i - 1]);
+        const dn = (y + 1 < H && edge[(y + 1) * W + x]) || (x + 1 < W && edge[i + 1]);
+        if (up && !dn) res[i] = tone(d[i], 1.22);
+        else if (dn && !up) res[i] = tone(d[i], 0.74);
+      }
+    }
+    d.set(res);
+    oc.putImageData(img, 0, 0);
+    return out;
+  },
+
+  // Ο Κέρβερος σε διπλή ανάλυση, για κάθε συνδυασμό κεφαλιών που γαβγίζουν (και ανάσας).
+  cerberusHD(barking, breath) {
+    const key = barking.map(Number).join('') + breath;
+    this._cerb = this._cerb || {};
+    if (!this._cerb[key]) {
+      const fr = this.build(cerberusGrid(barking, breath), POT.terra);
+      const c = this.hdify(fr.c);
+      this._cerb[key] = { c, f: c, w: c.width, h: c.height, hd: 2 };
+    }
+    return this._cerb[key];
   },
 
   get(name, i = 0) {

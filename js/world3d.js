@@ -76,12 +76,15 @@ const World3D = {
       return { c, f: c, w, h, ctx: c.getContext('2d') };
     };
     this.flame = canvas(28, 50);
+    this.buildScenery();
     this.cerb = canvas(64, 32);
   },
 
   // Καλείται σε κάθε spawn.
   reset() {
     this.sparks = [];
+    this.drips = [];
+    this.ripples = [];
     this.decor = Level.decor.map((d) => ({
       ...d, revealTime: -1e6, revealStrength: 0,
       onHear(wave, dist, los) {
@@ -113,7 +116,8 @@ const World3D = {
 
   // Βάζει όλες τις μορφές στην ουρά του Raycast και τις ζωγραφίζει.
   draw(pc, now, killer, deathAlpha) {
-    const S = (name, i) => Sprites.get(name, i);
+    // Όλες οι μορφές σε διπλή ανάλυση με σκίαση (Sprites.getHD).
+    const S = (name, i) => Sprites.getHD(name, i);
     const R = Raycast;
     const halfW = R.W / 2;
 
@@ -242,7 +246,7 @@ const World3D = {
       const a = Eggs.alpha(st, now);
       if (a > 0.01) {
         const p = R.project(st.x, st.y);
-        R.sprite(S('shade', Math.floor(now * 4)), { x: st.x, y: st.y, alpha: a * 0.9, flip: p ? p.sx > halfW : false });
+        R.sprite(S('ghoul', Math.floor(now * 4)), { x: st.x, y: st.y, alpha: a * 0.9, flip: p ? p.sx > halfW : false, scale: 0.5 });
       }
     }
     const cb = Eggs.cerberus;
@@ -251,11 +255,9 @@ const World3D = {
       const barking = [0, 1, 2].map((i) => barkT >= i * CERB_BARK_GAP && barkT < i * CERB_BARK_GAP + CERB_BARK_TIME);
       const a = Math.max(Eggs.alpha(cb, now), barking.some(Boolean) ? 1 : 0);
       if (a > 0.01) {
-        const c = this.cerb;
-        c.ctx.setTransform(1, 0, 0, 1, 0, 0);
-        c.ctx.clearRect(0, 0, c.w, c.h);
-        Pottery.cerberus(c.ctx, c.w / 2 + 3, c.h - 1, 46, 1, barking, 0.5 + 0.5 * Math.sin(now * 1.6));
-        R.sprite(c, { x: cb.x, y: cb.y, h: 44, alpha: a });
+        // Pixel sprite (διπλή ανάλυση): γαβγίζει όποιο κεφάλι γαβγίζει, αλλιώς αναπνέει στον ύπνο.
+        const fr = Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0);
+        R.sprite(fr, { x: cb.x, y: cb.y, alpha: a, scale: 0.85 });
       }
     }
 
@@ -285,6 +287,19 @@ const World3D = {
       });
     }
 
+    // ---- Διακοσμητικά: φαίνονται όσο φωτίζεται το κελί τους (κύμα, βωμός, φως της ημέρας) ----
+    const cl = R.cellLight;
+    for (const d of this.scenery) {
+      const dx = d.x - R.posX * TILE, dy = d.y - R.posY * TILE;
+      if (dx * dx + dy * dy > 520 * 520) continue;
+      const a = Math.min(1, cl[d.c] * 1.7);
+      if (a < 0.03) continue;
+      // Πολύ κοντά στην κάμερα (π.χ. στο κελί που στέκεσαι) δεν ζωγραφίζεται: θα γέμιζε την οθόνη.
+      const pd = (dx * R.dirX + dy * R.dirY) / TILE;
+      if (pd < 0.55) continue;
+      R.sprite(S(d.name), { x: d.x, y: d.y, z: d.z, scale: d.scale, alpha: a, flip: d.flip });
+    }
+
     // Πού είναι στην οθόνη οι πηγές φωτός (για τις ακτίνες φωτός του bloom): οι φλόγες των βωμών
     // και το φως της εξόδου, όσες φαίνονται (όχι πίσω από τοίχο).
     this.lights.length = 0;
@@ -303,6 +318,7 @@ const World3D = {
 
     R.flushSprites(pc);
     this.drawSparks(pc, now);
+    this.drawDrips(pc, now);
     this.drawMotes(pc, now);
 
     // ---- Η Μελωδία: χρυσή λάμψη σε όλη την οθόνη (δεν είναι κύμα ήχου) ----
@@ -331,11 +347,14 @@ const World3D = {
     if (!p) return;
     const flip = p.sx > R.W / 2;   // κοιτάζει προς τα εσένα
     const erinys = m.kind === 'erinys';
-    const fr = Sprites.get(m.kind, frame);
+    // Στο 3D η σκιά είναι η λεπτομερής μορφή "ghoul" (μισό μέγεθος στον κόσμο: είναι 2× πιο λεπτομερής).
+    const ghoul = m.kind === 'shade';
+    const fr = Sprites.getHD(ghoul ? 'ghoul' : m.kind, frame);
     const hover = m.fly ? 10 + Math.sin(now * 4 + m.homeTx) * 3 : 0;
-    const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 5.5, '255,210,90'] : [9.5, 3.5, '255,250,235'];
+    // Θέση των ματιών σε pixels του (HD) καρέ.
+    const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 11, '255,210,90'] : [45, 15, '255,250,235'];
     R.sprite(fr, {
-      x, y, z: hover, alpha: a, flip, fog: false,
+      x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : 1,
       glow: { r: 30, color: POT.red, a: a * 0.5 },
       after: (pc, b) => {
         const s = b.h / fr.h;   // art px ανά pixel του sprite
@@ -356,6 +375,157 @@ const World3D = {
         }
       },
     });
+  },
+
+  // ---- Διακοσμητικά (σταθερά, μία φορά στο init) ----
+  // Ανά περιοχή: σπηλιές = σταλαγμίτες/σταλακτίτες, πέτρες, λίγα κόκαλα (Στύγα/Αχέροντας: καλάμια
+  // στην όχθη· Ταίναρο/Άνοδος: ρίζες από τον κόσμο των ζωντανών)· Ασφόδελος = ασφόδελοι, σπασμένοι
+  // αμφορείς, κόκαλα· Τάρταρος = αλυσίδες, σωροί κρανίων, κόκαλα· παλάτι = αγάλματα, αμφορείς.
+  // Ποτέ εκεί που υπάρχει κάτι του παιχνιδιού (βωμοί, αντικείμενα, ψυχές, πύλες, έξοδος, easter eggs).
+  scenery: [],
+  buildScenery() {
+    const L = Level, cols = L.cols;
+    const hash = (a, b, k) => { const v = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
+    const busy = new Uint8Array(cols * L.rows);
+    const mark = (x, y, r) => {
+      const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+      for (let yy = ty - r; yy <= ty + r; yy++) for (let xx = tx - r; xx <= tx + r; xx++) {
+        if (xx >= 0 && yy >= 0 && xx < cols && yy < L.rows) busy[yy * cols + xx] = 1;
+      }
+    };
+    L.altars.forEach((a) => mark(a.x, a.y, 1));
+    L.items.forEach((it) => mark(it.x, it.y, 0));
+    L.souls.forEach((s) => mark(s.x, s.y, 0));
+    L.decor.forEach((d) => mark(d.x, d.y, 1));
+    L.gates.forEach((g) => mark(g.x, g.y, 1));
+    mark(L.exit.x, L.exit.y, 2);
+    mark(L.start.x, L.start.y, 1);
+    if (L.eggs.stuck) mark(L.eggs.stuck.x, L.eggs.stuck.y, 2);
+    if (L.eggs.cerberus) mark(L.eggs.cerberus.x, L.eggs.cerberus.y, 2);
+
+    const out = [];
+    const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    const SPX = RC_SPX;
+    const put = (name, tx, ty, ox, oy, scale, hang, c) => {
+      const fr = Sprites.frames[name][0];
+      const h = fr.h * SPX * scale;
+      out.push({
+        name, c, scale, flip: hash(tx, ty, 9) > 0.5,
+        x: (tx + 0.5 + ox) * TILE, y: (ty + 0.5 + oy) * TILE,
+        z: hang ? Math.max(0, TILE - h) : 0,
+      });
+    };
+    for (let ty = 0; ty < L.rows; ty++) {
+      for (let tx = 0; tx < cols; tx++) {
+        const c = ty * cols + tx;
+        if (busy[c] || L.terrain[c] !== T_FLOOR || L.grid[c] !== 0) continue;
+        const r = L.region[c];
+        if (r < 0) continue;
+        const wall = dirs.filter(([dx, dy]) => L.isOpaque(tx + dx, ty + dy));
+        const water = dirs.filter(([dx, dy]) => L.terrainAt(tx + dx, ty + dy) === T_WATER);
+        const h1 = hash(tx, ty, 1), h2 = hash(tx, ty, 2), h3 = hash(tx, ty, 3);
+        const jx = (hash(tx, ty, 4) - 0.5) * 0.5, jy = (hash(tx, ty, 5) - 0.5) * 0.5;
+        const sc = 0.85 + hash(tx, ty, 6) * 0.45;
+        const toWall = wall.length ? wall[Math.floor(h3 * wall.length)] : null;
+        const wx = toWall ? toWall[0] * 0.3 : jx, wy = toWall ? toWall[1] * 0.3 : jy;
+        const cave = r === 0 || r === 1 || r === 2 || r === 4 || r === 7;
+        if (cave) {
+          if (water.length && (r === 4 ? h1 < 0.55 : r === 1 && h1 < 0.22)) {
+            const w = water[0];
+            put('reeds', tx, ty, w[0] * 0.3, w[1] * 0.3, sc, false, c);
+          } else if (toWall && h1 < 0.17) put('stalagmite', tx, ty, wx, wy, sc, false, c);
+          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
+          else if (r !== 0 && h1 < 0.255) put('bones', tx, ty, jx, jy, 0.9, false, c);
+          else if (r !== 0 && h1 < 0.27) put('skull', tx, ty, jx, jy, 0.55, false, c);
+          // Από το ταβάνι: ρίζες κοντά στην επιφάνεια (Ταίναρο, Άνοδος), αλλού σταλακτίτες.
+          if ((r === 0 || r === 7) && h2 < 0.13) put('roots', tx, ty, jx, jy, sc, true, c);
+          else if (h2 < 0.15) put('stalactite', tx, ty, (hash(tx, ty, 7) - 0.5) * 0.6, (hash(tx, ty, 8) - 0.5) * 0.6, sc, true, c);
+        } else if (r === 3) {
+          if (h1 < 0.33) put('asphodel', tx, ty, jx, jy, sc * 0.8, false, c);
+          else if (toWall && h1 < 0.39) put('amphoraBroken', tx, ty, wx, wy, 0.9, false, c);
+          else if (h1 < 0.43) put('bones', tx, ty, jx, jy, 0.9, false, c);
+          else if (h1 < 0.45) put('skull', tx, ty, jx, jy, 0.55, false, c);
+        } else if (r === 5) {
+          if (toWall && h1 < 0.06) put('skullpile', tx, ty, wx, wy, 0.9, false, c);
+          else if (h1 < 0.14) put('bones', tx, ty, jx, jy, 0.9, false, c);
+          else if (h1 < 0.19) put('skull', tx, ty, jx, jy, 0.55, false, c);
+          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
+          if (h2 < 0.12) put('chain', tx, ty, jx, jy, 0.5 + hash(tx, ty, 10) * 0.12, true, c);
+        } else if (r === 6) {
+          if (toWall && h1 < 0.07) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1.05, false, c);
+          else if (toWall && h1 < 0.15) put('amphora', tx, ty, wx, wy, 0.85, false, c);
+          else if (toWall && h1 < 0.17) put('amphoraBroken', tx, ty, wx, wy, 0.85, false, c);
+        }
+      }
+    }
+    this.scenery = out;
+  },
+
+  // ---- Σταγόνες: πέφτουν από το ταβάνι των σπηλιών κοντά σου· "πλιπ" στο νερό, με κυματάκι ----
+  drips: [],
+  ripples: [],
+  _dripAt: 0,
+  updateDrips(dt, now, p) {
+    const L = Level;
+    const region = L.regionAt(Math.floor(p.x / TILE), Math.floor(p.y / TILE));
+    if (region >= 0 && RC_THEMES[region] === 'rock' && now >= this._dripAt) {
+      this._dripAt = now + 0.9 + Math.random() * 2.4;
+      for (let k = 0; k < 6; k++) {
+        const tx = Math.floor(p.x / TILE) + Math.round((Math.random() - 0.5) * 12);
+        const ty = Math.floor(p.y / TILE) + Math.round((Math.random() - 0.5) * 12);
+        const t = L.terrainAt(tx, ty);
+        if (L.isOpaque(tx, ty) || t === T_CHASM) continue;
+        this.drips.push({ x: (tx + 0.2 + Math.random() * 0.6) * TILE, y: (ty + 0.2 + Math.random() * 0.6) * TILE, z: TILE - 2, vz: 0, c: ty * L.cols + tx, water: t === T_WATER });
+        break;
+      }
+    }
+    for (let k = this.drips.length - 1; k >= 0; k--) {
+      const d = this.drips[k];
+      d.vz -= 420 * dt;
+      d.z += d.vz * dt;
+      if (d.z > 0) continue;
+      this.drips.splice(k, 1);
+      Sound.drip(d.x, d.y, d.water);
+      if (d.water) this.ripples.push({ x: d.x, y: d.y, t: now, c: d.c });
+    }
+    for (let k = this.ripples.length - 1; k >= 0; k--) if (now - this.ripples[k].t > 1.1) this.ripples.splice(k, 1);
+  },
+
+  drawDrips(pc, now) {
+    const R = Raycast, cl = R.cellLight;
+    if (this.drips.length === 0 && this.ripples.length === 0) return;
+    pc.save();
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.globalCompositeOperation = 'lighter';
+    for (const d of this.drips) {
+      const a = Math.min(1, cl[d.c] * 2);
+      if (a < 0.05) continue;
+      const p = R.project(d.x, d.y);
+      if (!p || !R.visible(p.sx, p.depth)) continue;
+      const y = R.horizon + (R.focal * (RC_EYE - d.z / TILE)) / p.depth;
+      pc.fillStyle = 'rgba(236,218,186,' + (a * 0.9).toFixed(3) + ')';
+      pc.fillRect(Math.round(p.sx), Math.round(y), 1, p.depth < 2 ? 3 : 2);
+    }
+    // Κυματάκι στο νερό: ένας κύκλος στο επίπεδο του δαπέδου που ανοίγει και σβήνει.
+    pc.lineWidth = 1;
+    for (const r of this.ripples) {
+      const t = (now - r.t) / 1.1;
+      const a = Math.min(1, cl[r.c] * 2 + 0.05) * (1 - t);
+      if (a < 0.04) continue;
+      const rad = 2 + t * 12;
+      pc.strokeStyle = 'rgba(236,218,186,' + (a * 0.8).toFixed(3) + ')';
+      pc.beginPath();
+      let pen = false;
+      for (let k = 0; k <= 14; k++) {
+        const ang = (k / 14) * Math.PI * 2;
+        const p = R.project(r.x + Math.cos(ang) * rad, r.y + Math.sin(ang) * rad);
+        if (!p) { pen = false; continue; }
+        const y = R.horizon + (R.focal * RC_EYE) / p.depth;
+        if (!pen) { pc.moveTo(p.sx, y); pen = true; } else pc.lineTo(p.sx, y);
+      }
+      pc.stroke();
+    }
+    pc.restore();
   },
 
   // Σπίθες: όπου το μέτωπο ενός κύματος χτυπάει τοίχο, πετάγονται μερικές μικρές πορτοκαλί

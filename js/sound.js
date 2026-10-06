@@ -945,6 +945,65 @@ const Sound = {
     }
   },
 
+  // ---- Νερό (3D): καταρράκτες και σταγόνες ----
+  // Δεν είναι ήχοι του παιχνιδιού (δεν περνάνε από το Echoes.emit): οι σκιές δεν τους ακούνε.
+
+  // Κάθε καρέ: ο θόρυβος του πιο κοντινού καταρράκτη, από τη θέση του. dist < 0 = σιωπή.
+  // Δυναμώνει όσο πλησιάζεις· πίσω από τοίχο ακούγεται πνιχτός.
+  updateWater(x, y, dist, los) {
+    if (!this.ctx) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (!this._water) {
+      const src = this.noiseSource(true);
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 900;
+      bp.Q.value = 0.6;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2400;
+      const g = ac.createGain();
+      g.gain.value = 0;
+      const pan = this.placeNode(x, y, 'equalpower');
+      src.connect(bp);
+      bp.connect(lp);
+      lp.connect(g);
+      g.connect(pan);
+      pan.connect(this.sfx);
+      const rev = ac.createGain();
+      rev.gain.value = 0.25;
+      g.connect(rev);
+      rev.connect(this.reverbSend);
+      src.start();
+      this._water = { g, lp, pan };
+    }
+    const w = this._water;
+    const p = dist < 0 ? 0 : Math.max(0, 1 - dist / 420);
+    w.g.gain.setTargetAtTime(p * p * 0.2, t, 0.3);
+    w.lp.frequency.setTargetAtTime(los ? 2400 : 700, t, 0.3);
+    if (dist >= 0) this.setPlace(w.pan, x, y);
+  },
+
+  // Μια σταγόνα που πέφτει από το ταβάνι: ένα σύντομο "πλιπ" (ψηλός τόνος που πέφτει), με ηχώ.
+  drip(x, y, onWater) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const d = Math.hypot(x - this.listenerX, y - this.listenerY);
+    if (d > 320) return;
+    const out = this.spatial(x, y, 0.75, 340);
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    const f = (onWater ? 1100 : 1700) + Math.random() * 700;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * (onWater ? 0.45 : 0.7), t + 0.07);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.05, 0.002, onWater ? 0.16 : 0.07);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.25);
+  },
+
   // ---- Γρύλισμα τεράτων ----
   makeGrowl() {
     const ac = this.ctx;

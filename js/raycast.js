@@ -74,6 +74,9 @@ const Raycast = {
   _redTouched: [],
   _redSrc: [],        // οι σκιές που λάμπουν αυτό το καρέ: [x, y (κελιά), ένταση, ...]
   monsters: [],       // οι σκιές (το main τις δίνει πριν το render)
+  waterFace: null,    // Uint8Array ανά (κελί*4 + πλευρά): 1 = υγρός τοίχος (νερό μπροστά), 2 = καταρράκτης
+  foam: null,         // Uint8Array ανά κελί: νερό μπροστά σε καταρράκτη (αφρός)
+  falls: [],          // κέντρα των καταρρακτών σε μονάδες κόσμου: [{ x, y }] (για τον ήχο του νερού)
   // Ποιότητα: 'auto' | 'high' | 'low'. Στο 'low' (ή στο 'auto' αν το render αργεί, π.χ. σε
   // αδύναμο κινητό) το δάπεδο/ταβάνι ζωγραφίζεται με μισή οριζόντια ανάλυση (ο ακριβότερος βρόχος).
   quality: 'auto',
@@ -110,6 +113,29 @@ const Raycast = {
     }
     this.cellLight = new Float32Array(L.cols * L.rows);
     this.segExtra = new Float32Array(L.segCount);
+
+    // Νερό: κάθε πλευρά τοίχου με νερό μπροστά της είναι υγρή· στη δυτική άκρη κάθε ποταμού (ο
+    // τοίχος δυτικά του νερού, πλευρά 3) το νερό πέφτει από τον τοίχο σαν καταρράκτης — από εκεί
+    // "έρχεται" το ποτάμι. Το νερό μπροστά σε καταρράκτη αφρίζει.
+    this.waterFace = new Uint8Array(L.cols * L.rows * 4);
+    this.foam = new Uint8Array(L.cols * L.rows);
+    this.falls = [];
+    const front = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    for (let ty = 0; ty < L.rows; ty++) {
+      for (let tx = 0; tx < L.cols; tx++) {
+        if (!L.isOpaque(tx, ty)) continue;
+        for (let side = 0; side < 4; side++) {
+          const fx = tx + front[side][0], fy = ty + front[side][1];
+          if (L.terrainAt(fx, fy) !== T_WATER) continue;
+          const fall = side === 3;
+          this.waterFace[(ty * L.cols + tx) * 4 + side] = fall ? 2 : 1;
+          if (fall) {
+            this.foam[fy * L.cols + fx] = 1;
+            this.falls.push({ x: (tx + 1) * TILE + 2, y: (ty + 0.5) * TILE });
+          }
+        }
+      }
+    }
 
     // Οι πύλες (η βάρκα του Χάροντα) δεν ζωγραφίζονται ως τοίχος: εκεί είναι νερό και η βάρκα.
     this.gateAt = new Int16Array(L.cols * L.rows).fill(-1);
@@ -662,6 +688,10 @@ const Raycast = {
       const edge = Math.min(1.25, (light + glow) * 1.05);
       const er = 206 * edge, eg = 98 * edge, eb = 54 * edge;
 
+      const wf = inside ? this.waterFace[(ty * cols + tx) * 4 + side] : 0;
+      // Καταρράκτης: 5 ρυάκια ανά πλάτος κελιού, το καθένα με δική του ταχύτητα και φάση.
+      const stream = Math.floor(frac * 5);
+      const sh = Math.abs(Math.sin(stream * 12.9898 + tx * 78.233 + ty * 37.719) * 43758.5453) % 1;
       const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bot));
       const yTop = Math.floor(top), yBot = Math.ceil(bot) - 1;
       const span = bot - top;
@@ -670,8 +700,33 @@ const Raycast = {
       const lit = light * shade;
       for (let y = y0; y < y1; y++, v += vStep) {
         let r, g, b;
-        if (corner || y === yTop || y === yBot) {
+        if (wf === 2) {
+          // Νερό που πέφτει: σκούρα βρεγμένη πέτρα από πίσω, φωτεινά ρυάκια που κατεβαίνουν,
+          // αφρός στη βάση.
+          const vv = v / N;
+          const ti = ((v < 0 ? 0 : v >= N ? N - 1 : v | 0) * N + u) * 3;
+          const fl = (vv * (1.1 + sh * 0.8) - now * (0.9 + sh * 0.8) + sh * 7) % 1;
+          const f = fl < 0 ? fl + 1 : fl;
+          // Στις άκρες κάθε ρυακιού σκοτεινότερο (το νερό χωρίζεται σε λωρίδες).
+          const sf = frac * 5 - stream;
+          let wk = (f < 0.55 ? 0.95 : f < 0.75 ? 0.6 : 0.3) * (sf < 0.12 || sf > 0.88 ? 0.45 : 1);
+          if (vv > 0.86) wk = Math.max(wk, 0.75 + 0.25 * Math.sin(now * 9 + stream * 2.3 + v));
+          const kk = lit;
+          r = tex[ti] * kk * 0.4 + 196 * wk * kk + gr;
+          g = tex[ti + 1] * kk * 0.4 + 168 * wk * kk + gg;
+          b = tex[ti + 2] * kk * 0.4 + 140 * wk * kk + gb;
+        } else if (corner || y === yTop || y === yBot) {
           r = er; g = eg; b = eb;
+        } else if (wf === 1) {
+          // Υγρός τοίχος: πιο σκούρος κοντά στο νερό, με σταγόνες που γλιστράνε σε μερικά σημεία.
+          const ti = ((v < 0 ? 0 : v >= N ? N - 1 : v | 0) * N + u) * 3;
+          const vv = v / N;
+          let k = lit * (vv > 0.62 ? 0.62 : 0.85);
+          if (sh > 0.78) {
+            const dl = (vv * 1.6 - now * (0.25 + sh * 0.3) + sh * 5) % 1;
+            if ((dl < 0 ? dl + 1 : dl) < 0.12) k *= 1.6;
+          }
+          r = tex[ti] * k + gr; g = tex[ti + 1] * k + gg; b = tex[ti + 2] * k + gb;
         } else {
           const ti = ((v < 0 ? 0 : v >= N ? N - 1 : v | 0) * N + u) * 3;
           // Σκιά στη βάση του τοίχου (εκεί που ακουμπάει το δάπεδο) και λίγο στην κορυφή.
@@ -775,6 +830,12 @@ const Raycast = {
           const m = (Y + Math.sin(X * 0.12 + ripple + tx * 1.7) * 3) % 13;
           const line = Math.abs((m < 0 ? m + 13 : m) - 6.5) < 0.6;
           if (line) { r = 112; g = 58; b = 30; } else { r = 30; g = 18; b = 13; }
+          // Αφρός μπροστά στον καταρράκτη: φωτεινές κηλίδες που ανακατεύονται, πιο πυκνές κοντά στον τοίχο.
+          if (this.foam[c]) {
+            const fx = wx - tx;
+            const n = Math.abs(Math.sin(Math.floor(X * 0.5) * 12.98 + Math.floor(Y * 0.5) * 78.23 + Math.floor(now * 7) * 3.1) * 43758.5) % 1;
+            if (n < 0.75 - fx * 0.8) { r = 200; g = 172; b = 140; }
+          }
         } else {
           const tex = cellFloor[c];
           const i = (v * RC_TEX + u) * 3;
@@ -844,7 +905,8 @@ const Raycast = {
       const alpha = Math.max(0, Math.min(1, (o.alpha === undefined ? 1 : o.alpha) * fog));
       if (alpha < 0.01) continue;
       const fh = frame ? frame.h : 1, fw = frame ? frame.w : 1;
-      const h = (o.h || fh * RC_SPX * (o.scale || 1)) * k;
+      // Τα καρέ διπλής ανάλυσης (frame.hd = 2) έχουν το ίδιο μέγεθος στον κόσμο με τα απλά.
+      const h = (o.h || (fh / ((frame && frame.hd) || 1)) * RC_SPX * (o.scale || 1)) * k;
       const w = (h * fw) / fh;
       const bottom = this.horizon + (this.focal * (RC_EYE - (o.z || 0) / TILE)) / p.depth;
       const top = Math.round(bottom - h), left = Math.round(p.sx - w / 2);

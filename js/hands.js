@@ -18,6 +18,8 @@ const Hands = {
 
   init() {
     this.art = [false, true].map((pluck) => this.build(pluck));
+    // Διπλή ανάλυση με σκίαση (όπως οι μορφές): λείες γραμμές, όγκος στα χέρια.
+    this.artHD = this.art.map((a) => ({ c: Sprites.hdify(a.c), s: Sprites.hdify(a.s) }));
   },
 
   build(pluck) {
@@ -132,7 +134,10 @@ const Hands = {
   //      πλησιάζει το όριο), light (0..1: φως από τον χώρο, π.χ. βωμός), walkPhase, walkSpeed, melody (0..1) }
   draw(pc, W, H, now, o) {
     // Μέγεθος: ακέραια μεγέθυνση ανάλογα με την ανάλυση (PC ~270 γραμμές → 2, κινητό οριζόντια → 1).
-    const k = Math.max(1, Math.round(Math.min(H, W * 0.75) / 165));
+    // Σε διπλή ανάλυση: kh art px ανά pixel της HD ζωγραφιάς (k = 2·kh στις συντεταγμένες της απλής).
+    // Μεγάλα, όπως το χέρι με το όπλο στα retro dungeon crawlers (~1/3 της οθόνης).
+    const kh = Math.max(1, Math.round(Math.min(H, W * 0.75) / 216));
+    const k = 2 * kh;
     const c = o.charging ? o.charge : 0;
     // Κίνηση: ταλαντεύεται με τα βήματα, σηκώνεται λίγο όσο φορτίζεις.
     // Όταν στέκεσαι: αργή "ανάσα" (τα χέρια ανεβοκατεβαίνουν λίγο), όπως στα FPS.
@@ -145,7 +150,7 @@ const Hands = {
 
     // Πόσο φωτεινά φαίνονται: αχνά στο σκοτάδι, φωτεινά όταν παίζει η λύρα.
     const bright = Math.min(1, 0.3 + o.light * 0.6 + c * 0.55 + o.pluck * 0.6 + o.melody * 0.7);
-    const art = this.art[o.pluck > 0.35 ? 1 : 0];
+    const art = this.artHD[o.pluck > 0.35 ? 1 : 0];
     pc.save();
     pc.setTransform(1, 0, 0, 1, 0, 0);
     pc.imageSmoothingEnabled = false;
@@ -189,7 +194,7 @@ const Hands = {
           // Η δόνηση: μεγαλύτερη στη μέση της χορδής, μηδέν στις άκρες.
           const mid = Math.sin(((y - HANDS_STRING_TOP) / (HANDS_STRING_BOT - HANDS_STRING_TOP)) * Math.PI);
           const dx = Math.round(Math.sin(now * (50 + i * 9) + y * 0.9) * vib * mid * 1.3);
-          pc.fillRect(ox + (sx + dx) * k, oy + y * k, k, k);
+          pc.fillRect(ox + (sx + dx) * k + (k - kh) / 2, oy + y * k, kh, k);
         }
       }
     }

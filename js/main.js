@@ -892,6 +892,7 @@ function frame(t) {
     Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
     Echoes.update(dt, gameTime);
     World3D.updateSparks(dt);
+    World3D.updateDrips(dt, gameTime, player);
     Hints.update(gameTime);
     updateLookBackWarning();
     Notice.update(gameTime);
@@ -939,10 +940,24 @@ function frame(t) {
   Sound.listenerY = player.y;
   Sound.listenerAngle = player.angle;
   Sound.updateListener();
+  updateWaterSound();
   Dread.update(dt, gameTime, player, monsters, state === 'play');
 
   draw();
   requestAnimationFrame(frame);
+}
+
+// Ο ήχος του πιο κοντινού καταρράκτη (μόνο όσο παίζεις): από τη θέση του, πνιχτός πίσω από τοίχο.
+function updateWaterSound() {
+  let best = null, bd = Infinity;
+  if (state === 'play' || state === 'dead') {
+    for (const f of Raycast.falls) {
+      const d = Math.hypot(f.x - player.x, f.y - player.y);
+      if (d < bd) { bd = d; best = f; }
+    }
+  }
+  if (best && bd < 440) Sound.updateWater(best.x, best.y, bd, Level.lineOfSight(player.x, player.y, best.x, best.y));
+  else Sound.updateWater(0, 0, -1, false);
 }
 
 // ---- Οθόνες ----
