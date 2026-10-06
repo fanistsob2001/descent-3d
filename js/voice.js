@@ -20,6 +20,8 @@ const VOICES = {
   orpheus:  { wave: 'sawtooth', f0: 132, syl: 0.14, range: 5, cut: 2300, crush: 0.2, breath: 0.08, wobble: 0.12, vol: 0.19, reverb: 0.45, fmt: 0.95 },
   charon:   { wave: 'sawtooth', f0: 62, syl: 0.2, range: 2, cut: 1100, crush: 0.7, breath: 0.12, wobble: 0.3, vol: 0.26, reverb: 0.55, fmt: 0.82 },
   hades:    { wave: 'square', f0: 78, syl: 0.18, range: 2, cut: 1300, crush: 0.5, breath: 0.04, wobble: 0.08, vol: 0.24, reverb: 0.7, fmt: 0.85 },
+  // Η Περσεφόνη: γυναίκα — βασιλική, ήρεμη, ζεστή.
+  persephone: { wave: 'triangle', f0: 245, syl: 0.16, range: 3, cut: 3400, crush: 0.1, breath: 0.3, wobble: 0.1, vol: 0.2, reverb: 0.75, fmt: 1.18 },
   // Η Ευρυδίκη: γυναίκα — ψηλή, απαλή, με ανάσα.
   eurydice: { wave: 'triangle', f0: 300, syl: 0.15, range: 4, cut: 3600, crush: 0.1, breath: 0.45, wobble: 0.15, vol: 0.2, reverb: 0.8, fmt: 1.2 },
   // Σκιές: παραμορφωμένο βογκητό, αντρικό ή γυναικείο.
@@ -31,6 +33,25 @@ const VOICES = {
   soulM:    { wave: 'triangle', f0: 118, syl: 0.16, range: 3, cut: 2500, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, hum: 0.14, reverb: 0.8, fmt: 0.88 },
   soulOld:  { wave: 'triangle', f0: 92, syl: 0.19, range: 2, cut: 2100, crush: 0, breath: 1, wobble: 0.5, vol: 0.2, whisper: true, hum: 0.12, reverb: 0.8, fmt: 0.82 },
   soulF:    { wave: 'triangle', f0: 225, syl: 0.15, range: 4, cut: 3800, crush: 0, breath: 1, wobble: 0.2, vol: 0.2, whisper: true, hum: 0.14, reverb: 0.8, fmt: 1.2 },
+};
+
+// Αληθινές φωνές (Web Speech API του browser): για κάθε χαρακτήρα φύλο ('m' / 'f'), τόνος (0..2),
+// ταχύτητα, ένταση, ποια από τις φωνές του φύλου του (pick, για ποικιλία), και μια "στρώση" από τις
+// συνθετικές φωνές από πάνω (layer = πόσο δυνατά): δίνει την ατμόσφαιρα (βογκητό, ψίθυρος,
+// στρίγγλισμα) και την κατεύθυνση στον χώρο, που οι φωνές του browser δεν έχουν.
+const SPEECH = {
+  narrator: { g: 'm', pitch: 0.82, rate: 0.88, vol: 1, pick: 0, layer: 0 },
+  orpheus:  { g: 'm', pitch: 1.08, rate: 0.95, vol: 1, pick: 1, layer: 0 },
+  charon:   { g: 'm', pitch: 0.1, rate: 0.68, vol: 1, pick: 2, layer: 0.35 },
+  hades:    { g: 'm', pitch: 0.3, rate: 0.74, vol: 1, pick: 3, layer: 0.3 },
+  eurydice: { g: 'f', pitch: 1.12, rate: 0.82, vol: 0.85, pick: 0, layer: 0.45 },
+  persephone: { g: 'f', pitch: 0.95, rate: 0.84, vol: 0.9, pick: 2, layer: 0.25 },
+  shade:    { g: 'm', pitch: 0.05, rate: 0.62, vol: 0.85, pick: 2, layer: 0.5 },
+  shadeF:   { g: 'f', pitch: 0.35, rate: 0.64, vol: 0.85, pick: 1, layer: 0.5 },
+  erinys:   { g: 'f', pitch: 1.75, rate: 1.08, vol: 0.9, pick: 2, layer: 0.55 },
+  soulM:    { g: 'm', pitch: 0.72, rate: 0.76, vol: 0.55, pick: 1, layer: 0.8 },
+  soulOld:  { g: 'm', pitch: 0.38, rate: 0.66, vol: 0.55, pick: 3, layer: 0.8 },
+  soulF:    { g: 'f', pitch: 0.98, rate: 0.76, vol: 0.55, pick: 1, layer: 0.8 },
 };
 
 // Formants (F1, F2) για κάθε φωνήεν — δίνουν στη φωνή το "α", "ε", "ι", "ο", "ου".
@@ -95,6 +116,7 @@ const Voice = {
   },
 
   stop() {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
     const t = Sound.ctx ? Sound.ctx.currentTime : 0;
     for (const n of this.active) {
       try {
@@ -105,13 +127,69 @@ const Voice = {
     this.active = [];
   },
 
+  // ---- Αληθινές φωνές (Web Speech API) ----
+  _voices: null,
+
+  // Οι αγγλικές φωνές του browser, χωρισμένες σε γυναικείες / αντρικές (από το όνομά τους).
+  speechVoices() {
+    if (!('speechSynthesis' in window)) return null;
+    if (this._voices && this._voices.all.length) return this._voices;
+    const all = speechSynthesis.getVoices().filter((v) => /^en/i.test(v.lang));
+    const F = /female|zira|hazel|susan|samantha|victoria|karen|moira|tessa|fiona|aria|jenny|libby|sonia|natasha|emma|olivia|catherine|serena|ava|allison|kate|linda|heera|michelle|ana\b|clara|elizabeth/i;
+    const M = /\bmale|david|mark|george|daniel|alex|fred|ryan|guy|james|thomas|oliver|arthur|brian|christopher|eric|roger|richard|william|sean|liam|tony|rishi|aaron/i;
+    const f = all.filter((v) => F.test(v.name));
+    const m = all.filter((v) => !F.test(v.name) && M.test(v.name));
+    this._voices = { all, f, m };
+    return this._voices;
+  },
+
+  // Αληθινές φωνές: αν το θέλει ο παίκτης (Settings.voice) και ο browser έχει αγγλικές φωνές.
+  realVoices() {
+    if (typeof Settings !== 'undefined' && Settings.voice === '8bit') return false;
+    const v = this.speechVoices();
+    return !!(v && v.all.length);
+  },
+
   // Λέει μια φράση. opts: { x, y } = από εκείνο το σημείο του κόσμου (panning, απόσταση),
   // fade: true = σβήνει σιγά σιγά ως τη σιωπή, delay: δευτ. πριν ξεκινήσει.
   // Επιστρέφει πόσο κρατάει (δευτ.) — για να μένει ο υπότιτλος όσο χρειάζεται.
   say(text, who, opts = {}) {
+    const sp = SPEECH[who];
+    if (!sp || !this.realVoices() || Sound.muted) return this.sayChip(text, who, opts);
+    // Πόσο μακριά (για την ένταση): πολύ μακριά = μόνο η στρώση (ή τίποτα).
+    let near = 1;
+    if (opts.x !== undefined) {
+      const d = Math.hypot(opts.x - Sound.listenerX, opts.y - Sound.listenerY);
+      near = Math.max(0, 1 - d / 650);
+    }
+    let dur = this.sayChip(text, who, { ...opts, volMul: sp.layer });
+    if (near > 0.05) {
+      const V = this.speechVoices();
+      const pool = (sp.g === 'f' ? V.f : V.m).length ? (sp.g === 'f' ? V.f : V.m) : V.all;
+      const u = new SpeechSynthesisUtterance(text);
+      u.voice = pool[sp.pick % pool.length];
+      u.lang = u.voice.lang;
+      // Αν δεν βρέθηκε φωνή του σωστού φύλου, ο τόνος το "διορθώνει" λίγο.
+      const wrongSex = !(sp.g === 'f' ? V.f : V.m).length;
+      u.pitch = Math.max(0, Math.min(2, sp.pitch + (wrongSex ? (sp.g === 'f' ? 0.5 : -0.3) : 0)));
+      u.rate = sp.rate;
+      u.volume = Math.max(0.05, Math.min(1, sp.vol * (0.35 + 0.65 * near)));
+      const go = () => speechSynthesis.speak(u);
+      if (opts.delay) setTimeout(go, opts.delay * 1000); else go();
+      // Πόσο θα κρατήσει περίπου (για τους υπότιτλους): ~14 χαρακτήρες το δευτ. σε κανονική ταχύτητα.
+      const est = (text.length / 14) / sp.rate + (text.match(/[.,!?…]/g) || []).length * 0.25 + 0.3;
+      dur = Math.max(dur, est);
+    }
+    return dur;
+  },
+
+  // Η συνθετική (chiptune) φωνή. opts.volMul = πόσο δυνατά (1 = κανονικά, 0 = καθόλου).
+  sayChip(text, who, opts = {}) {
     const dur = this.duration(text, who);
     if (!Sound.ready()) return dur;
-    const ac = Sound.ctx, v = VOICES[who] || VOICES.narrator;
+    if (opts.volMul === 0) return dur;
+    const ac = Sound.ctx, v0 = VOICES[who] || VOICES.narrator;
+    const v = opts.volMul !== undefined ? { ...v0, vol: v0.vol * opts.volMul } : v0;
     const t0 = ac.currentTime + (opts.delay || 0) + 0.03;
     const mine = [];   // οι κόμβοι αυτής της φράσης
     const keep = (n) => { mine.push(n); this.active.push(n); };
@@ -248,3 +326,9 @@ const Voice = {
     return t - t0;
   },
 };
+
+// Οι φωνές του browser φορτώνουν ασύγχρονα: όταν αλλάξουν, ξαναδιάβασέ τες.
+if ('speechSynthesis' in window) {
+  speechSynthesis.addEventListener('voiceschanged', () => { Voice._voices = null; });
+  speechSynthesis.getVoices();
+}

@@ -38,6 +38,7 @@
       </button>
     </div>
   </div>
+  <div id="mission" class="hidden"></div>
   <div id="hint"></div>
   <div id="notice"></div>
   <div id="level-intro"><p id="intro-number"></p><p id="intro-name"></p><p id="intro-line"></p></div>
@@ -48,6 +49,7 @@
     <div class="meander"></div>
     <h1>DESCENT</h1>
     <div class="meander"></div>
+    <p class="tagline">Only what can be heard.</p>
     <button id="btn-continue" class="btn" type="button" data-action="continue">Continue</button>
     <button id="btn-new" class="btn" type="button" data-action="new">New Game</button>
     <button class="btn" type="button" data-action="settings">Settings</button>
@@ -65,19 +67,37 @@
     <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
     <button class="btn vibration-toggle" type="button" data-action="vibration">Vibration: on</button>
     <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
+    <button class="btn voice-toggle" type="button" data-action="voice">Voices: real</button>
     <button class="btn primary" type="button" data-action="back">Back</button>
   </div>
 
   <div id="pause" class="overlay hidden">
-    <h2>Paused</h2>
-    <div class="meander"></div>
-    <p id="pause-chapter" class="small-label"></p>
-    <p id="pause-objective" class="objective"></p>
-    <button class="btn primary" type="button" data-action="resume">Resume</button>
-    <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
-    <button class="btn vibration-toggle" type="button" data-action="vibration">Vibration: on</button>
-    <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
-    <button class="btn" type="button" data-action="menu">Main menu</button>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Paused</h2>
+        <p id="pause-chapter" class="small-label"></p>
+      </div>
+      <div class="meander"></div>
+      <div class="panel-body">
+        <!-- Αποστολές (STORY.md, ενότητα 11): σκοπός, κύρια αποστολή, δευτερεύουσες -->
+        <section class="missions">
+          <h3>Mission</h3>
+          <p id="mission-goal" class="goal"></p>
+          <p id="mission-main" class="main-mission"></p>
+          <p id="pause-objective" class="objective"></p>
+          <h3>Side missions</h3>
+          <ul id="mission-side" class="side-missions"></ul>
+        </section>
+        <section class="panel-actions">
+          <button class="btn primary" type="button" data-action="resume">Resume</button>
+          <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
+          <button class="btn vibration-toggle touch-only" type="button" data-action="vibration">Vibration: on</button>
+          <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
+          <button class="btn voice-toggle" type="button" data-action="voice">Voices: real</button>
+          <button class="btn" type="button" data-action="menu">Main menu</button>
+        </section>
+      </div>
+    </div>
   </div>
 
   <!-- Χάρτης: ο ίδιος ο χάρτης ζωγραφίζεται στο canvas (drawMap στο js/main.js) -->
@@ -128,6 +148,7 @@
   <script src="js/fx.js"></script>
   <script src="js/hints.js"></script>
   <script src="js/save.js"></script>
+  <script src="js/missions.js"></script>
   <script src="js/altar.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/voice.js"></script>

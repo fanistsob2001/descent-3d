@@ -16,7 +16,8 @@ const Save = {
 
   // Η κατάσταση ενός καινούργιου παιχνιδιού (chapter -1 = πριν τον πρώτο βωμό).
   fresh() {
-    return { chapter: -1, jars: 0, strings: 0, obol: false, paid: false, melody: 0, taken: [], seen: '' };
+    // heard / secrets: οι ψυχές που άκουσες και τα μυστικά που βρήκες (αποστολές, js/missions.js).
+    return { chapter: -1, jars: 0, strings: 0, obol: false, paid: false, melody: 0, taken: [], seen: '', heard: [], secrets: [] };
   },
 
   load() {
@@ -73,6 +74,7 @@ const Settings = {
   sound: true,
   vibration: true,
   mouse: 1,          // πολλαπλασιαστής του βλέμματος με το ποντίκι (ένα από τα MOUSE_SENS)
+  voice: 'real',     // φωνές: 'real' (του browser) ή '8bit' (συνθετικές)
 
   load() {
     try {
@@ -81,13 +83,14 @@ const Settings = {
         this.sound = d.sound !== false;
         this.vibration = d.vibration !== false;
         if (MOUSE_SENS.includes(d.mouse)) this.mouse = d.mouse;
+        if (d.voice === '8bit' || d.voice === 'real') this.voice = d.voice;
       }
     } catch (_) { /* - */ }
   },
 
   store() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse }));
+      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice }));
     } catch (_) { /* - */ }
   },
 };

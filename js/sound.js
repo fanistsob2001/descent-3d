@@ -83,7 +83,7 @@ const Sound = {
     // Reverb από "τεχνητή" απόκριση χώρου: θόρυβος που σβήνει εκθετικά.
     this.reverbSend = ac.createGain();
     const conv = ac.createConvolver();
-    conv.buffer = this.makeImpulse(2.8, 3);
+    conv.buffer = this.makeImpulse(3.2, 3.2);
     const revOut = ac.createGain();
     revOut.gain.value = 0.6;
     this.reverbSend.connect(conv);
@@ -103,15 +103,29 @@ const Sound = {
   },
 
   makeImpulse(seconds, decay) {
+    // Σπηλιά: πρώτα μερικές διακριτές ανακλάσεις από τους κοντινούς τοίχους (διαφορετικές σε κάθε
+    // αυτί), μετά μια πυκνή ουρά που σβήνει εκθετικά και γίνεται όλο και πιο "σκοτεινή" (η πέτρα
+    // απορροφά τα πρίμα) — ένα lowpass που κλείνει με τον χρόνο.
     const ac = this.ctx;
     const len = Math.floor(ac.sampleRate * seconds);
     const buf = ac.createBuffer(2, len, ac.sampleRate);
     for (let c = 0; c < 2; c++) {
       const d = buf.getChannelData(c);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        const k = 0.75 - 0.7 * t;                    // όσο περνάει ο χρόνος, πιο πολύ lowpass
+        lp += k * ((Math.random() * 2 - 1) - lp);
+        d[i] = lp * Math.pow(1 - t, decay) * (1.4 - 0.4 * k);
+      }
+      for (let r = 0; r < 9; r++) {
+        const at = Math.floor(ac.sampleRate * (0.008 + Math.random() * 0.075));
+        d[at] += (Math.random() < 0.5 ? -1 : 1) * (0.9 - r * 0.07);
+      }
     }
     return buf;
   },
+
 
   noiseSource(loop = false) {
     const src = this.ctx.createBufferSource();
@@ -242,6 +256,56 @@ const Sound = {
     }
     noise.start();
     lfo.start();
+
+    // Αέρας που σφυρίζει μέσα από τις σπηλιές: θόρυβος μέσα από στενό φίλτρο που "ταξιδεύει"
+    // αργά, και δυναμώνει / σβήνει σαν ριπές.
+    const wind = this.noiseSource(true);
+    const wbp = ac.createBiquadFilter();
+    wbp.type = 'bandpass';
+    wbp.frequency.value = 520;
+    wbp.Q.value = 6;
+    const wg = ac.createGain();
+    wg.gain.value = 0.08;
+    wind.connect(wbp);
+    wbp.connect(wg);
+    wg.connect(this.ambient);
+    for (const [freq, depth, target] of [[0.045, 260, wbp.frequency], [0.11, 0.07, wg.gain]]) {
+      const l = ac.createOscillator();
+      l.frequency.value = freq;
+      const ld = ac.createGain();
+      ld.gain.value = depth;
+      l.connect(ld);
+      ld.connect(target);
+      l.start();
+    }
+    wind.start();
+  },
+
+  // Πού και πού, ένα μακρινό βουητό της γης (κάθε 20-50 δευτ.) — το Κάτω Κόσμο "αναπνέει".
+  // Δεν είναι ήχος του παιχνιδιού: οι σκιές δεν το ακούνε.
+  ambienceTick(now) {
+    if (!this.ready() || this.muted) return;
+    if (this._rumbleAt === undefined) this._rumbleAt = now + 15 + Math.random() * 20;
+    if (now < this._rumbleAt) return;
+    this._rumbleAt = now + 20 + Math.random() * 30;
+    const ac = this.ctx, t = ac.currentTime;
+    const src = this.noiseSource();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 90;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.32, t + 1.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
+    src.connect(lp);
+    lp.connect(g);
+    g.connect(this.sfx);
+    const rv = ac.createGain();
+    rv.gain.value = 0.6;
+    g.connect(rv);
+    rv.connect(this.reverbSend);
+    src.start(t, Math.random());
+    src.stop(t + 3.8);
   },
 
   // Ένταση του ambient (0..1), με ομαλή μετάβαση.
@@ -344,22 +408,45 @@ const Sound = {
     if (lyre) this.pluck(size > 0.5 ? 146.83 : 293.66, t + 0.03, 0.26);
   },
 
-  // Βήμα: πολύ σύντομος φιλτραρισμένος θόρυβος.
-  step() {
+  step(surface = 'stone', wet = false) {
+    // Βήμα (μόνο όταν τρέχεις): ο γδούπος της φτέρνας + το σύρσιμο της σόλας. surface:
+    // 'gravel' (σπηλιά: κοκκώδες, με χαλίκια), 'stone' (λαξευμένη πέτρα), 'marble' (παλάτι: καθαρό
+    // "κλακ"). wet = δίπλα σε νερό: λίγο πλατσούρισμα.
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;
-    const src = this.noiseSource();
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 420 + Math.random() * 380;
-    const g = ac.createGain();
-    this.envelope(g.gain, t, 0.09 + Math.random() * 0.03, 0.004, 0.07);
-    src.connect(lp);
-    lp.connect(g);
-    g.connect(this.sfx);
-    src.start(t, Math.random() * 1.5);
-    src.stop(t + 0.12);
+    const out = ac.createGain();
+    out.gain.value = 1;
+    out.connect(this.sfx);
+    const rv = ac.createGain();
+    rv.gain.value = surface === 'marble' ? 0.35 : 0.2;
+    out.connect(rv);
+    rv.connect(this.reverbSend);
+    const burst = (type, freq, q, peak, at, dec) => {
+      const src = this.noiseSource();
+      const f = ac.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = q;
+      const g = ac.createGain();
+      this.envelope(g.gain, t + at, peak, 0.003, dec);
+      src.connect(f);
+      f.connect(g);
+      g.connect(out);
+      src.start(t + at, Math.random() * 1.5);
+      src.stop(t + at + dec + 0.05);
+    };
+    burst('lowpass', 200 + Math.random() * 80, 0.8, 0.13, 0, 0.08);                 // φτέρνα
+    if (surface === 'marble') {
+      burst('bandpass', 3200 + Math.random() * 600, 3, 0.05, 0.006, 0.035);           // κλακ
+    } else {
+      burst('bandpass', (surface === 'gravel' ? 2400 : 1700) + Math.random() * 500, 1.6, 0.045, 0.014, 0.07);   // σύρσιμο
+    }
+    if (surface === 'gravel') {
+      for (let k = 0; k < 3; k++) burst('highpass', 3800, 0.7, 0.025, 0.01 + Math.random() * 0.05, 0.012);       // χαλίκια
+    }
+    if (wet) burst('bandpass', 900 + Math.random() * 300, 0.7, 0.05, 0.02, 0.16);    // πλατσούρισμα
   },
+
 
   // Πέταγμα αγγείου: σύντομο "φσστ".
   jarThrow() {
@@ -617,39 +704,147 @@ const Sound = {
   // Easter egg B: ένα γάβγισμα του Κέρβερου (freq = πόσο βαθύ), μετά από delay δευτ.
   // Δεν είναι κύμα του παιχνιδιού — οι σκιές δεν το ακούνε.
   bark(x, y, freq, delay) {
+    // Γάβγισμα: τραχύς λαρυγγικός τόνος (πριονωτός με "τρίξιμο" ~55 Hz) που ανεβαίνει απότομα και
+    // πέφτει ("γουάφ"), μέσα από δύο formants στόματος που κλείνουν (α → ου), λίγη παραμόρφωση,
+    // και θόρυβος ανάσας στην αρχή.
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime + delay;
-    const out = this.spatial(x, y, 0.9, 600);
-    // Φωνή: πριονωτός τόνος που πέφτει απότομα, μέσα από φίλτρο "στόματος".
+    const out = this.spatial(x, y, 1, 650);
     const o = ac.createOscillator();
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(freq * 1.5, t);
-    o.frequency.exponentialRampToValueAtTime(freq, t + 0.05);
-    o.frequency.exponentialRampToValueAtTime(freq * 0.7, t + 0.2);
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = freq * 3.2;
-    bp.Q.value = 1.4;
-    const g = ac.createGain();
-    this.envelope(g.gain, t, 0.5, 0.01, 0.2);
-    o.connect(bp);
-    bp.connect(g);
-    g.connect(out);
-    o.start(t);
-    o.stop(t + 0.3);
-    // Λίγη "ανάσα" στην αρχή του γαβγίσματος.
+    o.frequency.setValueAtTime(freq * 0.85, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.6, t + 0.035);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.72, t + 0.24);
+    const rough = ac.createGain();
+    rough.gain.value = 0.7;
+    const am = ac.createOscillator();
+    am.frequency.value = 55 + Math.random() * 15;
+    const amg = ac.createGain();
+    amg.gain.value = 0.35;
+    am.connect(amg);
+    amg.connect(rough.gain);
+    o.connect(rough);
+    const drive = ac.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) curve[i] = Math.tanh(((i / 255) * 2 - 1) * 2.5);
+    drive.curve = curve;
+    rough.connect(drive);
+    const env = ac.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.55, t + 0.012);
+    env.gain.setValueAtTime(0.55, t + 0.07);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.27);
+    for (const [f0, f1, q, gv] of [[freq * 2.4, freq * 1.5, 3, 1.4], [freq * 5.5, freq * 3.4, 5, 0.8]]) {
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = q;
+      bp.frequency.setValueAtTime(f0, t);
+      bp.frequency.exponentialRampToValueAtTime(f1, t + 0.22);
+      const g = ac.createGain();
+      g.gain.value = gv;
+      drive.connect(bp);
+      bp.connect(g);
+      g.connect(env);
+    }
+    env.connect(out);
+    o.start(t); am.start(t);
+    o.stop(t + 0.3); am.stop(t + 0.3);
     const n = this.noiseSource();
     const hp = ac.createBiquadFilter();
     hp.type = 'bandpass';
-    hp.frequency.value = freq * 6;
+    hp.frequency.value = 1800;
+    hp.Q.value = 0.8;
     const ng = ac.createGain();
-    this.envelope(ng.gain, t, 0.18, 0.005, 0.08);
+    this.envelope(ng.gain, t, 0.2, 0.005, 0.07);
     n.connect(hp);
     hp.connect(ng);
     ng.connect(out);
     n.start(t, Math.random());
     n.stop(t + 0.12);
   },
+
+  // Σφύριγμα φιδιού: θόρυβος στα πρίμα που φουσκώνει και σβήνει, με ένα λεπτό "τρέμουλο".
+  hiss(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.8, 420);
+    const src = this.noiseSource();
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 2600;
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(5200, t);
+    bp.frequency.linearRampToValueAtTime(6800, t + 0.9);
+    bp.Q.value = 0.9;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.32, t + 0.12);
+    g.gain.setValueAtTime(0.32, t + 0.65);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+    const trem = ac.createOscillator();
+    trem.frequency.value = 22;
+    const tg = ac.createGain();
+    tg.gain.value = 0.08;
+    trem.connect(tg);
+    tg.connect(g.gain);
+    src.connect(hp);
+    hp.connect(bp);
+    bp.connect(g);
+    g.connect(out);
+    src.start(t, Math.random());
+    trem.start(t);
+    src.stop(t + 1.2);
+    trem.stop(t + 1.2);
+  },
+
+  // Ο Κέρβερος κοιμάται: βαθιά ανάσα / ροχαλητό (θόρυβος μέσα από χαμηλό φίλτρο που ανεβοκατεβαίνει
+  // αργά) και ένα πολύ χαμηλό γρύλισμα, από τη θέση του. dist < 0 = σιωπή.
+  updateSnore(x, y, dist, los) {
+    if (!this.ctx) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (!this._snore) {
+      const src = this.noiseSource(true);
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 260;
+      bp.Q.value = 1.6;
+      const breath = ac.createGain();
+      breath.gain.value = 0.5;
+      const lfo = ac.createOscillator();
+      lfo.frequency.value = 0.28;
+      const lg = ac.createGain();
+      lg.gain.value = 0.5;
+      lfo.connect(lg);
+      lg.connect(breath.gain);
+      const growl = ac.createOscillator();
+      growl.type = 'sawtooth';
+      growl.frequency.value = 46;
+      const glp = ac.createBiquadFilter();
+      glp.type = 'lowpass';
+      glp.frequency.value = 180;
+      const gg = ac.createGain();
+      gg.gain.value = 0.25;
+      lg.connect(gg.gain);
+      const g = ac.createGain();
+      g.gain.value = 0;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1200;
+      const pan = this.placeNode(x, y, 'equalpower');
+      src.connect(bp); bp.connect(breath); breath.connect(g);
+      growl.connect(glp); glp.connect(gg); gg.connect(g);
+      g.connect(lp); lp.connect(pan); pan.connect(this.sfx);
+      src.start(); lfo.start(); growl.start();
+      this._snore = { g, lp, pan };
+    }
+    const w = this._snore;
+    const v = dist < 0 ? 0 : Math.max(0, 1 - dist / 260);
+    w.g.gain.setTargetAtTime(v * v * 0.5, t, 0.3);
+    w.lp.frequency.setTargetAtTime(los ? 1200 : 400, t, 0.3);
+    if (dist >= 0) this.setPlace(w.pan, x, y);
+  },
+
 
   // Ακύρωση κύματος: ένα απαλό "φσσσ" που πέφτει — ο ήχος δεν βγήκε ποτέ.
   cancel() {

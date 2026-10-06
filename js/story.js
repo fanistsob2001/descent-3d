@@ -78,6 +78,33 @@ const STORY = {
     "We hear you, living one.",
   ],
 
+  // Πρώτο πρόσωπο: ο Άδης και η Περσεφόνη στους θρόνους τους (STORY.md, ενότητα 8).
+  hadesHall: "Another living soul in my halls. Come closer, singer.",
+  persephoneHall: "I can hear the world above in your footsteps.",
+
+  // Αποστολές (STORY.md, ενότητα 11).
+  goal: "Bring Eurydice back to the world of the living.",
+  missionMain: [
+    "Find the way down",
+    "Cross the Acheron",
+    "Cross the waters of Lethe",
+    "Cross the Asphodel Meadows",
+    "Cross the marshes of Styx",
+    "Pass through Tartarus",
+    "Reach the throne of Hades",
+    "Lead Eurydice to the light. Do not look back.",
+  ],
+  sideMissions: [
+    { id: 'strings', title: "Mend the lyre", text: "Find the three strings of your lyre." },
+    { id: 'obol', title: "The ferryman's toll", text: "Find an obol and pay Charon." },
+    { id: 'souls', title: "Voices of the lost", text: "Hear all nine lost souls." },
+    { id: 'jars', title: "Libations", text: "Find every libation jar." },
+    { id: 'altars', title: "Rekindle the flames", text: "Light every altar." },
+    { id: 'cerberus', title: "The guardian sleeps", text: "Wake the hound of Hades.", secret: true },
+    { id: 'stuck', title: "Three thousand years", text: "Find the shade that walks into the wall.", secret: true },
+  ],
+  missionComplete: (t) => "Mission complete: " + t,
+
   // Easter eggs (STORY.md, ενότητα 9).
   stuckShade: "I have been walking into this wall for three thousand years.",
   cerberus: "Good boy. Good boy. Good boy.",

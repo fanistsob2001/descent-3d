@@ -150,7 +150,11 @@ function updatePlayer(dt) {
     const side = 3 * player.foot;
     Echoes.emit(player.x - uy * side, player.y + ux * side,
       STEP_WAVE.radius, STEP_WAVE.strength, 'step');
-    Sound.step();
+    // Το έδαφος κάτω από τα πόδια: χαλίκι στις σπηλιές, πέτρα, μάρμαρο στο παλάτι· δίπλα σε νερό πλατσούρισμα.
+    const ptx = Math.floor(player.x / TILE), pty = Math.floor(player.y / TILE);
+    const theme = RC_THEMES[Level.regionAt(ptx, pty)] || 'rock';
+    const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => Level.terrainAt(ptx + dx, pty + dy) === T_WATER);
+    Sound.step(theme === 'palace' ? 'marble' : theme === 'blocks' ? 'stone' : 'gravel', wet);
   }
 }
 
@@ -327,6 +331,10 @@ function draw() {
   const pc = Pixel.begin();
   const W = Pixel.w, H = Pixel.h;
 
+  if (state === 'menu' && !view2d) {
+    drawMenu3D(pc, W, H);
+    return;
+  }
   if (state === 'menu') {
     Fx.drawMenu(pc, W, H, performance.now() / 1000, menuArtBox(W, H));
     Pixel.present(ctx, dpr);
@@ -568,6 +576,43 @@ function drawMiniMap(pc, W, H) {
   pc.moveTo(x + 0.5, y + 0.5);
   pc.lineTo(x + 0.5 + player.fx * 6, y + 0.5 + player.fy * 6);
   pc.stroke();
+}
+
+// ---- Η σκηνή του μενού (3D): η αίθουσα του θρόνου του Άδη, ζωντανή πίσω από τα κουμπιά ----
+// Η κάμερα γυρίζει αργά, και κάθε λίγα δευτερόλεπτα ένα κύμα αποκαλύπτει τους τοίχους με τις
+// ζωφόρους, τα αγάλματα, τον Άδη και την Περσεφόνη. Δεν αγγίζει την πρόοδο του παίκτη (ούτε τον
+// χάρτη: Echoes.markSeen = false) — το spawn ξαναστήνει τα πάντα.
+const menuScene = { ready: false, t: 0, nextWave: 0.6 };
+function prepareMenuScene() {
+  Echoes.init();
+  Echoes.markSeen = false;
+  monsters = [];
+  Altars.reset(6);
+  Items.reset([]);
+  Souls.reset();
+  Eggs.reset();
+  World3D.reset();
+  Eurydice.reset('none', Level.start);
+  Echoes.listeners = World3D.listeners();
+  menuScene.ready = true;
+  menuScene.t = 0;
+  menuScene.nextWave = 0.6;
+}
+function menuCamera() {
+  const h = Level.decor.find((d) => d.kind === 'hades') || Level.start;
+  return { x: h.x - 6.4 * TILE, y: h.y + 0.5 * TILE, angle: Math.sin(menuScene.t * 0.11) * 0.55 };
+}
+function drawMenu3D(pc, W, H) {
+  if (!menuScene.ready) prepareMenuScene();
+  const c = menuCamera();
+  Raycast.exitA = 0;
+  Raycast.monsters = monsters;
+  Raycast.render(pc, c.x, c.y, c.angle, menuScene.t, Raycast.focal * Math.tan(0.05));
+  World3D.draw(pc, menuScene.t);
+  Pixel.bloom(0.55, World3D.lights);
+  Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
+  Pottery.meander(pc, 0, H - 7, W, 7, POT.terra, 0.35, 1);
+  Pixel.present(ctx, dpr, 0, 0, 'palette');
 }
 
 // Πού μπαίνει η σκηνή του μενού (σε art pixels): στον χώρο #menu-art, πάνω από τον τίτλο.
@@ -894,6 +939,7 @@ function frame(t) {
     World3D.updateSparks(dt);
     World3D.updateDrips(dt, gameTime, player);
     Hints.update(gameTime);
+    Missions.update(gameTime);
     updateLookBackWarning();
     Notice.update(gameTime);
 
@@ -924,6 +970,16 @@ function frame(t) {
     const follow = 1 - Math.pow(0.001, dt);
     camera.x += (player.x - camera.x) * follow;
     camera.y += (player.y - camera.y) * follow;
+  } else if (state === 'menu' && !view2d && menuScene.ready) {
+    // Η σκηνή του μενού: κύματα πού και πού από την κάμερα, που αποκαλύπτουν την αίθουσα.
+    menuScene.t += dt;
+    if (menuScene.t >= menuScene.nextWave) {
+      menuScene.nextWave = menuScene.t + 3.4;
+      const c = menuCamera();
+      Echoes.emit(c.x, c.y, 420, 0.85, 'call');
+    }
+    Echoes.update(dt, menuScene.t);
+    World3D.updateSparks(dt);
   } else if (state === 'dead') {
     gameTime += dt;
     Echoes.update(dt, gameTime);
@@ -958,12 +1014,21 @@ function updateWaterSound() {
   }
   if (best && bd < 440) Sound.updateWater(best.x, best.y, bd, Level.lineOfSight(player.x, player.y, best.x, best.y));
   else Sound.updateWater(0, 0, -1, false);
+  // Ο Κέρβερος ροχαλίζει στον ύπνο του (όχι όσο γαβγίζει).
+  const cb = Eggs.cerberus;
+  const playing = state === 'play' || state === 'dead';
+  if (cb && playing && gameTime - cb.barkStart > CERB_BARK_GAP * 3 + 0.5) {
+    const d = Math.hypot(cb.x - player.x, cb.y - player.y);
+    Sound.updateSnore(cb.x, cb.y, d < 300 ? d : -1, Level.lineOfSight(player.x, player.y, cb.x, cb.y));
+  } else Sound.updateSnore(0, 0, -1, false);
+  if (state === 'play') Sound.ambienceTick(gameTime);
 }
 
 // ---- Οθόνες ----
 function showScreen(name) {
   for (const key in screens) screens[key].classList.toggle('hidden', key !== name);
   hudEl.classList.toggle('hidden', state !== 'play' && state !== 'paused');
+  $('mission').classList.toggle('hidden', state !== 'play' || view2d);
   if (name === 'menu') {
     // Continue μόνο αν υπάρχει save· τότε είναι και το κύριο κουμπί (Enter).
     const hasSave = Save.exists();
@@ -971,10 +1036,43 @@ function showScreen(name) {
     $('btn-continue').classList.toggle('primary', hasSave);
     $('btn-new').classList.toggle('primary', !hasSave);
   }
-  if (name === 'pause') {
-    const ch = CHAPTERS[Math.max(0, chapter)];
-    $('pause-chapter').textContent = `${ch.numeral}. ${ch.name}`;
-    $('pause-objective').textContent = ch.objective(strings);
+  if (name === 'pause') fillPause();
+}
+
+// Η παύση: κεφάλαιο, σκοπός, κύρια αποστολή (με τον στόχο του κεφαλαίου) και δευτερεύουσες με πρόοδο.
+function fillPause() {
+  const r = Math.max(0, playerRegion(), 0);
+  const ch = CHAPTERS[Math.min(CHAPTERS.length - 1, r)];
+  $('pause-chapter').textContent = `${ch.numeral}. ${ch.name}`;
+  $('mission-goal').textContent = STORY.goal;
+  $('mission-main').textContent = Missions.mainTitle(r);
+  $('pause-objective').textContent = ch.objective(strings);
+  const ul = $('mission-side');
+  ul.textContent = '';
+  for (const m of STORY.sideMissions) {
+    const pr = Missions.progress(m.id);
+    const hide = m.secret && !pr.done;
+    const li = document.createElement('li');
+    if (pr.done) li.classList.add('done');
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.textContent = pr.done ? '\u2713' : '\u25C7';
+    const name = document.createElement('span');
+    name.className = 'name';
+    const b = document.createElement('b');
+    b.textContent = hide ? '???' : m.title;
+    name.appendChild(b);
+    if (!hide) {
+      const d = document.createElement('span');
+      d.className = 'desc';
+      d.textContent = ' \u2014 ' + m.text;
+      name.appendChild(d);
+    }
+    const prog = document.createElement('span');
+    prog.className = 'prog';
+    prog.textContent = pr.total > 1 ? `${pr.cur}/${pr.total}` : '';
+    li.append(mark, name, prog);
+    ul.appendChild(li);
   }
 }
 
@@ -983,6 +1081,7 @@ function updateToggleLabels() {
     b.textContent = Settings.sound ? 'Sound: on' : 'Sound: off';
   }
   for (const b of document.querySelectorAll('.mouse-toggle')) b.textContent = `Mouse: ${Settings.mouse}x`;
+  for (const b of document.querySelectorAll('.voice-toggle')) b.textContent = Settings.voice === '8bit' ? 'Voices: 8-bit' : 'Voices: real';
   for (const b of document.querySelectorAll('.vibration-toggle')) {
     b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
   }
@@ -998,6 +1097,7 @@ function updateHud() {
   $('melody-count').textContent = String(Melody.uses);
   const r = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
   hudRegion = r;
+  $('mission').textContent = r >= 0 ? Missions.mainTitle(r) : '';
   $('level-label').textContent = r >= 0 ? CHAPTERS[r].numeral : '';
   // Οι χορδές φαίνονται από το κεφάλαιο II (εκεί βρίσκεται η πρώτη).
   $('strings-label').textContent = Math.max(r, chapter) >= 1 || strings > 0 ? `Strings: ${strings}/3` : '';
@@ -1099,6 +1199,7 @@ function spawn(saved) {
   Level.mergeSeen(saved.seen);
 
   Echoes.init();
+  Echoes.markSeen = true;
   monsters = Level.monsters.map((m) => (m.kind === 'erinys'
     ? new Erinys(m.x, m.y, m.region)
     : new Monster(m.x, m.y, m.guard, m.region)));
@@ -1118,6 +1219,7 @@ function spawn(saved) {
   Souls.reset();
   Eggs.reset();
   World3D.reset();
+  Missions.reset(saved);
   // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
   Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
   Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners(), ...World3D.listeners()];
@@ -1189,7 +1291,7 @@ function lightAltar(i) {
   if (strings >= 3) Melody.uses = MELODY_USES;
   Save.write({
     chapter: i, jars: Jars.left, strings, obol: hasObol, paid: Charon.paid,
-    melody: Melody.uses, taken: Items.takenIds(), seen: Level.seenString(),
+    melody: Melody.uses, taken: Items.takenIds(), seen: Level.seenString(), ...Missions.saveData(),
   });
   Sound.win();
   updateHud();
@@ -1235,6 +1337,7 @@ function resumeGame() {
 }
 
 function goToMenu() {
+  menuScene.ready = false;
   setState('menu');
   stopInput();
   Hints.stop();
@@ -1253,6 +1356,14 @@ function doAction(action) {
   else if (action === 'map-close') closeMap();
   else if (action === 'menu') goToMenu();
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
+  else if (action === 'voice') {
+    // Φωνές: αληθινές (του browser) ή συνθετικές 8-bit.
+    Settings.voice = Settings.voice === '8bit' ? 'real' : '8bit';
+    Settings.store();
+    updateToggleLabels();
+    Voice.stop();
+    Voice.say('The living do not come down here. You did.', 'narrator');
+  }
   else if (action === 'mouse') {
     // Ευαισθησία ποντικιού: 0.5x → 3x και πάλι από την αρχή.
     Settings.mouse = MOUSE_SENS[(MOUSE_SENS.indexOf(Settings.mouse) + 1) % MOUSE_SENS.length];
@@ -1355,6 +1466,7 @@ function init() {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
 
   document.body.classList.toggle('embedded', EMBEDDED);
+  document.body.classList.toggle('fp', !view2d);
   Pixel.init();
   Sprites.init();
   Creatures.init();   // οι λεπτομερείς μορφές του 3D (μετά τα sprites)

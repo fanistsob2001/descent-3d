@@ -715,3 +715,123 @@ body.playing,
 body.playing * {
   cursor: none !important;
 }
+
+/* ================= 3D (πρώτο πρόσωπο, body.fp): μενού, παύση, αποστολή ================= */
+.tagline {
+  font-style: italic;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  margin: -0.4rem 0 1rem;
+}
+body:not(.fp) .tagline { display: none; }
+body.fp #menu-art { display: none; }
+
+/* Μενού: τα κουμπιά αριστερά, πάνω από τη ζωντανή σκηνή του παιχνιδιού (σκοτεινή διαβάθμιση). */
+body.fp #menu,
+body.fp #settings {
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+  padding-left: calc(var(--safe-left) + max(28px, 7vw));
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.78) 30%, rgba(0, 0, 0, 0.15) 62%, rgba(0, 0, 0, 0) 80%);
+}
+body.fp #menu h1 {
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  margin-right: 0;
+  text-shadow: 0 0 28px rgba(206, 108, 56, 0.55), 0 4px 0 #1a0b05;
+}
+body.fp #menu .meander { width: min(340px, 70vw); }
+body.fp .headphones, body.fp .controls { margin-left: 2px; }
+body.fp .controls { max-width: 420px; }
+
+/* Κουμπιά με hover για το ποντίκι (PC). */
+@media (pointer: fine) {
+  .btn { transition: background 0.15s, border-color 0.15s, transform 0.15s, padding-left 0.15s; }
+  .btn:hover { background: rgba(206, 108, 56, 0.2); border-color: var(--terra); }
+  .btn.primary:hover { background: var(--terra-light); }
+  body.fp #menu .btn:hover, body.fp #settings .btn:hover { transform: translateX(6px); }
+}
+
+/* Παύση: πάνελ πάνω από το παγωμένο παιχνίδι. */
+#pause { background: rgba(0, 0, 0, 0.62); }
+.panel {
+  width: min(880px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 22px 26px 24px;
+  background: rgba(14, 6, 4, 0.92);
+  border: 2px solid var(--terra);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8), 0 0 40px rgba(206, 108, 56, 0.15);
+  text-align: left;
+}
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.panel .meander { width: 100%; margin: 10px 0 16px; }
+.panel-body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 26px;
+}
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+.panel-actions .btn { width: 100%; }
+.missions h3 {
+  font-family: system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: normal;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--terra-light);
+  margin: 0 0 8px;
+}
+.missions h3 + * { margin-top: 0; }
+.missions .goal { font-style: italic; opacity: 0.8; margin-bottom: 10px; }
+.missions .main-mission { font-size: 1.15rem; color: var(--bright); margin-bottom: 4px; }
+.missions .main-mission::before { content: '\25C6  '; color: var(--terra); }
+.missions .objective { max-width: none; margin-bottom: 18px; }
+.side-missions { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.side-missions li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  font-family: system-ui, sans-serif;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+.side-missions .mark { color: var(--terra); }
+.side-missions li.done .mark { color: var(--terra-light); }
+.side-missions li.done .name { text-decoration: line-through; opacity: 0.6; }
+.side-missions .name b { font-weight: 600; color: var(--bright); }
+.side-missions .desc { opacity: 0.6; }
+.side-missions .prog { opacity: 0.7; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .panel-body { grid-template-columns: 1fr; }
+  .panel-actions { min-width: 0; }
+}
+
+/* Η τωρινή κύρια αποστολή, πάνω αριστερά κάτω από τα κουμπιά. */
+#mission {
+  position: fixed;
+  top: calc(var(--safe-top) + 72px);
+  left: calc(var(--safe-left) + 14px);
+  z-index: 3;
+  max-width: 46vw;
+  font-family: system-ui, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--bright);
+  opacity: 0.72;
+  text-shadow: 0 0 6px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+#mission::before { content: '\25C6  '; color: var(--terra); }

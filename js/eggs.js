@@ -39,6 +39,7 @@ const Eggs = {
         onHear(wave, d, los) {
           if (!los || wave.kind === 'step') return;
           this.revealTime = Echoes.now;
+          if (typeof Missions !== 'undefined') Missions.secrets.add('stuck');   // μυστική αποστολή
           if (Echoes.now - this.spokeAt > STUCK_TALK_GAP) {
             this.spokeAt = Echoes.now;
             const d = Voice.say(STORY.stuckShade, 'shade', { x: this.x, y: this.y });
@@ -57,6 +58,7 @@ const Eggs = {
           this.revealTime = Echoes.now;
           if (Echoes.now - this.barkStart < CERB_COOLDOWN) return;
           this.barkStart = Echoes.now;
+          if (typeof Missions !== 'undefined') Missions.secrets.add('cerberus');   // μυστική αποστολή
           const said = Voice.say(STORY.cerberus, 'orpheus', { delay: CERB_BARK_GAP * 3 + 0.2 });
           Notice.show(STORY.cerberus, Echoes.now, Math.max(5, said + CERB_BARK_GAP * 3 + 0.6));
           // Τρία γαβγίσματα, ένα από κάθε κεφάλι: χαμηλό, μεσαίο, ψηλό.

@@ -138,6 +138,9 @@ Objective otherwise: Your lyre is still broken. You climb without its song.
 - Eurydice following in chapter VIII (soft whisper, now and then): Orpheus... I am right behind you.
 - Shades, when they sense a sound wave (distorted whisper, one of): Who is there? | I hear life...
 - Erinyes, when they hear a loud sound (shriek, one of): Who dares to sing here? | We hear you, living one.
+- First-person version, in the throne room of chapter VII, when a wave reveals them on their thrones:
+  - Hades (deep, heavy): Another living soul in my halls. Come closer, singer.
+  - Persephone (soft, regal): I can hear the world above in your footsteps.
 
 ### Messages from lost souls
 Hidden on the map, visible only when a wave touches them. Placement: 1 in chapter I, 2 in II, 3 and 4 in III, 7 in IV, 8 in V, 9 in VI, 5 in VII, 6 in VIII.
@@ -207,7 +210,42 @@ Every line of dialogue is voiced, always with subtitles. Voices are synthesized 
 | Shades | distorted, eerie whisper/moan, from where the shade is; half of the shades male, half female | "Who is there?" · "I hear life..." |
 | Erinyes | female, harsh shriek with hissing snakes, from where the Erinys is | "Who dares to sing here?" · "We hear you, living one." |
 | Lost souls | whispered, from where the inscription is: souls 1, 4 and 7 a man, souls 2 and 9 an old man, souls 3, 5, 6 and 8 a woman | Each inscription is spoken when a wave touches it |
+| Persephone | soft, regal (female) | First-person version: "I can hear the world above in your footsteps." |
+| Hades (in the throne room) | deep, heavy (male) | First-person version: "Another living soul in my halls. Come closer, singer." |
+| Cerberus | three real dog barks (low, middle, high), deep snoring while asleep | — |
+| The snake | a hiss when a wave touches it | — |
 
-Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
+First-person version: the voices are the real speech voices of the browser (male or female as above, each with its own pitch and speed), with the synthesized voice underneath for atmosphere and direction. The player can switch back to the 8-bit voices in Settings.
+
+In the cutscenes Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
 
 Not voiced (they are interface text, not something a character says): the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
+
+---
+
+## 11. Missions (first-person version)
+
+Written by Claude at the user's request; the user may change them. Interface text: shown in the pause menu and (the current main mission) in the corner of the screen, not voiced.
+
+The goal: Bring Eurydice back to the world of the living.
+
+Main mission of each chapter (a short title; the full objective is the chapter objective of section 8):
+- I: Find the way down
+- II: Cross the Acheron
+- III: Cross the waters of Lethe
+- IV: Cross the Asphodel Meadows
+- V: Cross the marshes of Styx
+- VI: Pass through Tartarus
+- VII: Reach the throne of Hades
+- VIII: Lead Eurydice to the light. Do not look back.
+
+Side missions (title: description):
+- Mend the lyre: Find the three strings of your lyre.
+- The ferryman's toll: Find an obol and pay Charon.
+- Voices of the lost: Hear all nine lost souls.
+- Libations: Find every libation jar.
+- Rekindle the flames: Light every altar.
+- The guardian sleeps (secret): Wake the hound of Hades.
+- Three thousand years (secret): Find the shade that walks into the wall.
+
+A secret mission shows as "???" until it is completed. When a side mission is completed: Mission complete: (title)

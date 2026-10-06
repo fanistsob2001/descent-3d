@@ -21,6 +21,7 @@ const Souls = {
       onHear(wave, d, los) {
         if (!los || wave.kind === 'step') return;   // τα βήματα είναι πολύ αχνά για να τα φέρουν
         this.revealTime = Echoes.now;
+        if (typeof Missions !== 'undefined') Missions.heard.add(this.n);   // αποστολή "Voices of the lost"
         // Ψιθυρίζει τα λόγια της (όχι ξανά μέσα σε 12 δευτ.).
         if (Echoes.now - this.spokeAt > 12) {
           this.spokeAt = Echoes.now;
