@@ -548,6 +548,15 @@ function paintGrid(w, h, draw) {
       }
     },
   };
+  // mirror(): ό,τι είναι ζωγραφισμένο στο αριστερό μισό αντιγράφεται καθρεφτισμένο δεξιά (για
+  // συμμετρικές μορφές από μπροστά). map(fn): αλλάζει κάθε pixel — fn(x, y, ch) → νέος χαρακτήρας.
+  api.mirror = () => {
+    for (let y = 0; y < h; y++) for (let x = 0; x < Math.floor(w / 2); x++) if (g[y][x] !== '.') g[y][w - 1 - x] = g[y][x];
+  };
+  api.map = (fn) => {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) g[y][x] = fn(x, y, g[y][x]);
+  };
+  api.get = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? g[y][x] : '.');
   draw(api);
   return g.map((r) => r.join(''));
 }

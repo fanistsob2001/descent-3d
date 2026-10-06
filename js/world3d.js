@@ -184,8 +184,8 @@ const World3D = {
         // Παγωμένη από τη Μελωδία: χλωμή, ήρεμη ψυχή στη θέση της.
         const left = m.frozenUntil - now;
         const a = Math.min(1, left / 1.2) * (0.55 + 0.1 * Math.sin(now * 3));
-        R.sprite(S('soul', Math.floor(now * 2)), {
-          x: m.x, y: m.y, z: 6, alpha: a, scale: 1.4,
+        R.sprite(S('soulM3d', Math.floor(now * 2)), {
+          x: m.x, y: m.y, z: 6, alpha: a, scale: 0.53,
           glow: { r: 30, color: POT.cream, a: a * 0.3 },
         });
       } else {
@@ -204,8 +204,8 @@ const World3D = {
         if (t >= 0 && t < 1) { a = 0.78 * (1 - t); rise = t * 14; }
       }
       if (a > 0.01) {
-        R.sprite(S('eurydice', e.moving ? Math.floor(e.walked / 12) : 1), {
-          x: e.x, y: e.y, z: rise, alpha: a, fog: false,
+        R.sprite(S('eurydice3d', e.moving ? Math.floor(e.walked / 12) : 0), {
+          x: e.x, y: e.y, z: rise, alpha: a, fog: false, scale: 0.39,
           glow: { r: 30, color: POT.cream, a: a * 0.3 },
         });
       }
@@ -222,8 +222,8 @@ const World3D = {
         const flip = p ? p.sx > halfW : false;
         // Μετά την πληρωμή, η βάρκα απομακρύνεται στο ποτάμι.
         const y = Charon.y + leave * TILE * 0.8;
-        R.sprite(S('boat'), { x: Charon.x, y, alpha: a, flip, scale: 0.65 });
-        R.sprite(S('charon', Charon.paid ? 0 : 1), { x: Charon.x, y, z: 4, alpha: a, flip, scale: 0.85, bias: 0.01 });
+        R.sprite(S('boat3d'), { x: Charon.x, y, alpha: a, flip, scale: 0.35 });
+        R.sprite(S('charon3d', Charon.paid ? 0 : 1), { x: Charon.x, y, z: 4, alpha: a, flip, scale: 0.37, bias: 0.01 });
       }
     }
 
@@ -233,8 +233,9 @@ const World3D = {
       const a = Souls.alpha(s, now);
       if (a < 0.01) continue;
       const bob = Math.sin(now * 2 + s.n) * 2;
-      R.sprite(S('soul', Math.floor(now * 2 + s.n)), {
-        x: s.x, y: s.y, z: 12 + bob, alpha: a * 0.9, fog: false,
+      const look = { soulM: 'soulM3d', soulF: 'soulF3d', soulOld: 'soulOld3d' }[SOUL_VOICES[s.n - 1]] || 'soulM3d';
+      R.sprite(S(look, Math.floor(now * 2 + s.n)), {
+        x: s.x, y: s.y, z: 8 + bob, alpha: a * 0.9, fog: false, scale: 0.43,
         glow: { r: 24, color: POT.cream, a: a * 0.3 },
         after: (pc, b) => { s._scr = R.visible(b.sx, b.depth) ? { x: b.sx, y: b.top, a } : null; },
       });
@@ -269,12 +270,12 @@ const World3D = {
         // Σηκώνει το κεφάλι και σφυρίζει όταν το βρει ο ήχος.
         const hiss = now - d.revealTime < 1.4 ? 1 : 0;
         R.sprite(S('grass'), { x: d.x, y: d.y - 2, alpha: a * 0.8 });
-        R.sprite(S('snake', hiss), { x: d.x, y: d.y, alpha: a, flip: true, bias: 0.01 });
+        R.sprite(S('snake3d', hiss), { x: d.x, y: d.y, alpha: a, flip: true, bias: 0.01, scale: 0.36 });
       } else if (d.kind === 'hades') {
-        R.sprite(S('hades'), { x: d.x, y: d.y, alpha: a, scale: 1.25 });
-        R.sprite(S('hound'), { x: d.x - 8, y: d.y - 26, alpha: a });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
+        R.sprite(S('hades3d'), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
+        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 26, alpha: a, scale: 0.3 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
       } else {
-        R.sprite(S('persephone', 1), { x: d.x, y: d.y, alpha: a, scale: 1.25 });
+        R.sprite(S('persephone3d', 1), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
       }
     }
 
@@ -349,12 +350,12 @@ const World3D = {
     const erinys = m.kind === 'erinys';
     // Στο 3D η σκιά είναι η λεπτομερής μορφή "ghoul" (μισό μέγεθος στον κόσμο: είναι 2× πιο λεπτομερής).
     const ghoul = m.kind === 'shade';
-    const fr = Sprites.getHD(ghoul ? 'ghoul' : m.kind, frame);
+    const fr = Sprites.getHD(ghoul ? 'ghoul' : erinys ? 'erinys3d' : m.kind, frame);
     const hover = m.fly ? 10 + Math.sin(now * 4 + m.homeTx) * 3 : 0;
     // Θέση των ματιών σε pixels του (HD) καρέ.
-    const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 11, '255,210,90'] : [45, 15, '255,250,235'];
+    const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 18, '255,210,90'] : [45, 15, '255,250,235'];
     R.sprite(fr, {
-      x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : 1,
+      x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : erinys ? 0.48 : 1,
       glow: { r: 30, color: POT.red, a: a * 0.5 },
       after: (pc, b) => {
         const s = b.h / fr.h;   // art px ανά pixel του sprite

@@ -1357,6 +1357,7 @@ function init() {
   document.body.classList.toggle('embedded', EMBEDDED);
   Pixel.init();
   Sprites.init();
+  Creatures.init();   // οι λεπτομερείς μορφές του 3D (μετά τα sprites)
   Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
   Hands.init();
