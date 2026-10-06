@@ -198,11 +198,11 @@ Rule: easter eggs are hidden and harmless. Never in chapter VIII, cutscenes or e
 
 ## 10. Voices
 
-Every line of dialogue is voiced, always with subtitles. Voices are synthesized chiptune voices (no audio files): each character "speaks" in 8-bit syllables with its own timbre, in sync with the subtitle.
+Every line of dialogue is voiced, always with subtitles (except the chapter lines, see below). First-person version: the voices are real human-sounding speech voices (the most natural voices the player's browser has), male or female as below, each character with a voice of their own where possible. There are no 8-bit voices any more.
 
 | Speaker | Voice | Lines |
 |---|---|---|
-| Narrator | warm, calm (male) | Intro cutscene; the narration lines of the middle cutscene and of both endings; in the game: each chapter line, "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
+| Narrator | warm, calm (male) | Intro cutscene; the narration lines of the middle cutscene and of both endings; in the game: "The footsteps behind you stop.", the libation jar message and "Your lyre is whole again..." |
 | Orpheus | young man, warm, melodic | "Good boy. Good boy. Good boy." (to Cerberus) |
 | Charon | very deep, slow, gravelly (old man) | Both Charon lines |
 | Hades | deep, heavy (male) | Middle cutscene: the three quoted lines ("Take her," ... Forever.") |
@@ -215,11 +215,11 @@ Every line of dialogue is voiced, always with subtitles. Voices are synthesized 
 | Cerberus | three real dog barks (low, middle, high), deep snoring while asleep | — |
 | The snake | a hiss when a wave touches it | — |
 
-First-person version: the voices are the real speech voices of the browser (male or female as above, each with its own pitch and speed), with the synthesized voice underneath for atmosphere and direction. The player can switch back to the 8-bit voices in Settings.
+The player can turn the voices off in Settings (the subtitles stay).
 
 In the cutscenes Persephone has no spoken line: in the middle cutscene she is only described by the narrator.
 
-Not voiced (they are interface text, not something a character says): the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
+Not voiced (they are interface text, not something a character says): the chapter lines (shown with the chapter title), the checkpoint message, the objectives, "You found a string (X/3).", and the control hints.
 
 ---
 

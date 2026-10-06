@@ -1081,7 +1081,7 @@ function updateToggleLabels() {
     b.textContent = Settings.sound ? 'Sound: on' : 'Sound: off';
   }
   for (const b of document.querySelectorAll('.mouse-toggle')) b.textContent = `Mouse: ${Settings.mouse}x`;
-  for (const b of document.querySelectorAll('.voice-toggle')) b.textContent = Settings.voice === '8bit' ? 'Voices: 8-bit' : 'Voices: real';
+  for (const b of document.querySelectorAll('.voice-toggle')) b.textContent = Settings.voice === 'off' ? 'Voices: Off' : 'Voices: On';
   for (const b of document.querySelectorAll('.vibration-toggle')) {
     b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
   }
@@ -1109,7 +1109,6 @@ function showChapterTitle(ch) {
   $('intro-number').textContent = ch.numeral;
   $('intro-name').textContent = ch.name;
   $('intro-line').textContent = ch.line;
-  Voice.say(ch.line, 'narrator', { delay: 0.8 });
   el.classList.remove('show');
   void el.offsetWidth;   // ξαναξεκινάει το CSS animation
   el.classList.add('show');
@@ -1357,8 +1356,8 @@ function doAction(action) {
   else if (action === 'menu') goToMenu();
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
   else if (action === 'voice') {
-    // Φωνές: αληθινές (του browser) ή συνθετικές 8-bit.
-    Settings.voice = Settings.voice === '8bit' ? 'real' : '8bit';
+    // Φωνές των χαρακτήρων: ναι / όχι.
+    Settings.voice = Settings.voice === 'off' ? 'on' : 'off';
     Settings.store();
     updateToggleLabels();
     Voice.stop();
@@ -1470,6 +1469,7 @@ function init() {
   Pixel.init();
   Sprites.init();
   Creatures.init();   // οι λεπτομερείς μορφές του 3D (μετά τα sprites)
+  CutArt.init();      // οι ζωγραφιές των cutscenes (μετά τις μορφές)
   Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
   Hands.init();

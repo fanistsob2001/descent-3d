@@ -74,7 +74,7 @@ const Settings = {
   sound: true,
   vibration: true,
   mouse: 1,          // πολλαπλασιαστής του βλέμματος με το ποντίκι (ένα από τα MOUSE_SENS)
-  voice: 'real',     // φωνές: 'real' (του browser) ή '8bit' (συνθετικές)
+  voice: 'on',       // φωνές των χαρακτήρων: 'on' | 'off' (οι υπότιτλοι μένουν πάντα)
 
   load() {
     try {
@@ -83,7 +83,7 @@ const Settings = {
         this.sound = d.sound !== false;
         this.vibration = d.vibration !== false;
         if (MOUSE_SENS.includes(d.mouse)) this.mouse = d.mouse;
-        if (d.voice === '8bit' || d.voice === 'real') this.voice = d.voice;
+        if (d.voice === 'off') this.voice = 'off';
       }
     } catch (_) { /* - */ }
   },

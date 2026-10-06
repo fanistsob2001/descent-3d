@@ -649,31 +649,6 @@ const Sound = {
     src.stop(t + 0.14);
   },
 
-  // Ψίθυρος "Or-phe-us...": θόρυβος μέσα από φίλτρα φωνηέντων, με πολύ reverb.
-  whisper() {
-    if (!this.ready()) return;
-    const ac = this.ctx, t = ac.currentTime + 0.1;
-    // [πότε, διάρκεια, κεντρική συχνότητα, ένταση] — "Or", "phe", "u", "s"
-    const syllables = [[0, 0.32, 650, 0.22], [0.36, 0.2, 2600, 0.16], [0.58, 0.3, 900, 0.2], [0.86, 0.45, 5200, 0.12]];
-    for (const [dt, dur, f, vol] of syllables) {
-      const src = this.noiseSource();
-      const bp = ac.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.value = f;
-      bp.Q.value = f > 2000 ? 1.5 : 5;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, t + dt);
-      g.gain.exponentialRampToValueAtTime(vol, t + dt + dur * 0.35);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dt + dur);
-      src.connect(bp);
-      bp.connect(g);
-      g.connect(this.sfx);
-      g.connect(this.reverbSend);
-      src.start(t + dt, Math.random());
-      src.stop(t + dt + dur + 0.05);
-    }
-  },
-
   // Απαλή νότα λύρας για κάθε γραμμή μιας cutscene (ανεβαίνει σιγά σιγά).
   cutLine(i) {
     if (!this.ready()) return;
