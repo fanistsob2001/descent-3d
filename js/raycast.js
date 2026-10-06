@@ -196,25 +196,62 @@ const Raycast = {
       return t;
     };
 
-    // Λαξευμένοι λίθοι: σειρές των 16 texels, λίθοι των 32, μετατοπισμένοι ανά σειρά.
-    // Οι αρμοί είναι η "φωτεινή ακμή" που λάμπει όταν τους βρει ήχος· ανάγλυφο στις άκρες.
-    const block = (u, v, s) => {
-      const row = Math.floor(v / 16);
-      const bu = (u + (row % 2) * 16) % 32, bv = v % 16;
-      if (bu === 0 || bv === 0) return mul(LIGHT, 0.9);
-      const id = Math.floor((u + (row % 2) * 16) / 32) + row * 7;
-      let k = 0.66 + hash(id, s, 1) * 0.3 + (hash(u, v, s) - 0.5) * 0.14;
-      if (bv === 1 || bu === 1) k *= 1.32;           // φωτεινή πάνω/αριστερή ακμή (ανάγλυφο)
-      if (bv >= 14 || bu >= 30) k *= 0.62;            // σκιά στην κάτω/δεξιά ακμή
-      if (hash(u >> 1, v >> 1, s + 40) > 0.97) k *= 0.55;   // μικρές φθορές
-      return mul(DEEP, k);
+    // ---- Πέτρες (στυλ retro dungeon crawler): επίπεδα χρώματα, χοντρός σκούρος αρμός, στρογγυλεμένες
+    // γωνίες, φωτεινή πάνω/αριστερή ακμή, σκιά κάτω/δεξιά, βαθουλώματα και ρωγμές. ----
+    const MORTAR = [30, 13, 9];
+    // Πέτρες σε σειρές (σαν χτισμένος τοίχος): ύψη σειρών και πλάτη πετρών τυχαία αλλά σταθερά,
+    // που "κλείνουν" ακριβώς στο Nn (η υφή επαναλαμβάνεται χωρίς ραφές).
+    const courses = (Nn, seed, rh0, rh1, w0, w1) => {
+      const rows = [];
+      for (let y = 0; y < Nn;) {
+        let h = rh0 + Math.floor(hash(rows.length, 1, seed) * (rh1 - rh0 + 1));
+        if (Nn - (y + h) < rh0) h = Nn - y;
+        const ws = [];
+        for (let x = 0; x < Nn;) {
+          let w = w0 + Math.floor(hash(rows.length, ws.length + 3, seed) * (w1 - w0 + 1));
+          if (Nn - (x + w) < w0) w = Nn - x;
+          ws.push([x, w]);
+          x += w;
+        }
+        rows.push({ y0: y, h, ws, off: Math.floor(hash(rows.length, 99, seed) * Nn) });
+        y += h;
+      }
+      return (u, v) => {
+        let r = 0;
+        while (r < rows.length - 1 && v >= rows[r].y0 + rows[r].h) r++;
+        const row = rows[r], uu = (u + row.off) % Nn;
+        let k = 0;
+        while (k < row.ws.length - 1 && uu >= row.ws[k][0] + row.ws[k][1]) k++;
+        return { id: r * 31 + k, du: uu - row.ws[k][0], dv: v - row.y0, w: row.ws[k][1], h: row.h };
+      };
     };
+    // Το χρώμα ενός σημείου μιας πέτρας (st = αποτέλεσμα του courses), base = χρώμα της πέτρας.
+    const stone = (st, u, v, base, gap, seed) => {
+      const { du, dv, w, h, id } = st;
+      if (du < gap || dv < gap) return MORTAR;
+      // Στρογγυλεμένες γωνίες.
+      const rc = gap + 2, x = du - gap, y = dv - gap, iw = w - gap, ih = h - gap;
+      const cx = x < rc ? rc - x : x > iw - 1 - rc ? x - (iw - 1 - rc) : 0;
+      const cy = y < rc ? rc - y : y > ih - 1 - rc ? y - (ih - 1 - rc) : 0;
+      if (cx * cx + cy * cy > rc * rc + 1) return MORTAR;
+      let k = 0.86 + hash(id, 7, seed) * 0.26;
+      if (y <= 1 || x <= 0) k *= 1.28;                          // φωτεινή πάνω/αριστερή ακμή
+      else if (y >= ih - 2 || x >= iw - 1) k *= 0.66;           // σκιά κάτω/δεξιά
+      if (hash(u >> 1, v >> 1, seed + 40) > 0.92) k *= 0.62;    // βαθουλώματα
+      // Ρωγμή σε μερικές πέτρες: μια σκούρη λοξή γραμμή.
+      if (hash(id, 11, seed) > 0.72 && Math.abs((x - iw * 0.3) * 0.6 - (y - ih * 0.2)) < 0.6 && x > 2 && x < iw - 2) return mul(MORTAR, 1.4);
+      return mul(base, k);
+    };
+    const BRICK = [150, 40, 28];      // μπορντό λίθοι (σαν στην εικόνα αναφοράς)
+    const block = (u, v, s) => stone(courses(WN, s, 10, 16, 14, 30)(u, v), u, v, BRICK, 2, s);
+    const blockTex = (s) => { const f = courses(WN, s, 10, 16, 14, 30); return makeW((u, v) => stone(f(u, v), u, v, BRICK, 2, s)); };
 
-    // Σπηλιά: ακανόνιστοι βράχοι (Voronoi που επαναλαμβάνεται χωρίς ραφές), με λεπτές φωτεινές
-    // ρωγμές και "φουσκωμένες" πέτρες (φωτεινές στη μέση, σκοτεινές δίπλα στη ρωγμή).
+    // Σπηλιά: ακανόνιστοι βράχοι (Voronoi που επαναλαμβάνεται χωρίς ραφές) σε καφέ-μπορντό, με
+    // χοντρές σκούρες σχισμές, φωτεινή πάνω ακμή και σκιά από κάτω.
+    const ROCK = [132, 50, 32];
     const rock = (seedBase) => {
       const seeds = [];
-      for (let k = 0; k < 7; k++) seeds.push([hash(k, 1, seedBase) * WN, hash(k, 2, seedBase + 1) * WN]);
+      for (let k = 0; k < 9; k++) seeds.push([hash(k, 1, seedBase) * WN, hash(k, 2, seedBase + 1) * WN]);
       return makeW((u, v) => {
         let d1 = 1e9, d2 = 1e9, id = 0;
         for (let k = 0; k < seeds.length; k++) {
@@ -227,14 +264,14 @@ const Raycast = {
           }
         }
         const edge = d2 - d1;
-        if (edge < 0.9) return mul(LIGHT, 0.7);
-        const bulge = Math.min(1, edge / 13);
-        let k = 0.26 + bulge * 0.5 + hash(id, 4, seedBase) * 0.18 + (hash(u, v, 7) - 0.5) * 0.14;
-        if (edge < 2.2) k *= 0.5;
-        // Το φως "πέφτει" λίγο από πάνω: η πάνω μεριά κάθε πέτρας φωτεινότερη.
-        const up = seeds[id][1] - (v + 0.5);
-        k *= 1 + Math.max(-0.15, Math.min(0.15, up / 40));
-        return mul(DEEP, k);
+        if (edge < 2.2) return MORTAR;
+        // Πού είναι το σημείο ως προς το κέντρο της πέτρας: από πάνω = φως, από κάτω = σκιά.
+        let cy = seeds[id][1] - (v + 0.5);
+        if (cy > WN / 2) cy -= WN; else if (cy < -WN / 2) cy += WN;
+        let k = 0.8 + hash(id, 4, seedBase) * 0.3;
+        if (edge < 3.6) k *= cy > 0 ? 0.62 : 1.3;
+        if (hash(u >> 1, v >> 1, seedBase + 9) > 0.93) k *= 0.6;
+        return mul(ROCK, k);
       });
     };
 
@@ -276,7 +313,7 @@ const Raycast = {
       if (v <= 2 || v === 9 || v === 10 || v === 39) return clay(u, v);
       if (v <= 8) return meander(u, v - 3);
       if (v <= 37) return clay(u, v);
-      return block(u, v - 41 + 64, 5);
+      return block(u, v - 41, 5);
     }), figs, 13, 37);
     // Λαξευμένη πέτρα (IV, VI): λίθοι, και σε μερικές πλευρές μια στενή ζωφόρος με μορφές.
     const frieze = (figs) => stamp(makeW((u, v) => {
@@ -288,7 +325,7 @@ const Raycast = {
 
     this.walls = {
       rock: [rock(2), rock(11), rock(23)],
-      blocks: [makeW((u, v) => block(u, v, 3)), makeW((u, v) => block(u, v, 8)), makeW((u, v) => block(u, v, 13)),
+      blocks: [blockTex(3), blockTex(8), blockTex(13),
         frieze([['soul', 0, false, true], ['soul', 1, false, true], ['soul', 0, false, true]]),
         frieze([['shade', 0, false], ['shade', 1, false], ['erinys', 0, false]])],
       palace: [
@@ -299,23 +336,9 @@ const Raycast = {
       ],
     };
 
-    // Δάπεδο: 2×2 πήλινα πλακάκια ανά κελί, με φωτεινούς αρμούς· 4 παραλλαγές (μία με ρωγμή).
-    this.tex.floor = [0, 1, 2, 3].map((s) => make((u, v) => {
-      const tu = u % 20, tv = v % 20;
-      if (tu === 0 || tv === 0) return mul(TERRA, 0.7);
-      const id = Math.floor(u / 20) + Math.floor(v / 20) * 2;
-      let k = 0.55 + hash(id, s, 11) * 0.3 + (hash(u, v, s + 20) - 0.5) * 0.12;
-      if (tu === 1 || tv === 1) k *= 1.25;
-      // Ρωγμή σε ένα πλακάκι της παραλλαγής 3.
-      if (s === 3 && id === 1 && Math.abs((tu - 3) * 0.8 - (tv - 4)) < 0.7 && tu > 2 && tu < 17) k = 0.12;
-      return mul([92, 46, 26], k);
-    }));
-
-    // Ταβάνι: μεγάλες, σκούρες πλάκες βράχου.
-    this.tex.ceil = make((u, v) => {
-      if (u === 0 || v === 0 || (v === 20 && u < 26)) return mul(TERRA, 0.45);
-      return mul([70, 34, 20], 0.6 + hash(Math.floor(u / 13), Math.floor(v / 9), 30) * 0.4);
-    });
+    // Δάπεδο (IV, VI): επιμήκεις λίθοι σε σειρές (4 παραλλαγές)· ταβάνι από πιο σκούρους λίθους.
+    this.tex.floor = [0, 1, 2, 3].map((sd) => { const f = courses(N, 60 + sd, 7, 11, 11, 22); return make((u, v) => stone(f(u, v), u, v, BRICK, 2, 60 + sd)); });
+    this.tex.ceil = (() => { const f = courses(N, 70, 8, 12, 12, 24); return make((u, v) => stone(f(u, v), u, v, [104, 30, 21], 2, 70)); })();
 
     // Σπηλιά: δάπεδο από ακανόνιστες πλάκες πέτρας (Voronoi, χωρίς ραφές) με φωτεινούς αρμούς,
     // και τραχύ, σκοτεινό ταβάνι από βράχο με λεπτές ρωγμές.
@@ -336,14 +359,14 @@ const Raycast = {
         return fn(u, v, d2 - d1, id);
       });
     };
-    this.tex.caveFloor = [3, 17].map((sb) => voronoi(6, sb, (u, v, edge, id) => {
-      if (edge < 0.9) return mul(TERRA, 0.6);
-      const k = (0.42 + Math.min(1, edge / 10) * 0.3 + hash(id, 8, sb) * 0.2 + (hash(u, v, sb) - 0.5) * 0.14) * (edge < 2 ? 0.6 : 1);
-      return mul([96, 52, 32], k);
+    this.tex.caveFloor = [3, 17].map((sb) => voronoi(7, sb, (u, v, edge, id) => {
+      if (edge < 1.6) return MORTAR;
+      const k = (0.8 + hash(id, 8, sb) * 0.3) * (edge < 2.8 ? 1.22 : 1) * (hash(u >> 1, v >> 1, sb + 5) > 0.93 ? 0.6 : 1);
+      return mul(ROCK, k * 0.92);
     }));
-    this.tex.caveCeil = voronoi(5, 41, (u, v, edge, id) => {
-      if (edge < 0.7) return mul(TERRA, 0.38);
-      return mul([66, 34, 22], 0.45 + Math.min(1, edge / 9) * 0.35 + hash(id, 9, 41) * 0.2);
+    this.tex.caveCeil = voronoi(6, 41, (u, v, edge, id) => {
+      if (edge < 1.4) return MORTAR;
+      return mul([96, 36, 24], 0.75 + hash(id, 9, 41) * 0.3 + (edge < 2.6 ? 0.2 : 0));
     });
     // Παλάτι: δάπεδο σκακιέρα από "μαύρο γάνωμα" και πηλό (τα χρώματα των αγγείων), με
     // φωτεινούς αρμούς· ταβάνι με φατνώματα (τετράγωνα βαθουλώματα με πλαίσιο).
@@ -635,8 +658,9 @@ const Raycast = {
       let corner = false;
       if (frac < cw) corner = !(L.isOpaque(tx - adx, ty - ady) && !L.isOpaque(tx - adx + fdx, ty - ady + fdy));
       else if (frac > 1 - cw) corner = !(L.isOpaque(tx + adx, ty + ady) && !L.isOpaque(tx + adx + fdx, ty + ady + fdy));
-      const edge = Math.min(1.6, (light + glow) * 1.5);
-      const er = 236 * edge, eg = 156 * edge, eb = 98 * edge;
+      // (Πιο διακριτικές στο στυλ των επίπεδων χρωμάτων: πηλός, όχι λευκοπόρτοκαλο.)
+      const edge = Math.min(1.25, (light + glow) * 1.05);
+      const er = 206 * edge, eg = 98 * edge, eb = 54 * edge;
 
       const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(H, Math.ceil(bot));
       const yTop = Math.floor(top), yBot = Math.ceil(bot) - 1;
@@ -764,8 +788,7 @@ const Raycast = {
       }
     }
 
-    // Dithering του κόσμου εδώ, στον buffer (πιο γρήγορα από getImageData/putImageData μετά).
-    Pixel.quantizeBuf(buf, W, H);
+    // (Τα χρώματα μπαίνουν στην παλέτα στο τέλος του καρέ, μαζί με τις μορφές: Pixel.posterize.)
     pc.putImageData(this.img, 0, 0);
   },
 

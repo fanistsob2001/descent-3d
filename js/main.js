@@ -450,8 +450,8 @@ function draw3D(pc, W, H) {
   if (state === 'dead') drawDeathFlash(W, H);
   ctx = saved;
 
-  // Ο κόσμος έχει ήδη κβαντιστεί στον raycaster· οι μορφές, οι λάμψεις και τα χέρια μένουν όπως είναι.
-  Pixel.present(ctx, dpr, shakeX, shakeY, false);
+  // Όλα (κόσμος, μορφές, λάμψεις, χέρια) μπαίνουν στην παλέτα του 3D κόσμου: επίπεδα χρώματα.
+  Pixel.present(ctx, dpr, shakeX, shakeY, 'palette');
 
   // Από πάνω, σε πλήρη ανάλυση: τα λόγια των ψυχών, το joystick και το κουμπί της λύρας.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

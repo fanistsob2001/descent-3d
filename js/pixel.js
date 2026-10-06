@@ -6,9 +6,22 @@
 // σε λίγα επίπεδα με διάχυση Bayer 4×4 (ordered dithering), όπως στις παλιές κονσόλες:
 // οι λάμψεις και οι σκιάσεις γίνονται "κουκκιδωτές" διαβαθμίσεις.
 const PIXEL_TARGET = 200;    // περίπου πόσα art pixels χωράνε στη μικρή πλευρά της οθόνης (κινητό)
-const PIXEL_TARGET_PC = 290; // στο PC: περισσότερη λεπτομέρεια (π.χ. 480×270 σε οθόνη 1080p)
+const PIXEL_TARGET_PC = 210; // στο PC: χοντρά pixels, όπως στα retro dungeon crawlers (π.χ. 384×216 σε 1080p)
 const PIXEL_LEVELS = 9;      // επίπεδα ανά κανάλι χρώματος (λιγότερα = πιο "8-bit")
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+// Η παλέτα του 3D κόσμου: κάθε pixel γίνεται το πλησιέστερο από αυτά τα χρώματα, χωρίς
+// dithering — επίπεδα χρώματα, όπως στα retro dungeon crawlers (και στις εικόνες αναφοράς
+// του χρήστη). Ζεστά μόνο: μαύρο, μπορντό, καφέ/χακί, πηλός/πορτοκαλί, κρεμ, κόκκινο, χρυσό.
+const PALETTE = [
+  [0, 0, 0], [16, 7, 5], [30, 12, 9], [48, 16, 12], [70, 20, 15], [96, 26, 19], [124, 36, 25],
+  [38, 24, 15], [62, 40, 25], [92, 66, 42], [128, 100, 66], [170, 142, 100], [212, 190, 146],
+  [158, 64, 30], [198, 98, 40], [232, 138, 54], [248, 182, 100],
+  [236, 218, 186], [255, 246, 228],
+  [140, 18, 12], [200, 34, 22], [255, 84, 56],
+  [222, 172, 58], [168, 120, 40],
+  [206, 134, 92], [150, 90, 60],
+];
 
 const Pixel = {
   canvas: null,
@@ -18,6 +31,7 @@ const Pixel = {
   px: 2,         // πόσα CSS pixels είναι ένα art pixel
   dither: true,
   _lut: null,    // [16][256]: κβαντισμένη τιμή για κάθε κατώφλι Bayer και κάθε τιμή καναλιού
+  _pal: null,    // Uint32Array(32768): για κάθε χρώμα (5 bits ανά κανάλι) το πλησιέστερο της PALETTE
 
   init() {
     this.canvas = document.createElement('canvas');
@@ -38,6 +52,32 @@ const Pixel = {
       }
       return t;
     });
+    // Πίνακας παλέτας: για κάθε χρώμα 15-bit, το πλησιέστερο της PALETTE (με βάρη για το μάτι).
+    this._pal = new Uint32Array(32768);
+    for (let i = 0; i < 32768; i++) {
+      const r = ((i >> 10) & 31) * 8 + 4, g = ((i >> 5) & 31) * 8 + 4, b = (i & 31) * 8 + 4;
+      let best = 0, bd = Infinity;
+      for (let k = 0; k < PALETTE.length; k++) {
+        const p = PALETTE[k];
+        const dr = r - p[0], dg = g - p[1], db = b - p[2];
+        const d = 3 * dr * dr + 4 * dg * dg + 2 * db * db;
+        if (d < bd) { bd = d; best = k; }
+      }
+      const p = PALETTE[best];
+      this._pal[i] = 0xff000000 | (p[2] << 16) | (p[1] << 8) | p[0];
+    }
+  },
+
+  // Όλος ο μικρός καμβάς στην παλέτα (επίπεδα χρώματα, χωρίς dithering).
+  posterize() {
+    const img = this.ctx.getImageData(0, 0, this.w, this.h);
+    const d = new Uint32Array(img.data.buffer), pal = this._pal;
+    for (let i = 0; i < d.length; i++) {
+      const p = d[i];
+      if ((p & 0xffffff) === 0) continue;
+      d[i] = pal[((p & 0xf8) << 7) | ((p >> 6) & 0x3e0) | ((p >> 19) & 31)];
+    }
+    this.ctx.putImageData(img, 0, 0);
   },
 
   // target = πόσα art pixels στη μικρή πλευρά (PC: περισσότερα, για περισσότερη λεπτομέρεια).
@@ -159,8 +199,10 @@ const Pixel = {
   // Μεταφέρει τον μικρό καμβά στον κανονικό, μεγεθυμένο με καθαρά τετράγωνα pixels.
   // (ox, oy) = μετατόπιση σε art pixels (π.χ. τίναγμα της οθόνης).
   // dither = false: ο κόσμος έχει ήδη κβαντιστεί (π.χ. από τον raycaster).
+  // dither: true = Bayer (μενού, χάρτης, jump scare), false = τίποτα, 'palette' = η παλέτα του 3D κόσμου.
   present(mainCtx, dpr, ox = 0, oy = 0, dither = this.dither) {
-    if (dither) this.quantize();
+    if (dither === 'palette') this.posterize();
+    else if (dither) this.quantize();
     const k = this.px * dpr;
     mainCtx.setTransform(1, 0, 0, 1, 0, 0);
     mainCtx.imageSmoothingEnabled = false;
