@@ -329,6 +329,7 @@ const World3D = {
       if (p && R.visible(p.sx, p.depth - 0.3)) this.lights.push({ x: p.sx, y: R.horizon, a: R.exitA * 0.9 });
     }
 
+    if (typeof Prologue !== 'undefined' && Prologue.active) Prologue.sprites(R, now);
     R.flushSprites(pc);
     this.drawSparks(pc, now);
     this.drawDrips(pc, now);
@@ -397,6 +398,8 @@ const World3D = {
   // Ποτέ εκεί που υπάρχει κάτι του παιχνιδιού (βωμοί, αντικείμενα, ψυχές, πύλες, έξοδος, easter eggs).
   scenery: [],
   buildScenery() {
+    // Ο πρόλογος έχει τα δικά του (js/prologue.js).
+    if (typeof Prologue !== 'undefined' && Prologue.active) { this.scenery = []; return; }
     const L = Level, cols = L.cols;
     const hash = (a, b, k) => { const v = Math.sin(a * 127.1 + b * 311.7 + k * 74.7) * 43758.5453; return v - Math.floor(v); };
     const busy = new Uint8Array(cols * L.rows);

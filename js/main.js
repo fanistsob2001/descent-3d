@@ -108,6 +108,7 @@ function updatePlayer(dt) {
   let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
   player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens));
   Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
+  if (Prologue.active && Prologue.lock) { player.walkSpeed *= 0.9; return; }
   if (a > Math.PI) a -= Math.PI * 2;
   if (a <= -Math.PI) a += Math.PI * 2;
   player.angle = a;
@@ -148,8 +149,7 @@ function updatePlayer(dt) {
     player.stepDist -= STEP_LENGTH;
     player.foot = -player.foot;
     const side = 3 * player.foot;
-    Echoes.emit(player.x - uy * side, player.y + ux * side,
-      STEP_WAVE.radius, STEP_WAVE.strength, 'step');
+    if (!Prologue.active) Echoes.emit(player.x - uy * side, player.y + ux * side, STEP_WAVE.radius, STEP_WAVE.strength, 'step');
     // Το έδαφος κάτω από τα πόδια: χαλίκι στις σπηλιές, πέτρα, μάρμαρο στο παλάτι· δίπλα σε νερό πλατσούρισμα.
     const ptx = Math.floor(player.x / TILE), pty = Math.floor(player.y / TILE);
     const theme = RC_THEMES[Level.regionAt(ptx, pty)] || 'rock';
@@ -178,6 +178,7 @@ function emitCall(held) {
     'call');
   Sound.voice(c, strings >= 3);
   Hints.notify('call');
+  Prologue.onCall(c);
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
 }
 
@@ -271,7 +272,7 @@ function throwJar() {
 }
 
 function playMelody() {
-  if (state !== 'play' || strings < 3) return;
+  if (state !== 'play' || strings < 3 || Prologue.active) return;
   if (Melody.play(player, monsters, gameTime) >= 0) {
     Hints.notify('melody');
     updateHud();
@@ -437,7 +438,8 @@ function draw3D(pc, W, H) {
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
   // Ό,τι λάμπει "ξεχειλίζει" απαλά (κύματα, φλόγες, φως της ημέρας).
-  Pixel.bloom(0.55, World3D.lights);
+  // (Στο φως της ημέρας του προλόγου πολύ λιγότερο, αλλιώς ο ουρανός "καίγεται" στο λευκό.)
+  Pixel.bloom(Prologue.active ? 0.1 : 0.55, World3D.lights);
 
   let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
   if (state === 'dead') {
@@ -450,9 +452,10 @@ function draw3D(pc, W, H) {
   ctx = pc;
   if (state === 'play' || state === 'paused') {
     drawTurnWarning(pc, W, H);
-    drawHands3D(pc, W, H);
+    if (!(Prologue.active && Prologue.noLyre)) drawHands3D(pc, W, H);
     Dread.drawVignette(pc, W, H, gameTime);
   }
+  if (Prologue.active) Prologue.drawOverlay(pc, W, H, gameTime);
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
   if (showMap) drawMiniMap(pc, W, H);
   if (state === 'dead') drawDeathFlash(W, H);
@@ -888,7 +891,7 @@ function drawMap(pc, W, H) {
 }
 
 function openMap() {
-  if (state !== 'play') return;
+  if (state !== 'play' || Prologue.active) return;
   setState('map');
   stopInput();
   const ch = CHAPTERS[Math.max(0, playerRegion())];
@@ -927,7 +930,22 @@ function frame(t) {
   const dt = Math.min(0.05, Math.max(0, now - (lastFrame || now)));
   lastFrame = now;
 
-  if (state === 'play') {
+  if (state === 'play' && Prologue.active) {
+    // Ο πρόλογος: χωρίς σκιές, βωμούς, αντικείμενα — μόνο ο κόσμος, η Ευρυδίκη και το σενάριο.
+    gameTime += dt;
+    Input.update();
+    updatePlayer(dt);
+    Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
+    Echoes.update(dt, gameTime);
+    World3D.updateSparks(dt);
+    World3D.updateDrips(dt, gameTime, player);
+    Hints.update(gameTime);
+    Notice.update(gameTime);
+    Prologue.update(dt, gameTime);
+    const follow = 1 - Math.pow(0.001, dt);
+    camera.x += (player.x - camera.x) * follow;
+    camera.y += (player.y - camera.y) * follow;
+  } else if (state === 'play') {
     gameTime += dt;
     Input.update();
     updatePlayer(dt);
@@ -1041,6 +1059,14 @@ function showScreen(name) {
 
 // Η παύση: κεφάλαιο, σκοπός, κύρια αποστολή (με τον στόχο του κεφαλαίου) και δευτερεύουσες με πρόοδο.
 function fillPause() {
+  if (Prologue.active) {
+    $('pause-chapter').textContent = 'Thrace';
+    $('mission-goal').textContent = STORY.goal;
+    $('mission-main').textContent = Prologue.objective;
+    $('pause-objective').textContent = '';
+    $('mission-side').textContent = '';
+    return;
+  }
   const r = Math.max(0, playerRegion(), 0);
   const ch = CHAPTERS[Math.min(CHAPTERS.length - 1, r)];
   $('pause-chapter').textContent = `${ch.numeral}. ${ch.name}`;
@@ -1092,11 +1118,17 @@ function updateHud() {
   jarBtn.classList.toggle('hidden', !jarsFound);
   jarBtn.classList.toggle('empty', Jars.left === 0);
   $('jar-count').textContent = String(Jars.left);
-  melodyBtn.classList.toggle('hidden', strings < 3);
+  melodyBtn.classList.toggle('hidden', strings < 3 || Prologue.active);
   melodyBtn.classList.toggle('empty', Melody.uses === 0);
   $('melody-count').textContent = String(Melody.uses);
   const r = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
   hudRegion = r;
+  if (Prologue.active) {
+    $('mission').textContent = Prologue.objective;
+    $('level-label').textContent = '';
+    $('strings-label').textContent = '';
+    return;
+  }
   $('mission').textContent = r >= 0 ? Missions.mainTitle(r) : '';
   $('level-label').textContent = r >= 0 ? CHAPTERS[r].numeral : '';
   // Οι χορδές φαίνονται από το κεφάλαιο II (εκεί βρίσκεται η πρώτη).
@@ -1171,7 +1203,8 @@ function setState(s) {
   // (Πετυχαίνει όταν γίνεται μέσα σε κλικ / πλήκτρο· αλλιώς ένα κλικ στο παιχνίδι το πιάνει.)
   if (s === 'play' && !IS_TOUCH) Input.requestLock(false);
   if (s !== 'play' && warnOn) { warnOn = false; Sound.tension(false); }
-  Sound.setAmbient(AMBIENT[s]);
+  // Στον πρόλογο (πάνω κόσμος) δεν ακούγεται το βουητό του Κάτω Κόσμου.
+  Sound.setAmbient(Prologue.active ? 0 : AMBIENT[s]);
 }
 
 // Τα μηνύματα που βγαίνουν όταν ανάβει ο βωμός ενός κεφαλαίου (STORY.md, ενότητα 2).
@@ -1184,6 +1217,19 @@ function chapterMessages(i) {
     // Η οδηγία κίνησης έχει ήδη φανεί στην αρχή (και για να φτάσει εδώ, ο παίκτης κινήθηκε).
     ...ch.hints.filter((h) => h.until !== 'move'),
   ];
+}
+
+// Φορτώνει έναν κόσμο: τα κεφάλαια του Κάτω Κόσμου (CHAPTERS) ή τον πρόλογο (js/prologue.js).
+// outdoor = RC_OUTDOOR ανά περιοχή (ουρανός, φως ημέρας). Ό,τι εξαρτάται από τον χάρτη φτιάχνεται ξανά.
+function loadWorldData(chapters, outdoor = {}) {
+  for (const k in RC_OUTDOOR) delete RC_OUTDOOR[k];
+  Object.assign(RC_OUTDOOR, outdoor);
+  RC_THEMES = chapters.map((c, i) => c.theme || RC_THEMES_MAIN[i] || 'rock');
+  Level.loadWorld(chapters);
+  Raycast.init();
+  Raycast.buildCells();
+  World3D.buildScenery();
+  menuScene.ready = false;
 }
 
 // Βάζει τον παίκτη στον κόσμο με την κατάσταση ενός save (βλ. Save.fresh()).
@@ -1260,11 +1306,12 @@ function playCutscene(lines, style, art, then, who) {
   Cutscene.play(lines, style, then, art, who);
 }
 
+// Νέο παιχνίδι: ο playable πρόλογος (js/prologue.js) — οι γραμμές του intro εμφανίζονται μέσα σε αυτόν.
 function newGame() {
   Save.clear();
   Level.seen.fill(0);
   goFullscreen();
-  playCutscene(STORY.intro, '', 'intro', () => spawn(Save.fresh()), STORY.introWho);
+  Prologue.start();
 }
 
 // Τέλος του κεφαλαίου IV: ο Άδης δίνει την Ευρυδίκη. Μετά συνεχίζεις από εκεί
@@ -1336,6 +1383,7 @@ function resumeGame() {
 }
 
 function goToMenu() {
+  Prologue.abort();
   menuScene.ready = false;
   setState('menu');
   stopInput();
@@ -1354,6 +1402,7 @@ function doAction(action) {
   else if (action === 'resume') resumeGame();
   else if (action === 'map-close') closeMap();
   else if (action === 'menu') goToMenu();
+  else if (action === 'skip-prologue') { if (Prologue.active) Prologue.finish(); }
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
   else if (action === 'voice') {
     // Φωνές των χαρακτήρων: ναι / όχι.

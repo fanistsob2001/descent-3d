@@ -20,6 +20,7 @@ const Level = {
   opaque: null,        // Uint8Array, 1 = σταματάει τον ήχο (μόνο τοίχοι και κλειστή πύλη)
   terrain: null,       // Uint8Array, T_FLOOR | T_WALL | T_WATER | T_CHASM
   region: null,        // Int8Array: σε ποιο κεφάλαιο ανήκει κάθε κελί (-1 = γέμισμα)
+  wallKind: null,      // Uint8Array ανά κελί τοίχου: 0 = βράχος / λίθοι ('#'), 1 = χαμηλή ξερολιθιά ('%'), 2 = τοίχος σπιτιού ('=')
   start: { x: 0, y: 0 },
   monsters: [],        // { x, y, guard, region, kind: 'shade' | 'erinys' } — θέσεις εκκίνησης των τεράτων
   altars: [],          // { x, y, tx, ty } — ένας βωμός ανά κεφάλαιο, με τη σειρά
@@ -61,7 +62,11 @@ const Level = {
     this.opaque = new Uint8Array(this.cols * this.rows).fill(1);
     this.terrain = new Uint8Array(this.cols * this.rows).fill(T_WALL);
     this.region = new Int8Array(this.cols * this.rows).fill(-1);
+    this.wallKind = new Uint8Array(this.cols * this.rows);
     this.seen = new Uint8Array(this.cols * this.rows);
+    // Κάθε κόσμος (ο πρόλογος, ο κάτω κόσμος) ξεκινάει χωρίς αφετηρία / έξοδο από τον προηγούμενο.
+    this.start = { x: 0, y: 0 };
+    this.exit = { tx: -10, ty: -10, x: -1e6, y: -1e6 };
     this.monsters = [];
     this.altars = [];
     this.items = [];
@@ -71,13 +76,19 @@ const Level = {
     this.decor = [];
 
     let top = 0;
+    // Πού μπήκε κάθε μπλοκ στον κόσμο (σε κελιά): για όποιον διαβάζει δικούς του χαρακτήρες (ο πρόλογος).
+    this.blockX = offsets.slice();
+    this.blockY = [];
     chapters.forEach((ch, r) => {
+      this.blockY.push(top);
       ch.map.forEach((line, y) => {
         for (let x = 0; x < line.length; x++) {
           const wx = offsets[r] + x, wy = top + y;
           const i = wy * this.cols + wx;
           const c = line[x];
-          const t = c === '#' ? T_WALL : c === '~' ? T_WATER : c === ':' ? T_CHASM : T_FLOOR;
+          const t = c === '#' || c === '%' || c === '=' ? T_WALL : c === '~' ? T_WATER : c === ':' ? T_CHASM : T_FLOOR;
+          if (c === '%') this.wallKind[i] = 1;
+          if (c === '=') this.wallKind[i] = 2;
           this.terrain[i] = t;
           this.grid[i] = t === T_FLOOR ? 0 : 1;
           this.opaque[i] = t === T_WALL ? 1 : 0;

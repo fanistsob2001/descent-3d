@@ -308,6 +308,118 @@ const Sound = {
     src.stop(t + 3.8);
   },
 
+  // ---- Ο πρόλογος (στον πάνω κόσμο): φύση αντί για το βουητό του Κάτω Κόσμου ----
+  // mode: 'day' (πουλιά, τζιτζίκια), 'dusk' (γρύλοι), 'night' (θάλασσα, αέρας), null = τίποτα.
+  natureMode: null,
+  nature(mode) {
+    this.natureMode = mode;
+    this._natureAt = 0;
+  },
+  natureTick(now) {
+    const mode = this.natureMode;
+    if (!mode || !this.ready() || this.muted || now < (this._natureAt || 0)) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = ac.createGain();
+    out.gain.value = 1;
+    out.connect(this.sfx);
+    const pan = (v) => { const p = ac.createStereoPanner(); p.pan.value = v; p.connect(out); return p; };
+    if (mode === 'day') {
+      this._natureAt = now + 0.6 + Math.random() * 1.6;
+      if (Math.random() < 0.55) {
+        // Πουλί: 2-5 γρήγορα κελαηδίσματα (ημίτονο που γλιστράει πάνω-κάτω).
+        const p = pan(Math.random() * 1.6 - 0.8), n = 2 + Math.floor(Math.random() * 4), f = 2400 + Math.random() * 1800;
+        for (let k = 0; k < n; k++) {
+          const o = ac.createOscillator(), g = ac.createGain(), at = t + k * (0.09 + Math.random() * 0.05);
+          o.frequency.setValueAtTime(f * (0.9 + Math.random() * 0.2), at);
+          o.frequency.exponentialRampToValueAtTime(f * (1.2 + Math.random() * 0.3), at + 0.06);
+          this.envelope(g.gain, at, 0.035, 0.008, 0.07);
+          o.connect(g); g.connect(p);
+          o.start(at); o.stop(at + 0.1);
+        }
+      } else {
+        // Τζιτζίκι: θόρυβος σε ψηλή μπάντα που "τρίβεται" γρήγορα (διαμόρφωση πλάτους), 1-2 δευτ.
+        const src = this.noiseSource(), bp = ac.createBiquadFilter(), g = ac.createGain(), am = ac.createOscillator(), amg = ac.createGain();
+        bp.type = 'bandpass'; bp.frequency.value = 5200 + Math.random() * 1500; bp.Q.value = 6;
+        const d = 1 + Math.random() * 1.2;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.03, t + 0.3);
+        g.gain.linearRampToValueAtTime(0.0001, t + d);
+        am.frequency.value = 38 + Math.random() * 20; amg.gain.value = 0.02;
+        am.connect(amg); amg.connect(g.gain);
+        src.connect(bp); bp.connect(g); g.connect(pan(Math.random() * 1.6 - 0.8));
+        src.start(t, Math.random()); src.stop(t + d + 0.05); am.start(t); am.stop(t + d + 0.05);
+      }
+    } else if (mode === 'dusk') {
+      // Γρύλος: σύντομα "τρρ" σε σταθερό ύψος.
+      this._natureAt = now + 0.5 + Math.random() * 0.9;
+      const p = pan(Math.random() * 1.6 - 0.8), f = 4300 + Math.random() * 500;
+      for (let k = 0; k < 3; k++) {
+        const o = ac.createOscillator(), g = ac.createGain(), at = t + k * 0.06;
+        o.frequency.value = f;
+        this.envelope(g.gain, at, 0.018, 0.004, 0.035);
+        o.connect(g); g.connect(p);
+        o.start(at); o.stop(at + 0.05);
+      }
+    } else if (mode === 'night') {
+      // Κύμα που σκάει στα βράχια από κάτω (χαμηλός θόρυβος που φουσκώνει και αποσύρεται).
+      this._natureAt = now + 3 + Math.random() * 3;
+      const src = this.noiseSource(), lp = ac.createBiquadFilter(), g = ac.createGain();
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(400, t); lp.frequency.linearRampToValueAtTime(1100, t + 1.3); lp.frequency.linearRampToValueAtTime(300, t + 3.4);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.13, t + 1.3);
+      g.gain.linearRampToValueAtTime(0.0001, t + 3.6);
+      src.connect(lp); lp.connect(g); g.connect(pan(0.5 - Math.random() * 0.3));
+      src.start(t, Math.random()); src.stop(t + 3.7);
+    }
+  },
+
+  // Κραυγή γυναίκας από μακριά (ο πρόλογος): φωνή με formants "α" που ανεβαίνει και σπάει.
+  scream(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.5, 900);
+    const o = ac.createOscillator(), o2 = ac.createOscillator();
+    o.type = 'sawtooth'; o2.type = 'sawtooth';
+    o.frequency.setValueAtTime(520, t);
+    o.frequency.linearRampToValueAtTime(820, t + 0.25);
+    o.frequency.linearRampToValueAtTime(760, t + 0.9);
+    o.frequency.linearRampToValueAtTime(380, t + 1.4);
+    o2.frequency.setValueAtTime(527, t);
+    o2.frequency.linearRampToValueAtTime(812, t + 0.25);
+    o2.frequency.linearRampToValueAtTime(380, t + 1.4);
+    const vib = ac.createOscillator(), vg = ac.createGain();
+    vib.frequency.value = 7; vg.gain.value = 18;
+    vib.connect(vg); vg.connect(o.frequency); vg.connect(o2.frequency);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.08);
+    g.gain.setValueAtTime(0.5, t + 0.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+    for (const [f, q, k] of [[900, 6, 1], [1500, 8, 0.6], [2900, 9, 0.35]]) {
+      const bp = ac.createBiquadFilter(), bg = ac.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; bg.gain.value = k;
+      o.connect(bp); o2.connect(bp); bp.connect(bg); bg.connect(g);
+    }
+    g.connect(out);
+    const rv = ac.createGain();
+    rv.gain.value = 0.5;
+    g.connect(rv); rv.connect(this.reverbSend);
+    for (const n of [o, o2, vib]) { n.start(t); n.stop(t + 1.6); }
+  },
+
+  // Το γλίστρημα στο πρώτο σκαλί: γδούπος, η λύρα σπάει, οι χορδές "φεύγουν" με ένα τελευταίο τρέμουλο.
+  slip() {
+    if (!this.ready()) return;
+    this.shatter(this.listenerX + 20, this.listenerY);
+    const t = this.ctx.currentTime;
+    [392, 330, 262].forEach((f, k) => this.pluck(f * (1 - k * 0.02), t + 0.25 + k * 0.22, 0.22 - k * 0.05));
+    const src = this.noiseSource(), lp = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = 160;
+    this.envelope(g.gain, t, 0.5, 0.005, 0.35);
+    src.connect(lp); lp.connect(g); g.connect(this.sfx);
+    src.start(t, Math.random()); src.stop(t + 0.4);
+  },
+
   // Ένταση του ambient (0..1), με ομαλή μετάβαση.
   setAmbient(level) {
     if (!this.ambient) return;

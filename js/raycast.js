@@ -26,19 +26,23 @@ const RC_ALTAR_R = 2.4;              // ως πόσα κελιά φτάνει τ
 // Χώρος (στάδιο 1 της μεγάλης επέκτασης, STORY.md ενότητα 12): οι τοίχοι έχουν δικό τους ύψος (σε κελιά),
 // ανάλογα με το πόσο ανοιχτός είναι ο χώρος μπροστά τους· ταβάνι (σε ύψος 1) μόνο στα στενά περάσματα,
 // αλλού σκοτάδι από πάνω. Οι βράχοι έχουν ακανόνιστη κορυφή.
-const RC_WALL_MAX = { rock: 2.7, blocks: 1.5, palace: 2.2 };   // πόσο ψηλώνουν (πάνω από το 1) στους μεγάλους χώρους
+const RC_WALL_MAX = { rock: 2.7, blocks: 1.5, palace: 2.2, meadow: 0.8, grave: 0.8, road: 2.4 };   // πόσο ψηλώνουν (πάνω από το 1) στους μεγάλους χώρους
+// Ύψος ανά είδος τοίχου (Level.wallKind): 1 = χαμηλή ξερολιθιά, 2 = τοίχος σπιτιού.
+const RC_KIND_H = [0, 0.72, 1.7];
 const RC_HMAX = 4.2;                 // το πιο ψηλό που μπορεί να είναι ένας τοίχος (για να σταματάει η ακτίνα)
 const RC_NARROW = 0.44;              // κάτω από τόσο "άνοιγμα" (ποσοστό ελεύθερων κελιών 5×5) ένα κελί έχει ταβάνι
 const RC_JAG = 0.28;                 // πόσο ακανόνιστη είναι η κορυφή των βράχων (ποσοστό του ύψους)
 // Περιοχές (κεφάλαια) στο ύπαιθρο: ουρανός αντί για σκοτάδι, φως ημέρας παντού (για τον πρόλογο).
-const RC_OUTDOOR = {};               // region → { sky: [[θέση 0..1, [r,g,b]], ...], light: 0..1 }
+// sun: { az, el (ακτίνια), r (ακτίνια), color, glow } (ήλιος ή φεγγάρι), stars: true, hills: [r,g,b].
+const RC_OUTDOOR = {};               // region → { sky: [[θέση 0..1, [r,g,b]], ...], light: 0..1, sun, stars, hills }
 const RC_SPX = 1.9;                  // μονάδες κόσμου ανά pixel ενός sprite (η σκιά = 16 px ≈ 30 μονάδες)
 const RC_DAY = [255, 236, 190];      // το φως της ημέρας στην έξοδο
 const RC_AO = 0.3;                   // ως πόσο μακριά (σε κελιά) από τοίχο σκοτεινιάζει το δάπεδο/ταβάνι
 const RC_RED_R = 1.8;                // ακτίνα (κελιά) της κόκκινης λάμψης κάτω από μια σκιά που φάνηκε
 
 // Ποια υφή τοίχου έχει κάθε κεφάλαιο: σπηλιά, λαξευμένη πέτρα, παλάτι (με μαίανδρο).
-const RC_THEMES = ['rock', 'rock', 'rock', 'blocks', 'rock', 'blocks', 'palace', 'rock'];
+const RC_THEMES_MAIN = ['rock', 'rock', 'rock', 'blocks', 'rock', 'blocks', 'palace', 'rock'];
+let RC_THEMES = RC_THEMES_MAIN.slice();   // τα θέματα του κόσμου που είναι φορτωμένος (loadWorldData)
 
 // Ένα μοτίβο μαιάνδρου 6×6 (σε texels) — μαύρο πάνω σε πηλό, όπως στα μελανόμορφα αγγεία.
 const RC_MEANDER = [
@@ -238,7 +242,7 @@ const Raycast = {
         if (best < 0) continue;
         const theme = RC_THEMES[L.region[c]] || this.regionThemeNear(tx, ty);
         const k = Math.max(0, Math.min(1, (best - 0.3) / 0.42));
-        H[c] = 1 + k * (RC_WALL_MAX[theme] || 1.5);
+        H[c] = L.wallKind[c] ? RC_KIND_H[L.wallKind[c]] : 1 + k * (RC_WALL_MAX[theme] || 1.5);
       }
     }
     // Μέσα στον βράχο: το ύψος των γειτόνων (λίγα περάσματα "διαστολής").
@@ -358,7 +362,7 @@ const Raycast = {
     // Σπηλιά: ακανόνιστοι βράχοι (Voronoi που επαναλαμβάνεται χωρίς ραφές) σε καφέ-μπορντό, με
     // χοντρές σκούρες σχισμές, φωτεινή πάνω ακμή και σκιά από κάτω.
     const ROCK = [132, 50, 32];
-    const rock = (seedBase) => {
+    const rock = (seedBase, base = ROCK) => {
       const seeds = [];
       for (let k = 0; k < 9; k++) seeds.push([hash(k, 1, seedBase) * WN, hash(k, 2, seedBase + 1) * WN]);
       return makeW((u, v) => {
@@ -380,7 +384,7 @@ const Raycast = {
         let k = 0.8 + hash(id, 4, seedBase) * 0.3;
         if (edge < 3.6) k *= cy > 0 ? 0.62 : 1.3;
         if (hash(u >> 1, v >> 1, seedBase + 9) > 0.93) k *= 0.6;
-        return mul(ROCK, k);
+        return mul(base, k);
       });
     };
 
@@ -432,7 +436,24 @@ const Raycast = {
       return block(u, v, 3);
     }), figs, 2, 20);
 
+    // Ύπαιθρο (πρόλογος): ασβεστόλιθος στους λόφους, ξερολιθιά (χαμηλοί τοίχοι), ασβεστωμένος
+    // τοίχος σπιτιού με ρωγμές και κόκκινη λωρίδα στη βάση.
+    const LIME = [176, 150, 112];
+    const dry = courses(WN, 31, 7, 12, 9, 20);
+    const plaster = makeW((u, v) => {
+      if (v >= WN - 6) return mul([150, 64, 36], v === WN - 6 ? 0.7 : 1);      // κόκκινη λωρίδα
+      let k = 0.9 + hash(u >> 2, v >> 2, 70) * 0.1;
+      if (hash(u, v, 71) > 0.985) k *= 0.75;
+      if (Math.abs(((u * 0.7 + v * 0.4) % 23) - 11) < 0.5 && hash(u >> 3, v >> 3, 72) > 0.7) k *= 0.7;   // ρωγμές
+      return mul([236, 222, 196], k);
+    });
+
     this.walls = {
+      meadow: [rock(41, LIME), rock(47, LIME)],
+      grave: [rock(41, LIME), rock(53, LIME)],
+      road: [rock(2), rock(11)],
+      drystone: [makeW((u, v) => stone(dry(u, v), u, v, LIME, 1, 33))],
+      plaster: [plaster],
       rock: [rock(2), rock(11), rock(23)],
       blocks: [blockTex(3), blockTex(8), blockTex(13),
         frieze([['soul', 0, false, true], ['soul', 1, false, true], ['soul', 0, false, true]]),
@@ -486,6 +507,27 @@ const Raycast = {
       const k = 0.85 + (hash(u, v, 51) - 0.5) * 0.1 + (tu === 1 || tv === 1 ? 0.2 : 0);
       return dark ? mul([40, 24, 18], k) : mul([170, 90, 48], k);
     });
+    // Ύπαιθρο (πρόλογος): ξερό καλοκαιρινό χορτάρι με λεπίδες και πετραδάκια, χωματόδρομος,
+    // πήλινα πλακάκια του σπιτιού (= το floor), δοκάρια στο ταβάνι του σπιτιού.
+    this.tex.grass = [0, 1].map((k) => make((u, v) => {
+      const n = hash(u, v, 60 + k), m = hash(Math.floor(u / 3), Math.floor(v / 5), 62 + k);
+      if (n > 0.93) return mul([214, 170, 92], 0.95);                         // λεπίδα στον ήλιο
+      if (n < 0.06) return mul([92, 66, 42], 0.9);                            // σκιά
+      if (hash(Math.floor(u / 6), Math.floor(v / 6), 64 + k) > 0.92 && n > 0.5) return [150, 140, 120];   // πετραδάκι
+      return mul([168, 128, 62], 0.78 + m * 0.22);
+    }));
+    this.tex.dirt = make((u, v) => {
+      const n = hash(u, v, 66), m = hash(Math.floor(u / 4), Math.floor(v / 4), 67);
+      if (n > 0.95) return [176, 150, 112];
+      if (n < 0.05) return [74, 50, 32];
+      return mul([140, 104, 68], 0.8 + m * 0.2);
+    });
+    this.tex.beams = make((u, v) => {
+      const tu = u % 10;
+      if (tu <= 2) return mul([110, 70, 40], tu === 0 ? 0.6 : 1);           // δοκάρι
+      return mul([170, 140, 100], 0.55 + hash(Math.floor(u / 10), v >> 3, 68) * 0.1);   // καλάμια
+    });
+
     this.tex.palaceCeil = make((u, v) => {
       const tu = u % 20, tv = v % 20;
       if (tu <= 1 || tv <= 1) return mul(TERRA, 0.6);                       // δοκάρια
@@ -494,9 +536,13 @@ const Raycast = {
       return mul([70, 38, 24], 0.7 + hash(Math.floor(u / 20), Math.floor(v / 20), 52) * 0.15);
     });
 
-    // Ανά κελί: ποια υφή δαπέδου / ταβανιού (ανάλογα με το θέμα της περιοχής), και ποιοι
-    // γείτονες είναι τοίχοι (ambient occlusion: bit 0..3 = Β, Ν, Δ, Α· 4..7 = διαγώνιες γωνίες
-    // ΒΔ, ΒΑ, ΝΔ, ΝΑ, μόνο όταν οι δύο πλαϊνοί δεν είναι τοίχοι).
+    this.buildCells();
+  },
+
+  // Ανά κελί: ποια υφή δαπέδου / ταβανιού (ανάλογα με το θέμα της περιοχής), και ποιοι
+  // γείτονες είναι τοίχοι (ambient occlusion: bit 0..3 = Β, Ν, Δ, Α· 4..7 = διαγώνιες γωνίες
+  // ΒΔ, ΒΑ, ΝΔ, ΝΑ, μόνο όταν οι δύο πλαϊνοί δεν είναι τοίχοι). Ξανά σε κάθε κόσμο που φορτώνεται.
+  buildCells() {
     const L = Level, cells = L.cols * L.rows;
     this.cellFloor = new Array(cells);
     this.cellCeil = new Array(cells);
@@ -509,6 +555,10 @@ const Raycast = {
         if (theme === 'palace') {
           this.cellFloor[c] = this.tex.palaceFloor;
           this.cellCeil[c] = this.tex.palaceCeil;
+        } else if (theme === 'meadow' || theme === 'grave' || theme === 'road') {
+          // Ύπαιθρο: ξερό χορτάρι (το σπίτι και τα μονοπάτια τα αλλάζει ο πρόλογος).
+          this.cellFloor[c] = this.tex.grass[(tx * 5 + ty * 3) & 1];
+          this.cellCeil[c] = this.tex.beams;
         } else if (theme === 'blocks') {
           this.cellFloor[c] = this.tex.floor[(tx * 7 + ty * 13) & 3];
           this.cellCeil[c] = this.tex.ceil;
@@ -625,7 +675,7 @@ const Raycast = {
     buf.fill(0xff000000);
     // Στο ύπαιθρο: ουρανός πάνω από τον ορίζοντα (αλλιώς σκοτάδι — στις σπηλιές δεν φαίνεται τίποτα από πάνω).
     const outdoor = RC_OUTDOOR[L.regionAt(Math.floor(px / TILE), Math.floor(py / TILE))];
-    if (outdoor) this.fillSky(outdoor.sky, H * 0.5 + bob);
+    if (outdoor) this.fillSky(outdoor, H * 0.5 + bob, angle);
 
     const posX = px / TILE, posY = py / TILE;
     const dirX = Math.cos(angle), dirY = Math.sin(angle);
@@ -735,7 +785,7 @@ const Raycast = {
         const theme = (inside && RC_THEMES[L.region[ci]]) || this.regionThemeNear(tx, ty);
         let h = inside ? wallH[ci] : 3;
         // Βράχος: ακανόνιστη κορυφή.
-        if (theme === 'rock' && h > 1.15) h *= 1 + RC_JAG * Math.min(1, h - 1) * (this.jag(along * 1.7 + side * 31.7) - 0.5) * 2;
+        if (theme !== 'palace' && theme !== 'blocks' && !(inside && L.wallKind[ci]) && h > 1.15) h *= 1 + RC_JAG * Math.min(1, h - 1) * (this.jag(along * 1.7 + side * 31.7) - 0.5) * 2;
         const top = hz - lineH * (h - RC_EYE), bot = hz + lineH * RC_EYE;
         const isFirst = first;
         if (first) {
@@ -784,10 +834,11 @@ const Raycast = {
         const shade = xSide ? 0.8 : 1;
         let u = Math.floor(frac * N);
         if (side === 3 || side === 0) u = N - 1 - u;
-        const variants = this.walls[theme] || this.walls.rock;
+        const kind = inside ? L.wallKind[ci] : 0;
+        const variants = kind === 1 ? this.walls.drystone : kind === 2 ? this.walls.plaster : this.walls[theme] || this.walls.rock;
         const tex0 = variants[(((tx * 73856093) ^ (ty * 19349663) ^ (side * 83492791)) >>> 0) % variants.length];
         // Πάνω από το πρώτο ύψος: απλοί λίθοι (οι ζωφόροι και οι τοιχογραφίες μόνο μία φορά, στο ύψος των ματιών).
-        const texUp = theme === 'rock' ? tex0 : this.walls.blocks[0];
+        const texUp = !kind && (theme === 'palace' || theme === 'blocks') ? this.walls.blocks[0] : tex0;
 
         // Φωτεινές ακμές: η (ακανόνιστη) κορυφή, η βάση, και οι κάθετες γωνίες.
         const adx = fdy !== 0 ? 1 : 0, ady = fdx !== 0 ? 1 : 0;
@@ -972,16 +1023,57 @@ const Raycast = {
   },
 
   // Ουρανός (ύπαιθρο): κάθετη διαβάθμιση πάνω από τον ορίζοντα. stops = [[θέση 0 (πάνω) .. 1 (ορίζοντας), [r,g,b]], ...]
-  fillSky(stops, hz) {
-    const W = this.W, buf = this.buf, top = Math.min(this.H, Math.ceil(hz));
+  // o = RC_OUTDOOR[...]: sky (διαβάθμιση), sun (ήλιος / φεγγάρι σε σταθερή κατεύθυνση του κόσμου),
+  // stars, hills (μακρινοί λόφοι στον ορίζοντα, γυρίζουν μαζί με το βλέμμα).
+  fillSky(o, hz, angle) {
+    const W = this.W, buf = this.buf, top = Math.min(this.H, Math.ceil(hz)), stops = o.sky, f0 = this.focal;
+    const pack = (r, g, b) => 0xff000000 | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
     for (let y = 0; y < top; y++) {
       const t = Math.max(0, Math.min(1, 1 - (hz - y) / (this.H * 0.75)));
       let k = 0;
       while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
       const [p0, c0] = stops[k], [p1, c1] = stops[Math.min(k + 1, stops.length - 1)];
       const f = p1 > p0 ? Math.max(0, Math.min(1, (t - p0) / (p1 - p0))) : 0;
-      const r = c0[0] + (c1[0] - c0[0]) * f, g = c0[1] + (c1[1] - c0[1]) * f, b = c0[2] + (c1[2] - c0[2]) * f;
-      buf.fill(0xff000000 | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0), y * W, (y + 1) * W);
+      buf.fill(pack(c0[0] + (c1[0] - c0[0]) * f, c0[1] + (c1[1] - c0[1]) * f, c0[2] + (c1[2] - c0[2]) * f), y * W, (y + 1) * W);
+    }
+    if (top <= 0) return;
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    for (let x = 0; x < W; x++) {
+      const a = angle + Math.atan((x + 0.5 - W / 2) / f0);
+      // Αστέρια: σταθερά στον ουρανό (ανά γωνία / ύψος), όχι στην οθόνη.
+      if (o.stars) {
+        const ai = Math.floor(((a % 6.2832) + 6.2832) * 90);
+        for (let y = 0; y < top; y++) {
+          const ei = Math.floor(Math.atan((hz - y) / f0) * 90);
+          const h = Math.sin(ai * 12.9898 + ei * 78.233) * 43758.5453;
+          if (h - Math.floor(h) > 0.992) buf[y * W + x] = h - Math.floor(h) > 0.997 ? pack(255, 246, 228) : pack(170, 142, 100);
+        }
+      }
+      // Ήλιος / φεγγάρι με λάμψη γύρω του.
+      if (o.sun) {
+        const s = o.sun, da = wrap(a - s.az);
+        if (Math.abs(da) < s.r * 5) {
+          for (let y = 0; y < top; y++) {
+            const de = Math.atan((hz - y) / f0) - s.el, d = Math.hypot(da, de) / s.r;
+            if (d < 1) buf[y * W + x] = pack(...s.color);
+            else if (d < 2.6 && s.glow) {
+              const k = (1 - (d - 1) / 1.6) * 0.35, p = buf[y * W + x];
+              buf[y * W + x] = pack((p & 255) + (s.glow[0] - (p & 255)) * k, ((p >> 8) & 255) + (s.glow[1] - ((p >> 8) & 255)) * k, ((p >> 16) & 255) + (s.glow[2] - ((p >> 16) & 255)) * k);
+            }
+          }
+        }
+      }
+      // Μακρινοί λόφοι: δύο στρώσεις, πιο σκούρα η κοντινή.
+      if (o.hills) {
+        for (let layer = 0; layer < 2; layer++) {
+          const n = (q) => { const i = Math.floor(q), fr = q - i, u = fr * fr * (3 - 2 * fr); const h = (k) => { const v = Math.sin(k * 127.1 + layer * 31.3) * 43758.5453; return v - Math.floor(v); }; return h(i) * (1 - u) + h(i + 1) * u; };
+          const q = ((a % 6.2832) + 6.2832) * (layer ? 2.2 : 1.3);
+          const el = (layer ? 0.035 : 0.06) + (layer ? 0.05 : 0.07) * (n(q) * 0.7 + n(q * 3.1) * 0.3);
+          const yTop = Math.max(0, Math.floor(hz - Math.tan(el) * f0));
+          const c = o.hills[layer] || o.hills[0];
+          for (let y = yTop; y < top; y++) buf[y * W + x] = pack(c[0], c[1], c[2]);
+        }
+      }
     }
   },
 

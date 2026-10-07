@@ -78,6 +78,31 @@ const STORY = {
     "We hear you, living one.",
   ],
 
+  // Ο πρόλογος (STORY.md, ενότητα 12, "Prologue texts").
+  prologueObj: {
+    find: "Find Eurydice.",
+    water: "Fetch water from the spring.",
+    bring: "Bring the water to Eurydice.",
+    play: "Play the lyre for Eurydice.",
+    flowers: (n) => "Gather flowers for her hair. Flowers: " + n + "/3",
+    follow: "Follow Eurydice to the meadow.",
+    run: "Run.",
+    grave: "Leave the flowers on her grave.",
+    road: "Go to Taenarum.",
+  },
+  prologueEury: {
+    greet: "There you are. The water jar is empty, and the spring will not come to us.",
+    water: "Cold as winter. Thank you, my love.",
+    askPlay: "Now play for me. The new song, the one you keep hiding.",
+    played: "Even the birds stopped to listen.",
+    askFlowers: "Will you find me some flowers for my hair? I will come with you.",
+    lookAt: "What? Is there something on my face?",
+    flowers: "Asphodels? Those are flowers for the dead. I will wear them anyway.",
+    goMeadow: "I am going down to the meadow before the sun sets. Don't be long.",
+    scream: "Orpheus!",
+  },
+  skipPrologue: "Skip prologue",
+
   // Πρώτο πρόσωπο: ο Άδης και η Περσεφόνη στους θρόνους τους (STORY.md, ενότητα 8).
   hadesHall: "Another living soul in my halls. Come closer, singer.",
   persephoneHall: "I can hear the world above in your footsteps.",

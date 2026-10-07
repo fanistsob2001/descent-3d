@@ -841,3 +841,11 @@ body.fp .controls { max-width: 420px; }
   pointer-events: none;
 }
 #mission::before { content: '\25C6  '; color: var(--terra); }
+
+/* Ο πρόλογος: το κουμπί "Skip prologue" στην παύση μόνο τότε. */
+.prologue-only { display: none; }
+body.prologue .prologue-only { display: block; }
+/* Στο φως της ημέρας τα γράμματα χρειάζονται σκιά για να διαβάζονται. */
+body.prologue #hud, body.prologue #hint, body.prologue #notice, body.prologue #level-intro {
+  text-shadow: 0 1px 0 #000, 0 0 6px rgba(0, 0, 0, 0.85);
+}

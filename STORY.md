@@ -262,6 +262,8 @@ that part is built. Until then, the game keeps the 8 chapters above.
 - One continuous, much bigger world. Spaces are not all the same: narrow passages with a low rock ceiling, and
   huge caverns, river halls and palace halls where there is no ceiling at all — only darkness above, with
   stalactites, roots and chains hanging out of it. Cave walls are tall and jagged; built walls are straight.
+- **Never a maze.** Spaces are open and readable: wide caverns, long sight lines, landmarks (a waterfall, a
+  statue, a glow in the distance) and one clear way forward. Side rooms are short and obviously optional.
 - Saving happens only in **safe rooms** (small shrines of Hermes, guide of souls). Each has a small oil lamp
   (not a big fire): rest at the lamp to save. Shades never enter a shrine. Each shrine also has an offering table
   where you **craft** items.
@@ -272,7 +274,7 @@ that part is built. Until then, the game keeps the 8 chapters above.
 |---|---|---|---|
 | 0 | Thrace (prologue) | — | Playable, in daylight (see below) |
 | I | The Gate of Taenarum | The living do not come down here. You did. | The first cave |
-| II | The Shore of Acheron | The ferryman takes no one for free. Not even the dead. | Charon and the obol |
+| II | The Shore of Acheron | The ferryman takes no one for free. Not even the dead. | Charon and the obol; the crossing (see below) |
 | III | The River of Wailing | Cocytus is made of tears. Every one of them is still crying. | Weeping souls everywhere: their noise hides you, and hides the shades |
 | IV | The Waters of Lethe | What you see here, you soon forget. Do not forget why you came. | Walls fade fast |
 | V | The Asphodel Meadows | Here wander the dead who were neither good nor wicked. Only forgotten. | Wide open space |
@@ -283,6 +285,16 @@ that part is built. Until then, the game keeps the 8 chapters above.
 | X | The Gate of Hades | Three heads. Six ears. One song. | **Boss: Cerberus** |
 | XI | The Palace of Hades | The king of the dead has never heard a song. | You play for Hades and Persephone (playable) |
 | XII | The Ascent | Behind you, footsteps. Hers. Do not look back. | Eurydice follows; playable endings |
+
+### No monsters before the river; the crossing
+
+- Chapters I and II have **no shades**: only the dark, the sounds and the first lessons of echolocation.
+- On the shore of Acheron, before the crossing, you find a **letter** (a clay tablet) left by a living man who
+  came down before you. It tells what waits on the other side: the shades are blind, they hunt by sound, walk as
+  if you do not exist.
+- Paying Charon is a scene: you step into his boat and he rows you across. Thick fog closes in, the shore
+  disappears, only the oar and the water are heard. When the fog lifts you are in chapter III, in the
+  Underworld proper. From here on, the shades hunt you.
 
 ### Prologue (playable, chapter 0)
 
@@ -295,6 +307,38 @@ A morning in Thrace, in full daylight and colour — the only time the player se
 5. The first step: you slip, the lyre shatters, the strings scatter into the dark. Everything goes black.
    Chapter I begins.
 The lines of the intro cutscene (section 8) appear during the prologue, at these moments.
+
+#### Prologue texts
+
+Objectives (interface text, not voiced):
+- Find Eurydice.
+- Fetch water from the spring.
+- Bring the water to Eurydice.
+- Play the lyre for Eurydice.
+- Gather flowers for her hair. Flowers: X/3
+- Follow Eurydice to the meadow.
+- Run.
+- Leave the flowers on her grave.
+- Go to Taenarum.
+
+Eurydice (voiced, soft, young woman):
+- When you find her: There you are. The water jar is empty, and the spring will not come to us.
+- When you bring the water: Cold as winter. Thank you, my love.
+- Then: Now play for me. The new song, the one you keep hiding.
+- After you play: Even the birds stopped to listen.
+- Then: Will you find me some flowers for my hair? I will come with you.
+- If you turn and look at her while she follows you: What? Is there something on my face?
+- When you have three flowers: Asphodels? Those are flowers for the dead. I will wear them anyway.
+- Then: I am going down to the meadow before the sun sets. Don't be long.
+- In the meadow (a scream, far away): Orpheus!
+
+The intro lines (section 8) are shown in the middle of the screen: "A snake in the grass. A single bite." and
+"Eurydice never woke again." when you reach her in the meadow; "Everyone said the dead do not return." and
+"Orpheus did not listen." at the grave; "At Taenarum, the earth opens downward. He went down." at the mouth of
+the cave; "On the first step he slipped. His lyre shattered on the rocks.", "Its strings scattered into the
+dark.", "There is no light down here." and "Only what can be heard." on the first step.
+
+In the pause menu during the prologue: Skip prologue
 
 ### Boss: Cerberus (chapter X)
 
