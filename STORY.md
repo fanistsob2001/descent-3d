@@ -248,3 +248,94 @@ Side missions (title: description):
 - Three thousand years (secret): Find the shade that walks into the wall.
 
 A secret mission shows as "???" until it is completed. When a side mission is completed: Mission complete: (title)
+
+---
+
+## 12. The extended descent (first-person version) — design plan
+
+Written by Claude at the user's request (7/10/2026); the user may change anything here. This is the plan for the
+big expansion of the 3D version. It is built in stages; the texts of each part are finalised in this file before
+that part is built. Until then, the game keeps the 8 chapters above.
+
+### The world
+
+- One continuous, much bigger world. Spaces are not all the same: narrow passages with a low rock ceiling, and
+  huge caverns, river halls and palace halls where there is no ceiling at all — only darkness above, with
+  stalactites, roots and chains hanging out of it. Cave walls are tall and jagged; built walls are straight.
+- Saving happens only in **safe rooms** (small shrines of Hermes, guide of souls). Each has a small oil lamp
+  (not a big fire): rest at the lamp to save. Shades never enter a shrine. Each shrine also has an offering table
+  where you **craft** items.
+
+### Chapters
+
+| # | Name | Line | What is new there |
+|---|---|---|---|
+| 0 | Thrace (prologue) | — | Playable, in daylight (see below) |
+| I | The Gate of Taenarum | The living do not come down here. You did. | The first cave |
+| II | The Shore of Acheron | The ferryman takes no one for free. Not even the dead. | Charon and the obol |
+| III | The River of Wailing | Cocytus is made of tears. Every one of them is still crying. | Weeping souls everywhere: their noise hides you, and hides the shades |
+| IV | The Waters of Lethe | What you see here, you soon forget. Do not forget why you came. | Walls fade fast |
+| V | The Asphodel Meadows | Here wander the dead who were neither good nor wicked. Only forgotten. | Wide open space |
+| VI | The Fields of Mourning | Here walk those who died of love. They never stopped. | A quiet chapter with no shades, many souls, many stories |
+| VII | The Marshes of Styx | Even the gods fear this water. They swear their oaths on it. | First meeting with Cerberus: he breaks loose and you must run (chase) |
+| VIII | The River of Fire | Phlegethon burns and roars. Down here, no one can hear you. Or them. | The roar of the fire hides your steps, but also the shades' |
+| IX | The Pit of Tartarus | Below everything, the Furies keep watch over the damned. | Sisyphus' boulder; the Furies wake and the whole pit hunts you (chase) |
+| X | The Gate of Hades | Three heads. Six ears. One song. | **Boss: Cerberus** |
+| XI | The Palace of Hades | The king of the dead has never heard a song. | You play for Hades and Persephone (playable) |
+| XII | The Ascent | Behind you, footsteps. Hers. Do not look back. | Eurydice follows; playable endings |
+
+### Prologue (playable, chapter 0)
+
+A morning in Thrace, in full daylight and colour — the only time the player sees the world lit.
+1. Home: small chores with Eurydice (fetch water from the spring, tune the lyre and play for her, gather
+   flowers). She can walk behind you here, and you may turn and look at her freely.
+2. The meadow: she goes ahead while you finish a chore. A scream. You run. The snake. You arrive too late.
+3. The grave, at dusk: you leave the flowers. "Everyone said the dead do not return."
+4. The road to Taenarum at night, along the cliffs by the sea, to the mouth of the cave.
+5. The first step: you slip, the lyre shatters, the strings scatter into the dark. Everything goes black.
+   Chapter I begins.
+The lines of the intro cutscene (section 8) appear during the prologue, at these moments.
+
+### Boss: Cerberus (chapter X)
+
+An arena before the gate, with pillars and braziers. Cerberus is awake and hunts by sound, much faster than a
+shade. In the myth Orpheus put him to sleep with music: each head must be lulled with the Melody, played close
+to him without being heard first. Throw a honey cake (crafted) or a libation jar to make him go to it, sneak
+close, play. Three heads, three phases; each phase he is angrier and faster. When all three sleep, the gate
+opens.
+
+### Chases
+
+- Chapter VII: Cerberus breaks his chain in the marsh and comes after you. Run across the causeways to a gate
+  that closes behind you. (He waits for you again in chapter X.)
+- Chapter IX: the Furies wake all at once. Run through the pit while Sisyphus' boulder thunders down behind you.
+
+### Chests, map pieces, hiding places
+
+- **Chests** (wooden chests, clay jars, sarcophagi): opening one creaks — a small sound that shades can hear.
+  Inside: materials, obols, libation jars, clay tablets with stories, or the chapter's map piece.
+- **Map pieces**: one per chapter, not hard to find (in a side room or chest close to the main path).
+  Without it the map shows only what you have seen; with it, the whole chapter.
+- **Hiding places** (alcoves, open sarcophagi, reeds): inside you hold your breath for a few seconds and the
+  shade passes by. Your heartbeat grows louder as it comes closer. Run out of breath, and you gasp.
+
+### Crafting (at the offering table of a safe room)
+
+| Item | Made from | Use |
+|---|---|---|
+| Libation jar | clay + wine | Thrown: a loud sound far from you (as now) |
+| Pebbles | (found, no crafting) | Thrown: a small sound, to distract one shade |
+| Honey cake | honey + poppy | Thrown: Cerberus goes to eat it (and shades are drawn to the smell) |
+| Bronze bell | bronze + thread | Placed: rings after a few seconds, far from where you are |
+| Lyre resin | pine resin + wax | One more use of the Melody |
+
+### Lost souls with requests
+
+Some lost souls ask for something (find an obol for one who cannot cross, carry words to someone in another
+chapter). These become side missions.
+
+### Endings (playable)
+
+- **Good:** you come out into the light; it is the meadow of the prologue. You walk home with her behind you.
+  At the door, for the first time: "Turn around". You turn, and you see her.
+- **Bad:** you come out alone. The house is empty. You can walk to her grave and play the lyre. Nothing answers.

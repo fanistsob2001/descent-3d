@@ -140,14 +140,14 @@ const World3D = {
       const age = now - a.revealTime;
       if (age < ALTAR_REVEAL_TIME) stone = Math.min(1, 0.3 + a.revealStrength) * (1 - age / ALTAR_REVEAL_TIME);
       if (a.lit) stone = Math.max(stone, 0.9);
-      if (stone > 0.01) R.sprite(S('tripod'), { x: a.x, y: a.y, alpha: stone, scale: 1.2 });
+      if (stone > 0.01) R.sprite(S('tripod'), { x: a.x, y: a.y, alpha: stone, scale: 0.6 });
       if (!a.lit) continue;
       if (!flameDrawn) { this.drawFlame(now); flameDrawn = true; }
       const flick = 0.82 + 0.1 * Math.sin(now * 13 + a.x) + 0.08 * Math.sin(now * 5.3 + a.y * 0.3);
       const burst = Math.max(0, 1 - (now - a.litAt) / 1.4);
       R.sprite(this.flame, {
-        x: a.x, y: a.y, z: 25, h: 50, add: true, fog: false,
-        glow: { r: 46 + burst * 60, color: '255,160,70', a: 0.3 * flick + 0.4 * burst, cy: 0.85 },
+        x: a.x, y: a.y, z: 12, h: 22, add: true, fog: false,
+        glow: { r: 26 + burst * 40, color: '255,160,70', a: 0.3 * flick + 0.4 * burst, cy: 0.85 },
       });
     }
 
@@ -420,12 +420,16 @@ const World3D = {
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     const SPX = RC_SPX;
     const put = (name, tx, ty, ox, oy, scale, hang, c) => {
+      // Κρεμαστά (σταλακτίτες, ρίζες, αλυσίδες): από το ταβάνι στα στενά περάσματα· αλλού κρέμονται
+      // από το σκοτάδι, πιο ψηλά και πιο μεγάλα (το ταβάνι δεν φαίνεται).
+      const open = hang && !Raycast.ceilOn[c];
+      if (open) scale *= 1.35;
       const fr = Sprites.frames[name][0];
       const h = fr.h * SPX * scale;
       out.push({
         name, c, scale, flip: hash(tx, ty, 9) > 0.5,
         x: (tx + 0.5 + ox) * TILE, y: (ty + 0.5 + oy) * TILE,
-        z: hang ? Math.max(0, TILE - h) : 0,
+        z: hang ? (open ? Math.max(TILE * 1.5, TILE * (2.6 + hash(tx, ty, 11) * 0.9) - h) : Math.max(0, TILE - h)) : 0,
       });
     };
     for (let ty = 0; ty < L.rows; ty++) {
@@ -488,7 +492,7 @@ const World3D = {
         const ty = Math.floor(p.y / TILE) + Math.round((Math.random() - 0.5) * 12);
         const t = L.terrainAt(tx, ty);
         if (L.isOpaque(tx, ty) || t === T_CHASM) continue;
-        this.drips.push({ x: (tx + 0.2 + Math.random() * 0.6) * TILE, y: (ty + 0.2 + Math.random() * 0.6) * TILE, z: TILE - 2, vz: 0, c: ty * L.cols + tx, water: t === T_WATER });
+        this.drips.push({ x: (tx + 0.2 + Math.random() * 0.6) * TILE, y: (ty + 0.2 + Math.random() * 0.6) * TILE, z: (Raycast.ceilOn[ty * L.cols + tx] ? TILE : TILE * 2.4) - 2, vz: 0, c: ty * L.cols + tx, water: t === T_WATER });
         break;
       }
     }

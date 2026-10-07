@@ -107,6 +107,7 @@ const Pixel = {
   // ακτίνες (god rays): η φωτεινή περιοχή γύρω από την πηγή "σέρνεται" ακτινωτά προς τα έξω, οπότε
   // ό,τι μπαίνει μπροστά της (κολόνες, ακμές) αφήνει σκοτεινές λωρίδες.
   bloom(strength = 0.5, lights = []) {
+    if (!this.canvas.width || !this.canvas.height) return;   // π.χ. σε κρυφό παράθυρο χωρίς μέγεθος
     const w = Math.max(1, Math.ceil(this.w / 4)), h = Math.max(1, Math.ceil(this.h / 4));
     if (!this._bloom || this._bloom.width !== w || this._bloom.height !== h) {
       const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };

@@ -11,7 +11,7 @@ const LOOK_TOUCH = 0.0065;
 const LOOK_MOUSE = 0.0026;
 const TURN_SPEED = 2.4;
 // Βλέμμα πάνω / κάτω με το ποντίκι (σαν τα παλιά FPS: ο ορίζοντας μετακινείται), ως τόσα ακτίνια.
-const PITCH_MAX = 0.42;
+const PITCH_MAX = 0.55;
 
 const STEP_WAVE = { radius: 65, strength: 0.22 };                   // αχνά βήματα (μόνο όταν τρέχεις)
 const CALL_WAVE = { minR: 110, maxR: 560, minS: 0.5, maxS: 1.0 };   // το "κύμα" του παίκτη
