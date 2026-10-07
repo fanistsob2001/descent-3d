@@ -81,11 +81,11 @@ const STORY = {
   // Ο πρόλογος (STORY.md, ενότητα 12, "Prologue texts").
   prologueObj: {
     find: "Find Eurydice.",
-    water: "Fetch water from the spring.",
+    water: "Fetch water from the well.",
     bring: "Bring the water to Eurydice.",
     play: "Play the lyre for Eurydice.",
     flowers: (n) => "Gather flowers for her hair. Flowers: " + n + "/3",
-    follow: "Follow Eurydice to the meadow.",
+    wine: "Bring wine from the village.",
     run: "Run.",
     grave: "Leave the flowers on her grave.",
     road: "Go to Taenarum.",
@@ -98,9 +98,10 @@ const STORY = {
     askFlowers: "Will you find me some flowers for my hair? I will come with you.",
     lookAt: "What? Is there something on my face?",
     flowers: "Asphodels? Those are flowers for the dead. I will wear them anyway.",
-    goMeadow: "I am going down to the meadow before the sun sets. Don't be long.",
+    goVillage: "We have no wine for tonight's feast. Go up to the village and bring some. I will be in the meadow, gathering more flowers.",
     scream: "Orpheus!",
   },
+  villagerWine: "For the singer! Play for us tonight, Orpheus.",
   skipPrologue: "Skip prologue",
 
   // Αντικείμενα, κατασκευή, ιερά, κρυψώνες (STORY.md, ενότητα 12, "Item and interface texts").

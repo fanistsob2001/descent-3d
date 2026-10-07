@@ -46,6 +46,66 @@ const Creatures = {
     F.boulder = [0, 1].map((f) => Sprites.build(paintGrid(30, 28, (p) => { p.ellipse(15, 14, 14, 13, 'l'); p.ellipse(11, 9, 7, 5, 'i'); p.ellipse(19, 20, 9, 6, 'L'); for (const [x, y] of f ? [[8, 16], [20, 8], [14, 22], [24, 15]] : [[10, 20], [22, 12], [16, 6], [6, 12]]) p.line(x, y, x + 3, y + 2, 1, 'L'); }), dk));
     F.olive = [0, 1].map((f) => Sprites.build(this.olive(f), dk));
     F.stele = [0, 1].map((f) => Sprites.build(this.stele(f), dk));
+    // Ο μεγαλύτερος πρόλογος: το σπίτι, η αυλή, το χωριό, η κηδεία.
+    F.hearth = [Sprites.build(paintGrid(26, 10, (p) => {
+      p.ellipse(13, 6, 12, 3.6, 'm'); p.ellipse(13, 5.5, 9, 2.4, 'N');
+      for (const x of [3, 8, 13, 18, 23]) p.ellipse(x, 7, 2.2, 1.6, 'n');
+      p.line(7, 4, 18, 6, 2, 'O'); p.line(9, 6, 19, 3, 2, 'o');           // κούτσουρα
+    }), dk)];
+    F.loom = [Sprites.build(paintGrid(26, 40, (p) => {
+      p.line(2, 0, 4, 39, 2, 'o'); p.line(23, 0, 21, 39, 2, 'o'); p.line(1, 2, 24, 2, 2, 'O');
+      p.poly([[5, 4], [20, 4], [20, 26], [5, 26]], 'w');                   // το ύφασμα
+      for (let x = 6; x <= 19; x += 2) p.line(x, 26, x, 33, 1, 'W');        // στημόνι
+      for (let y = 8; y <= 22; y += 5) p.line(5, y, 20, y, 1, 'r');         // κόκκινος μαίανδρος στο ύφασμα
+      for (let x = 6; x <= 19; x += 3) p.ellipse(x, 34.5, 1.2, 1.4, 'n');   // βαρίδια
+    }), dk)];
+    F.table = [Sprites.build(paintGrid(28, 18, (p) => {
+      p.poly([[0, 7], [27, 7], [27, 9], [0, 9]], 'o'); p.line(0, 9, 27, 9, 1, 'O');
+      for (const x of [2, 24]) p.line(x, 10, x, 17, 2, 'O');
+      p.ellipse(8, 5, 4, 2.4, 'Y'); p.ellipse(8, 4.4, 3, 1.4, 'y');         // ψωμί
+      p.poly([[16, 1], [20, 1], [19, 6], [17, 6]], 'A'); p.line(16, 2, 20, 2, 1, 'N');   // κύπελλο
+      p.ellipse(23, 5.5, 2.5, 1.6, 'r');                                     // ρόδι
+    }), dk)];
+    F.bed = [Sprites.build(paintGrid(34, 14, (p) => {
+      p.poly([[0, 5], [33, 5], [33, 10], [0, 10]], 'o');
+      p.poly([[1, 3], [32, 3], [32, 7], [1, 7]], 'w'); p.line(1, 3, 32, 3, 1, 'W');
+      p.poly([[16, 2], [32, 2], [32, 7], [16, 7]], 'R'); p.line(16, 2, 32, 2, 1, 'r');   // κουβέρτα
+      p.ellipse(5, 3, 3.5, 2, 'W');                                         // μαξιλάρι
+      for (const x of [1, 31]) p.line(x, 10, x, 13, 2, 'O');
+    }), dk)];
+    F.well = [Sprites.build(paintGrid(26, 30, (p) => {
+      p.line(3, 0, 3, 18, 2, 'o'); p.line(22, 0, 22, 18, 2, 'o'); p.line(2, 1, 23, 1, 2, 'O');
+      p.line(13, 2, 13, 12, 1, 'J'); p.poly([[11, 12], [15, 12], [14, 16], [12, 16]], 'A');   // σχοινί, κουβάς
+      p.poly([[1, 18], [24, 18], [25, 29], [0, 29]], 'm');
+      for (let y = 20; y <= 28; y += 3) for (let x = (y % 2) * 3 + 1; x < 25; x += 6) p.line(x, y, x + 4, y, 1, 'M');
+      p.line(0, 18, 25, 18, 1, 'n');
+    }), dk)];
+    F.laundry = [Sprites.build(paintGrid(46, 34, (p) => {
+      p.line(1, 0, 1, 33, 2, 'o'); p.line(44, 0, 44, 33, 2, 'o');
+      p.line(1, 3, 44, 5, 1, 'J');
+      p.poly([[6, 4], [15, 4], [16, 18], [5, 17]], 'w'); p.line(5, 17, 16, 18, 1, 'r');
+      p.poly([[19, 5], [27, 5], [27, 14], [19, 15]], 'R');
+      p.poly([[30, 5], [40, 5], [41, 21], [29, 20]], 'W'); p.line(30, 8, 40, 8, 1, 'w');
+    }), dk)];
+    F.goat = [0, 1].map((f) => Sprites.build(paintGrid(26, 20, (p) => {
+      p.ellipse(12, 10, 9, 5, 'W'); p.ellipse(9, 9, 3, 2.5, 'K');              // σώμα με κηλίδα
+      for (const [x, d] of [[6, f], [9, -f], [15, -f], [18, f]]) p.line(x, 14, x + d, 19, 1, 'O');
+      const hx = 22, hy = f ? 7 : 9;                                          // κεφάλι (βόσκει ή σηκώνει)
+      p.line(19, 8, hx, hy, 2, 'W'); p.ellipse(hx + 1, hy, 2.8, 2, 'W');
+      p.line(hx, hy - 2, hx - 2, hy - 5, 1, 'I'); p.px(hx + 1, hy - 0.5, 'e'); p.px(hx + 2, hy + 2, 'W');
+      p.line(3, 8, 1, 6, 1, 'W');                                              // ουρά
+    }), dk));
+    const recolor = (rows, map, extra) => {
+      const g = rows.map((r) => [...r].map((c) => map[c] || c));
+      if (extra) extra(g);
+      return g.map((r) => r.join(''));
+    };
+    // Ο γέρος του χωριού: γκρίζα μαλλιά και γένια, καφέ μανδύας, χωρίς λύρα.
+    F.villager = [Sprites.build(recolor(this.orpheus('stand', 0, false), { h: 'B', H: 'W', R: 'z', r: 'Z', Y: 'B', y: 'B' },
+      (g) => { for (let y = 9; y <= 12; y++) for (let x = 15; x <= 18; x++) if (g[y][x] !== '.') g[y][x] = 'B'; }), dk)];
+    // Άνθρωποι της κηδείας: γυναίκες με μαύρη μαντίλα, άντρες με μαύρο μανδύα.
+    F.mournerF = [Sprites.build(recolor(this.eurydiceAlive(0), { R: 'K', r: 'K', y: 'K', a: 'K' }), dk)];
+    F.mournerM = [Sprites.build(recolor(this.orpheus('stand', 0, false), { h: 'a', H: 'K', R: 'K', r: 'k', Y: 'a', y: 'a' }), dk)];
   },
 
   // Ξύλινο κιβώτιο με χάλκινες λωρίδες. f = 1: ανοιχτό (το καπάκι σηκωμένο, σκοτεινό μέσα).

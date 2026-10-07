@@ -348,11 +348,11 @@ The lines of the intro cutscene (section 8) appear during the prologue, at these
 
 Objectives (interface text, not voiced):
 - Find Eurydice.
-- Fetch water from the spring.
+- Fetch water from the well.
 - Bring the water to Eurydice.
 - Play the lyre for Eurydice.
 - Gather flowers for her hair. Flowers: X/3
-- Follow Eurydice to the meadow.
+- Bring wine from the village.
 - Run.
 - Leave the flowers on her grave.
 - Go to Taenarum.
@@ -365,8 +365,14 @@ Eurydice (voiced, soft, young woman):
 - Then: Will you find me some flowers for my hair? I will come with you.
 - If you turn and look at her while she follows you: What? Is there something on my face?
 - When you have three flowers: Asphodels? Those are flowers for the dead. I will wear them anyway.
-- Then: I am going down to the meadow before the sun sets. Don't be long.
-- In the meadow (a scream, far away): Orpheus!
+- Then (she sends you away, and goes to the meadow): We have no wine for tonight's feast. Go up to the village and bring some. I will be in the meadow, gathering more flowers.
+- In the meadow (a scream, far away, while you are in the village): Orpheus!
+
+The old man of the village (voiced, old man), when you take the wine: For the singer! Play for us tonight, Orpheus.
+
+The prologue map (first-person version, bigger): the village (houses, a square, the old man with the wine), the road
+through the olive grove, the house (two rooms: hearth, loom, table, bed; a yard with a well, washing on a line, a pen with
+goats, the garden), the meadow. At the grave, people of the village stand around it in black.
 
 The intro lines (section 8) are shown in the middle of the screen: "A snake in the grass. A single bite." and
 "Eurydice never woke again." when you reach her in the meadow; "Everyone said the dead do not return." and
