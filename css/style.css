@@ -856,3 +856,52 @@ body.prologue #hud, body.prologue #hint, body.prologue #notice, body.prologue #l
   line-height: 1.55;
   color: #ecd9b6;
 }
+/* Στάδιο 4: το αντικείμενο που κρατάς, η προτροπή (E — Open), η ανάσα στην κρυψώνα, το ιερό. */
+#item-slot {
+  position: fixed;
+  right: calc(var(--safe-right) + 16px);
+  bottom: calc(var(--safe-bottom) + 18px);
+  z-index: 3;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  color: var(--bright);
+  text-shadow: 0 0 6px #000, 0 0 2px #000;
+  pointer-events: none;
+  text-align: right;
+  line-height: 1.5;
+}
+#item-slot .keys { opacity: 0.55; font-size: 0.7rem; }
+#prompt {
+  position: fixed;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 4px 10px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: var(--bright);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(206, 108, 56, 0.45);
+  pointer-events: none;
+}
+#breath {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 34px);
+  width: 180px;
+  height: 6px;
+  transform: translateX(-50%);
+  z-index: 3;
+  border: 1px solid rgba(236, 218, 186, 0.5);
+  pointer-events: none;
+}
+#breath div { height: 100%; background: #ecdab9; }
+.hidden#item-slot, .hidden#prompt, .hidden#breath { display: none; }
+#shrine .panel-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+#shrine-recipes .btn { width: 100%; }
+#shrine-recipes .btn small { display: block; font-size: 0.65rem; opacity: 0.65; letter-spacing: 0.04em; text-transform: none; }
+.shrine-actions { display: flex; gap: 0.8rem; justify-content: center; margin-top: 1rem; }
+@media (max-width: 640px) { #shrine .panel-body { grid-template-columns: 1fr; } }

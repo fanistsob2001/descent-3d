@@ -68,6 +68,8 @@ const Level = {
     this.start = { x: 0, y: 0 };
     this.exit = { tx: -10, ty: -10, x: -1e6, y: -1e6 };
     this.landing = null;   // εκεί που αράζει η βάρκα του Χάροντα (K)
+    this.chests = [];      // { x, y, region, map } — Q / q (q = με το κομμάτι του χάρτη)
+    this.hides = [];       // { x, y, region } — κρυψώνες (h)
     this.boss = null;      // ο Κέρβερος (B)
     let tablets = 0;
     this.monsters = [];
@@ -106,6 +108,8 @@ const Level = {
           const kind = { o: 'obol', s: 'string', j: 'jar', L: 'tablet' }[c];
           if (kind) this.items.push({ kind, x: cx, y: cy, region: r, n: kind === 'tablet' ? tablets++ : -1 });
           if (c === 'K') this.landing = { x: cx, y: cy };
+          if (c === 'Q' || c === 'q') this.chests.push({ x: cx, y: cy, region: r, map: c === 'q' });
+          if (c === 'h') this.hides.push({ x: cx, y: cy, region: r });
           if (c === 'B') this.boss = { x: cx, y: cy, region: r };
           if (c >= '1' && c <= '9') this.souls.push({ n: Number(c), x: cx, y: cy });
           if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
@@ -127,6 +131,20 @@ const Level = {
       for (let y = cty - 2; y <= cty + 2; y++) {
         for (let x = ctx - 3; x <= ctx + 2; x++) {
           if (x >= 0 && y >= 0 && x < this.cols && y < this.rows) this.quiet[y * this.cols + x] = 1;
+        }
+      }
+    }
+
+    // Τα ιερά του Ερμή (γύρω από κάθε βωμό): ασφαλή κελιά — καμία σκιά δεν μπαίνει, κανείς δεν σε πιάνει εκεί.
+    this.safe = new Uint8Array(this.cols * this.rows);
+    for (const a of this.altars) {
+      if (!a) continue;
+      for (let y = a.ty - 4; y <= a.ty + 4; y++) {
+        for (let x = a.tx - 4; x <= a.tx + 4; x++) {
+          if (x < 0 || y < 0 || x >= this.cols || y >= this.rows) continue;
+          const i = y * this.cols + x;
+          if (this.opaque[i] || this.region[i] !== this.region[a.ty * this.cols + a.tx]) continue;
+          if (Math.hypot(x - a.tx, y - a.ty) <= 3.2) this.safe[i] = 1;
         }
       }
     }
@@ -249,7 +267,7 @@ const Level = {
       for (const [nx, ny] of next) {
         if (fly ? this.isOpaque(nx, ny) : this.isWall(nx, ny)) continue;
         const ni = ny * this.cols + nx;
-        if (dist[ni] !== -1) continue;
+        if (dist[ni] !== -1 || (this.safe && this.safe[ni])) continue;   // κανείς δεν μπαίνει σε ιερό
         dist[ni] = dist[cur] + 1;
         parent[ni] = cur;
         queue[tail++] = ni;

@@ -459,6 +459,86 @@ const Sound = {
     o.start(t); o.stop(t + d + 0.05); src.start(t, Math.random()); src.stop(t + d + 0.05);
   },
 
+  // ---- Στάδιο 4: κιβώτια, χαλίκια, κουδούνι, κρυψώνα ----
+  // Κιβώτιο που ανοίγει: ξύλο που τρίζει (τόνος που γλιστράει, με τραχύτητα) από τη θέση του.
+  creak(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.4, 400);
+    const o = ac.createOscillator(), g = ac.createGain(), bp = ac.createBiquadFilter(), am = ac.createOscillator(), amg = ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.linearRampToValueAtTime(260, t + 0.35);
+    o.frequency.linearRampToValueAtTime(150, t + 0.7);
+    bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 3;
+    am.frequency.value = 34; amg.gain.value = 0.5;
+    am.connect(amg); amg.connect(g.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.05);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.75);
+    o.connect(bp); bp.connect(g); g.connect(out);
+    o.start(t); o.stop(t + 0.8); am.start(t); am.stop(t + 0.8);
+  },
+
+  // Χαλίκι που χτυπάει στην πέτρα: δύο-τρία κοφτά "τικ".
+  pebble(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.35, 500);
+    for (let k = 0; k < 3; k++) {
+      const src = this.noiseSource(), bp = ac.createBiquadFilter(), g = ac.createGain(), at = t + k * (0.07 + Math.random() * 0.05);
+      bp.type = 'bandpass'; bp.frequency.value = 3200 + Math.random() * 1500; bp.Q.value = 6;
+      this.envelope(g.gain, at, 0.4 / (k + 1), 0.002, 0.04);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      src.start(at, Math.random()); src.stop(at + 0.06);
+    }
+  },
+
+  // Χάλκινο κουδούνι: καθαρή, μεταλλική νότα με δυσαρμονικές αρμονικές που σβήνει αργά.
+  bell(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.5, 700);
+    for (const [f, a, d] of [[880, 0.3, 2.2], [880 * 2.76, 0.12, 1.2], [880 * 5.4, 0.06, 0.6], [440, 0.12, 2.6]]) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f;
+      this.envelope(g.gain, t, a, 0.003, d);
+      o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + d + 0.1);
+    }
+  },
+
+  // Κρυψώνα: η ανάσα σου, κρατημένη (σιγανό, κοντά στο αυτί). on = false: σταματάει.
+  breath(on) {
+    if (!this.ready()) return;
+    const ac = this.ctx;
+    if (!this._breath) {
+      const src = this.noiseSource(true), bp = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+      g.gain.value = 0;
+      lfo.frequency.value = 0.35; lg.gain.value = 0.012;
+      lfo.connect(lg); lg.connect(g.gain);
+      src.connect(bp); bp.connect(g); g.connect(this.sfx);
+      src.start(); lfo.start();
+      this._breath = g;
+    }
+    this._breath.gain.setTargetAtTime(on ? 0.014 : 0, ac.currentTime, 0.3);
+  },
+
+  // Η ανάσα τελείωσε: ένα δυνατό, απότομο λαχάνιασμα.
+  gasp() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const src = this.noiseSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(700, t); bp.frequency.linearRampToValueAtTime(1800, t + 0.4);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    src.connect(bp); bp.connect(g); g.connect(this.sfx);
+    src.start(t, Math.random()); src.stop(t + 0.65);
+  },
+
   // Το κουπί του Χάροντα μπαίνει στο νερό: πλατσούρισμα και το ξύλο που τρίζει.
   oar() {
     if (!this.ready()) return;

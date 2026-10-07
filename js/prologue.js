@@ -220,6 +220,9 @@ const Prologue = {
     Eggs.reset();
     World3D.reset();
     Missions.reset(Save.fresh());
+    Inventory.reset(Save.fresh());
+    Chests.reset();
+    Hides.reset();
     Eurydice.reset('none', Level.start);
     Notice.clear();
     player.x = camera.x = L.start.x;

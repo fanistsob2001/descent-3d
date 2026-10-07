@@ -22,17 +22,45 @@ const Jars = {
   throw(x, y, dx, dy) {
     if (this.left <= 0) return false;
     this.left--;
-    this.items.push({
-      x, y, r: JAR_RADIUS,
-      vx: dx * JAR_SPEED, vy: dy * JAR_SPEED,
-      spin: 0, brokenAt: -1, shards: null,
-    });
+    this.launch(x, y, dx, dy, 'jar');
     return true;
+  },
+
+  // Οτιδήποτε πετιέται (js/inventory.js): 'jar' σπάει με δυνατό ήχο, 'pebble' ένα μικρό "τικ",
+  // 'cake' πέφτει αθόρυβα και τραβάει τις κοντινές σκιές (και τον Κέρβερο) με τη μυρωδιά,
+  // 'bell' πέφτει και χτυπάει δυνατά μετά από λίγα δευτερόλεπτα (εσύ έχεις ήδη φύγει).
+  launch(x, y, dx, dy, kind) {
+    const sp = kind === 'bell' ? JAR_SPEED * 0.75 : JAR_SPEED;
+    this.items.push({ x, y, r: JAR_RADIUS, vx: dx * sp, vy: dy * sp, spin: 0, brokenAt: -1, shards: null, kind, ringAt: 0 });
   },
 
   shatter(it, now) {
     it.brokenAt = now;
     it.vx = it.vy = 0;
+    if (it.kind === 'pebble') {
+      Echoes.emit(it.x, it.y, 210, 0.5, 'jar');
+      Sound.pebble(it.x, it.y);
+      it.shards = [];
+      return;
+    }
+    if (it.kind === 'cake') {
+      // Η μυρωδιά: οι σκιές του ίδιου κεφαλαίου σε 380 μονάδες πάνε εκεί (χωρίς ήχο).
+      const r = Level.regionAt(Math.floor(it.x / TILE), Math.floor(it.y / TILE));
+      for (const m of (typeof monsters !== 'undefined' ? monsters : [])) {
+        if (m.region !== r || m.isFrozen() || Math.hypot(m.x - it.x, m.y - it.y) > 380) continue;
+        m.state = 'hunt';
+        m.soundX = it.x;
+        m.soundY = it.y;
+        m.goTo(Math.floor(it.x / TILE), Math.floor(it.y / TILE));
+      }
+      it.shards = [];
+      return;
+    }
+    if (it.kind === 'bell') {
+      it.ringAt = now + 4;
+      it.shards = [];
+      return;
+    }
     it.shards = [];
     for (let i = 0; i < 9; i++) {
       const ang = Math.random() * Math.PI * 2, sp = 20 + Math.random() * 45;
@@ -46,7 +74,14 @@ const Jars = {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];
       if (it.brokenAt >= 0) {
-        if (now - it.brokenAt > JAR_SHARDS_TIME) this.items.splice(i, 1);
+        if (it.kind === 'bell' && it.ringAt && now >= it.ringAt) {
+          it.ringAt = 0;
+          it.rangAt = now;
+          Echoes.emit(it.x, it.y, 480, 0.95, 'jar');
+          Sound.bell(it.x, it.y);
+        }
+        const life = it.kind === 'cake' ? 12 : it.kind === 'bell' ? (it.rangAt ? it.rangAt - it.brokenAt + 2 : 99) : it.kind === 'pebble' ? 0.5 : JAR_SHARDS_TIME;
+        if (now - it.brokenAt > life) this.items.splice(i, 1);
         continue;
       }
 

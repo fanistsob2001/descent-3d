@@ -39,6 +39,9 @@
     </div>
   </div>
   <div id="mission" class="hidden"></div>
+  <div id="item-slot" class="hidden"></div>
+  <div id="prompt" class="hidden"></div>
+  <div id="breath" class="hidden"><div></div></div>
   <div id="hint"></div>
   <div id="notice"></div>
   <div id="level-intro"><p id="intro-number"></p><p id="intro-name"></p><p id="intro-line"></p></div>
@@ -69,6 +72,27 @@
     <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
     <button class="btn voice-toggle" type="button" data-action="voice">Voices: On</button>
     <button class="btn primary" type="button" data-action="back">Back</button>
+  </div>
+
+  <!-- Ιερό του Ερμή (safe room): κατασκευή αντικειμένων και ξεκούραση (save). Το γεμίζει το js/main.js. -->
+  <div id="shrine" class="overlay hidden">
+    <div class="panel shrine-panel">
+      <div class="panel-head">
+        <h2 id="shrine-title"></h2>
+        <p id="shrine-line" class="small-label"></p>
+      </div>
+      <div class="meander"></div>
+      <div class="panel-body">
+        <section class="missions">
+          <ul id="shrine-mats" class="side-missions"></ul>
+        </section>
+        <section class="panel-actions" id="shrine-recipes"></section>
+      </div>
+      <div class="shrine-actions">
+        <button class="btn primary" type="button" data-action="rest" id="shrine-rest"></button>
+        <button class="btn" type="button" data-action="shrine-close" id="shrine-leave"></button>
+      </div>
+    </div>
   </div>
 
   <div id="pause" class="overlay hidden">
@@ -153,6 +177,7 @@
   <script src="js/hints.js"></script>
   <script src="js/save.js"></script>
   <script src="js/missions.js"></script>
+  <script src="js/inventory.js"></script>
   <script src="js/altar.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/voice.js"></script>

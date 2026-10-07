@@ -103,6 +103,22 @@ const STORY = {
   },
   skipPrologue: "Skip prologue",
 
+  // Αντικείμενα, κατασκευή, ιερά, κρυψώνες (STORY.md, ενότητα 12, "Item and interface texts").
+  materials: { clay: "Clay", wine: "Wine", honey: "Honey", poppy: "Poppy seeds", bronze: "Bronze", thread: "Thread", resin: "Pine resin", wax: "Beeswax" },
+  tools: { jar: "Libation jar", pebble: "Pebbles", cake: "Honey cake", bell: "Bronze bell", lyreResin: "Lyre resin" },
+  chestInside: (list) => "Inside: " + list + ".",
+  mapPiece: "A map of this place, scratched on a shard.",
+  shrineTitle: "Shrine of Hermes",
+  shrineLine: "Shades never cross this threshold.",
+  shrineRest: "Rest",
+  shrineCraft: "Craft",
+  shrineLeave: "Leave",
+  made: (item) => "Made: " + item + ".",
+  resinUsed: "The lyre can play once more.",
+  holdBreath: "You hold your breath.",
+  gasp: "You gasp for air!",
+  prompts: { open: "Open", shrine: "Shrine", hide: "Hide", leave: "Come out" },
+
   // Πρώτο πρόσωπο: ο Άδης και η Περσεφόνη στους θρόνους τους (STORY.md, ενότητα 8).
   hadesHall: "Another living soul in my halls. Come closer, singer.",
   persephoneHall: "I can hear the world above in your footsteps.",

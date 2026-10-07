@@ -409,6 +409,19 @@ opens.
 | Bronze bell | bronze + thread | Placed: rings after a few seconds, far from where you are |
 | Lyre resin | pine resin + wax | One more use of the Melody |
 
+### Item and interface texts (first-person version)
+
+Interface text, not voiced.
+- Materials: Clay · Wine · Honey · Poppy seeds · Bronze · Thread · Pine resin · Beeswax
+- Items: Libation jar · Pebbles · Honey cake · Bronze bell · Lyre resin
+- Opening a chest: Inside: (list of what you found).
+- The map piece: A map of this place, scratched on a shard.
+- The shrine: title "Shrine of Hermes", line "Shades never cross this threshold.", buttons "Rest", "Craft", "Leave";
+  after crafting: Made: (item).; after resting, the checkpoint message of section 8.
+- Using lyre resin: The lyre can play once more.
+- Hiding: You hold your breath. · When the breath runs out: You gasp for air!
+- Prompts: Open · Shrine · Hide · Come out
+
 ### Lost souls with requests
 
 Some lost souls ask for something (find an obol for one who cannot cross, carry words to someone in another

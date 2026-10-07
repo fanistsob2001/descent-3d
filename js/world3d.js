@@ -174,9 +174,18 @@ const World3D = {
         const p = R.project(it.x, it.y);
         if (!p || p.depth < 0.7) continue;
         const z = 2 + 12 * Math.min(1, Math.hypot(it.vx, it.vy) / JAR_SPEED);
-        R.sprite(S('lekythos'), { x: it.x, y: it.y, z, scale: 0.45 });
+        const look = { jar: ['lekythos', 0.45], pebble: ['rocks', 0.18], cake: ['cake', 0.5], bell: ['bell', 0.5] }[it.kind || 'jar'];
+        R.sprite(S(look[0]), { x: it.x, y: it.y, z, scale: look[1] });
         continue;
       }
+      // Η μελόπιτα / το κουδούνι μένουν στο έδαφος (το κουδούνι λάμπει όταν χτυπάει).
+      if (it.kind === 'cake' || it.kind === 'bell') {
+        const ring = it.rangAt ? Math.max(0, 1 - (now - it.rangAt) / 1.5) : 0;
+        R.sprite(S(it.kind), { x: it.x, y: it.y, z: ring * 3 * Math.sin(now * 40), scale: 0.5, alpha: Math.min(1, 0.35 + Raycast.cellLight[Math.floor(it.y / TILE) * Level.cols + Math.floor(it.x / TILE)] + ring),
+          glow: ring ? { r: 30, color: '255,200,120', a: ring * 0.6 } : undefined });
+        continue;
+      }
+      if (it.kind === 'pebble') continue;
       const t = (now - it.brokenAt) / JAR_SHARDS_TIME;
       const spread = 1 - Math.pow(1 - Math.min(1, t * 2.5), 3);
       for (const s of it.shards) {
@@ -186,6 +195,20 @@ const World3D = {
           z: Math.max(0, 10 * (1 - t * 3)) + Math.sin(s.rot) * 1.5, alpha: 1 - t, scale: 0.8,
         });
       }
+    }
+
+    // ---- Κιβώτια και κρυψώνες: φαίνονται όσο τα φωτίζει ο ήχος (ή το φως του κελιού) ----
+    const cellLit = (x, y) => Raycast.cellLight[Math.floor(y / TILE) * Level.cols + Math.floor(x / TILE)] || 0;
+    for (const c of Chests.list) {
+      const age = now - c.revealTime;
+      const a = Math.max(age < 3 ? Math.min(1, 0.3 + c.revealStrength) * (1 - age / 3) : 0, Math.min(1, cellLit(c.x, c.y) * 1.4));
+      if (a > 0.02) R.sprite(S('chest', c.opened ? 1 : 0), { x: c.x, y: c.y, alpha: a, scale: 0.55,
+        glow: c.map && !c.opened ? { r: 16, color: '236,218,186', a: a * 0.35 } : undefined });
+    }
+    for (const h of Hides.list) {
+      const age = now - h.revealTime;
+      const a = Math.max(age < 3 ? Math.min(1, 0.3 + h.revealStrength) * (1 - age / 3) : 0, Math.min(1, cellLit(h.x, h.y) * 1.4));
+      if (a > 0.02 && Hides.active !== h) R.sprite(S('niche'), { x: h.x + h.wx * TILE * 0.38, y: h.y + h.wy * TILE * 0.38, alpha: a, scale: 0.75 });
     }
 
     // ---- Σκιές και Ερινύες ----

@@ -37,6 +37,9 @@ const Save = {
           melody: int(d.melody),
           taken: Array.isArray(d.taken) ? d.taken.filter(Number.isInteger) : [],
           seen: typeof d.seen === 'string' && /^[0-9a-f]*$/.test(d.seen) ? d.seen : '',
+          heard: Array.isArray(d.heard) ? d.heard : [],
+          secrets: Array.isArray(d.secrets) ? d.secrets : [],
+          inv: d.inv && typeof d.inv === 'object' ? d.inv : {},
         };
       }
     } catch (_) { /* χωρίς αποθήκευση */ }

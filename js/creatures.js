@@ -34,8 +34,42 @@ const Creatures = {
     // Ο πρόλογος (js/prologue.js): δέντρα, η επιτύμβια στήλη.
     F.cypress = [Sprites.build(this.cypress(), dk)];
     F.tablet = [Sprites.build(this.tablet(), dk)];
+    // Στάδιο 4: κιβώτια, αντικείμενα που φτιάχνεις, κρυψώνες.
+    F.chest = [0, 1].map((f) => Sprites.build(this.chest(f), dk));
+    F.cake = [Sprites.build(paintGrid(12, 8, (p) => { p.ellipse(6, 4.5, 5.5, 3, 'Y'); p.ellipse(6, 3.6, 4.5, 2, 'y'); p.px(4, 3, 'b'); p.px(7, 4, 'b'); p.px(8, 3, 'b'); }), dk)];
+    F.bell = [Sprites.build(paintGrid(10, 12, (p) => { p.line(5, 0, 5, 2, 1, 'J'); p.poly([[3, 2], [7, 2], [9, 10], [1, 10]], 'V'); p.line(1, 10, 9, 10, 1, 'D'); p.line(3, 4, 3, 9, 1, 'D'); p.px(5, 11, 'J'); }), dk)];
+    F.niche = [Sprites.build(this.niche(), dk)];
     F.olive = [0, 1].map((f) => Sprites.build(this.olive(f), dk));
     F.stele = [0, 1].map((f) => Sprites.build(this.stele(f), dk));
+  },
+
+  // Ξύλινο κιβώτιο με χάλκινες λωρίδες. f = 1: ανοιχτό (το καπάκι σηκωμένο, σκοτεινό μέσα).
+  chest(f) {
+    return paintGrid(22, 18, (p) => {
+      p.poly([[1, 8], [21, 8], [20, 17], [2, 17]], 'o');
+      for (const y of [11, 14]) p.line(2, y, 20, y, 1, 'O');
+      for (const x of [3, 18]) p.line(x, 8, x, 17, 1, 'V');
+      if (f) {
+        p.poly([[2, 8], [20, 8], [19, 6], [3, 6]], 'N');                  // μέσα
+        p.poly([[2, 6], [20, 6], [18, 0], [4, 0]], 'o');                  // σηκωμένο καπάκι
+        p.line(4, 0, 18, 0, 1, 'V'); p.line(3, 3, 19, 3, 1, 'O');
+      } else {
+        p.poly([[1, 4], [21, 4], [21, 8], [1, 8]], 'o');                  // καπάκι
+        p.line(1, 4, 21, 4, 1, 'V'); p.line(1, 8, 21, 8, 1, 'O');
+        p.ellipse(11, 9, 1.4, 1.4, 'V'); p.px(11, 9, 'N');                // κλειδαριά
+      }
+    });
+  },
+
+  // Κρυψώνα: όρθια ανοιχτή πέτρινη σαρκοφάγος μέσα στον βράχο, σκοτεινή μέσα.
+  niche() {
+    return paintGrid(18, 34, (p) => {
+      p.poly([[2, 2], [16, 2], [17, 33], [1, 33]], 'm');
+      p.poly([[5, 5], [13, 5], [14, 31], [4, 31]], 'N');
+      p.line(2, 2, 16, 2, 1, 'n'); p.line(1, 33, 17, 33, 1, 'M');
+      p.ellipse(9, 3, 7, 2, 'm'); p.ellipse(9, 4, 4, 1, 'N');
+      for (const y of [12, 22]) p.line(2, y, 4, y, 1, 'M');
+    });
   },
 
   // Πήλινη πινακίδα ακουμπισμένη στο έδαφος, με χαραγμένες γραμμές γραφής.
