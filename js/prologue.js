@@ -671,8 +671,8 @@ const Prologue = {
     // Οι χορδές που φεύγουν: λεπτές γραμμές φωτός.
     for (const st of this.strings) {
       if (st.a < 0.02) continue;
-      R.sprite(S('stringCoil', 0), { x: st.x, y: st.y, z: Math.max(0, st.z), scale: 0.6, alpha: st.a, add: true, fog: false,
-        glow: { r: 16, color: '255,220,150', a: 0.5 * st.a } });
+      R.sprite(S('stringLoose', Math.floor(now * 6 + st.vx) % 2), { x: st.x, y: st.y, z: Math.max(0, st.z), scale: 0.45, alpha: st.a, add: true, fog: false,
+        glow: { r: 12, color: '255,220,150', a: 0.4 * st.a } });
     }
   },
 

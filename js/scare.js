@@ -100,6 +100,51 @@ function scareHand(erinys) {
   });
 }
 
+// Ο Κέρβερος: κεφάλι σκύλου από μπροστά — σκούρο τρίχωμα, μυτερά αυτιά, κόκκινα μάτια, ρυτίδες
+// στη μουσούδα· το στόμα από γρύλισμα με κυνόδοντες ως ορθάνοιχτο με γλώσσα και σάλια.
+function scareDogFace(m) {
+  return paintGrid(56, 54, (p) => {
+    p.poly([[5, 16], [10, 0], [19, 12]], 'K');                // αυτί
+    p.poly([[8, 14], [11, 4], [16, 12]], 'M');
+    p.ellipse(28, 25, 24, 22, 'k');                           // κεφάλι
+    p.ellipse(16, 30, 8, 9, 'K');                             // μάγουλο (σκιά)
+    p.line(10, 14, 20, 18, 2, 'K');                           // βαριά φρύδια
+    p.ellipse(19, 21, 3.4, 2.2, 'N'); p.px(19, 21, 'r'); p.px(20, 21, 'r'); p.px(18, 21, 'r');   // μάτι
+    p.ellipse(22, 37, 9, 9, 'M');                             // μουσούδα
+    for (const [y, x0] of [[29, 18], [31, 17], [33, 18]]) p.line(x0, y, x0 + 5, y + 1, 1, 'K');   // ρυτίδες γρυλίσματος
+    p.mirror();
+    p.ellipse(28, 30, 4.2, 2.6, 'N'); p.px(27, 29, 'n');      // μύτη
+    if (m === 0) {
+      p.line(19, 40, 37, 40, 1, 'N');
+      for (const x of [21, 34]) { p.line(x, 40, x + 0.5, 44, 2, 'i'); }        // κυνόδοντες έξω από τα χείλη
+      for (let x = 23; x <= 33; x += 2) p.px(x, 41, 'i');
+    } else if (m === 1) {
+      p.poly([[18, 39], [38, 39], [35, 47], [21, 47]], 'N');
+      p.line(18, 39, 38, 39, 1, 'R');
+      for (let x = 19; x <= 37; x += 2) p.line(x, 40, x, 41, 1, 'i');
+      for (const x of [20, 36]) p.line(x, 40, x, 45, 2, 'i');
+      p.ellipse(28, 45, 4, 1.6, 't');
+    } else {
+      p.poly([[15, 37], [41, 37], [38, 53], [18, 53]], 'N');                    // ορθάνοιχτο
+      p.line(15, 37, 41, 37, 2, 'R');
+      p.ellipse(28, 49, 7, 4, 't'); p.line(28, 46, 28, 52, 1, 'R');             // γλώσσα
+      for (let x = 17; x <= 39; x += 3) { p.line(x, 38, x + 0.5, 41.5, 1, 'i'); p.line(x, 53, x + 0.5, 50, 1, 'i'); }
+      for (const x of [17, 39]) { p.line(x, 38, x + (x < 28 ? 1 : -1), 46, 2, 'i'); p.line(x + (x < 28 ? 2 : -2), 53, x + (x < 28 ? 2 : -2), 47, 2, 'i'); }
+      for (const [x, y] of [[16, 44], [40, 46]]) p.line(x, y, x, y + 7, 1, 'p');   // σάλια
+    }
+  });
+}
+
+// Πόδι σκύλου με μαύρα νύχια (αντί για χέρι, στο jump scare του Κέρβερου).
+function scarePaw() {
+  return paintGrid(26, 36, (p) => {
+    p.poly([[6, 14], [20, 14], [22, 36], [4, 36]], 'k');
+    p.ellipse(13, 13, 10, 7, 'k');
+    for (const x of [6, 11, 16, 20]) { p.ellipse(x, 9, 2.6, 3, 'K'); p.line(x, 6, x + (x - 13) * 0.15, 1, 2, 'N'); }
+    for (const y of [20, 26, 31]) p.line(6, y, 10, y + 2, 1, 'K');
+  });
+}
+
 // Το αριστερό φτερό της Ερινύας (το δεξί = καθρέφτης): κόκκινη μεμβράνη με μαύρα κόκαλα.
 function scareWing() {
   return paintGrid(34, 40, (p) => {
@@ -119,6 +164,8 @@ function scareWing() {
 const SCARE_KINDS = {
   shade: { face: (m) => [scareShadeFace(m)], eye: 'E', eyeColor: '255,250,235', erinys: false, wing: false, halo: POT.red, size: 1.05 },
   erinys: { face: (m) => [0, 1].map((f) => scareErinysFace(m, f)), eye: 'y', eyeColor: '255,214,90', erinys: true, wing: true, halo: '190,40,20', size: 0.8 },
+  // Ο Κέρβερος: τρία κεφάλια (τα δύο στα πλάγια, πιο πίσω), πόδια με νύχια αντί για χέρια.
+  cerberus: { face: (m) => [scareDogFace(m)], eye: 'r', eyeColor: '255,70,40', erinys: false, wing: false, halo: '170,30,10', size: 0.95, heads: true, paw: true },
 };
 
 const Scare = {
@@ -148,7 +195,8 @@ const Scare = {
       this.kinds[name] = {
         faces: [0, 1, 2].map((m) => d.face(m).map((g) => hd(Sprites.build(g, POT.terra)))),
         eyes,
-        hand: hd(Sprites.build(scareHand(d.erinys), POT.terra)),
+        hand: hd(Sprites.build(d.paw ? scarePaw() : scareHand(d.erinys), POT.terra)),
+        heads: !!d.heads,
         wing: d.wing ? hd(Sprites.build(scareWing(), POT.terra)) : null,
         eyeColor: d.eyeColor,
         halo: d.halo,
@@ -222,6 +270,16 @@ const Scare = {
       const wy = Math.round(cy - wh * 0.75 + flap);
       ctx.drawImage(K.wing.c, Math.round(cx - fw * 0.3 - ww), wy, ww, wh);
       ctx.drawImage(K.wing.f, Math.round(cx + fw * 0.3), wy, ww, wh);
+    }
+
+    // Ο Κέρβερος: τα δύο άλλα κεφάλια, στα πλάγια και λίγο πιο πίσω, με το δικό τους τίναγμα.
+    if (K.heads) {
+      for (const s of [-1, 1]) {
+        const sk = k * 0.72, sw = face.w * sk, sh = face.h * sk;
+        const sx = Math.round(cx + s * fw * 0.6 - sw / 2 + (Math.random() - 0.5) * shake * 1.5);
+        const sy = Math.round(cy - sh * 0.38 + (Math.random() - 0.5) * shake * 1.5);
+        ctx.drawImage(s < 0 ? face.c : face.f, sx, sy, sw, sh);
+      }
     }
 
     // Το πρόσωπο. Στις στιγμές της "παρεμβολής" κόβεται σε λωρίδες που γλιστράνε στο πλάι.

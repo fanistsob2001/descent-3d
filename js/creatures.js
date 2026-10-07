@@ -39,6 +39,8 @@ const Creatures = {
     F.cake = [Sprites.build(paintGrid(12, 8, (p) => { p.ellipse(6, 4.5, 5.5, 3, 'Y'); p.ellipse(6, 3.6, 4.5, 2, 'y'); p.px(4, 3, 'b'); p.px(7, 4, 'b'); p.px(8, 3, 'b'); }), dk)];
     F.bell = [Sprites.build(paintGrid(10, 12, (p) => { p.line(5, 0, 5, 2, 1, 'J'); p.poly([[3, 2], [7, 2], [9, 10], [1, 10]], 'V'); p.line(1, 10, 9, 10, 1, 'D'); p.line(3, 4, 3, 9, 1, 'D'); p.px(5, 11, 'J'); }), dk)];
     F.niche = [Sprites.build(this.niche(), dk)];
+    // Μια χορδή της λύρας που ξεφεύγει: λεπτή, φωτεινή, κυματιστή γραμμή.
+    F.stringLoose = [0, 1].map((f) => Sprites.build(paintGrid(9, 40, (p) => { for (let y = 0; y < 40; y++) p.px(4 + Math.sin(y * 0.35 + f * 1.6) * 3, y, y % 9 === 0 ? 'y' : '1'); }), null));
     // Στάδιο 5: τα χάλκινα κάγκελα της Πύλης, η πέτρα του Σίσυφου.
     F.bars = [Sprites.build(paintGrid(20, 40, (p) => { for (let x = 1; x < 20; x += 4) { p.line(x, 2, x, 39, 1, 'V'); p.px(x, 1, 'y'); p.px(x, 0, 'Y'); } p.line(0, 6, 19, 6, 1, 'D'); p.line(0, 30, 19, 30, 1, 'D'); }), dk)];
     F.boulder = [0, 1].map((f) => Sprites.build(paintGrid(30, 28, (p) => { p.ellipse(15, 14, 14, 13, 'l'); p.ellipse(11, 9, 7, 5, 'i'); p.ellipse(19, 20, 9, 6, 'L'); for (const [x, y] of f ? [[8, 16], [20, 8], [14, 22], [24, 15]] : [[10, 20], [22, 12], [16, 6], [6, 12]]) p.line(x, y, x + 3, y + 2, 1, 'L'); }), dk));
@@ -96,15 +98,25 @@ const Creatures = {
 
   // Ελιά: στριφτός κορμός, πλατιά ασημοπράσινη (εδώ χακί) κόμη από τούφες. f = παραλλαγή.
   olive(f) {
-    return paintGrid(44, 40, (p) => {
-      p.line(22, 39, 20, 26, 4, 'O');
-      p.line(20, 26, 14, 18, 2, 'O'); p.line(21, 27, 28, 17, 2, 'O');
-      p.px(21, 33, 'b'); p.px(19, 29, 'b');
-      const tufts = f ? [[10, 14, 9, 6], [22, 10, 11, 7], [33, 14, 9, 6], [16, 20, 8, 4], [29, 20, 8, 4]]
-        : [[12, 12, 10, 7], [26, 9, 11, 7], [35, 16, 8, 5], [18, 19, 9, 4]];
-      for (const [x, y, rx, ry] of tufts) p.ellipse(x, y, rx, ry, 'X');
-      for (const [x, y, rx, ry] of tufts) p.ellipse(x - 1, y - 2, rx * 0.6, ry * 0.5, 'x');
-      p.map((x, y, ch) => (ch !== '.' && ch !== 'O' && ch !== 'b' && (x * 5 + y * 3) % 13 === 0 ? 'V' : ch));
+    // Στριφτός, διχαλωτός κορμός με σκούρες ρωγμές· η κόμη από πολλές μικρές τούφες σε διαφορετικά ύψη, με
+    // κενά ανάμεσα (φαίνεται ο ουρανός), ασημοχακί από πάνω και σκούρα από κάτω — όπως οι ελιές της Μάνης.
+    return paintGrid(48, 52, (p) => {
+      const s = f ? -1 : 1;
+      p.poly([[21, 51], [27, 51], [26, 40], [24, 34], [22, 40]], 'O');
+      p.line(24, 36, 24 - 7 * s, 26, 3, 'O'); p.line(24, 36, 24 + 6 * s, 24, 3, 'O'); p.line(24 + 6 * s, 24, 24 + 11 * s, 17, 2, 'O');
+      p.line(24 - 7 * s, 26, 24 - 12 * s, 19, 2, 'O'); p.line(24, 34, 25, 22, 2, 'O');
+      for (const [x, y] of [[23, 44], [25, 39], [22, 47]]) p.px(x, y, 'b');
+      const tufts = [];
+      for (let i = 0; i < 22; i++) {
+        const a = (i / 22) * Math.PI * 2, r = 9 + ((i * 7 + f * 3) % 5) * 1.8;
+        tufts.push([24 + Math.cos(a) * r * 1.35, 17 + Math.sin(a) * r * 0.8, 3.2 + (i % 3) * 0.7]);
+      }
+      tufts.push([24, 12, 4], [17, 16, 3.5], [31, 15, 3.5], [24, 20, 3]);
+      for (const [x, y, r] of tufts) p.ellipse(x, y + 1, r, r * 0.7, 'X');           // σκιά (κάτω μεριά)
+      for (const [x, y, r] of tufts) p.ellipse(x - 0.6, y - 0.6, r * 0.75, r * 0.5, 'x'); // φως
+      for (const [x, y, r] of tufts) p.px(x - r * 0.3, y - r * 0.3, 'V');              // ασημί φύλλα
+      // Κενά μέσα στην κόμη.
+      for (const [x, y] of [[18, 20], [30, 21], [24, 9], [13, 13], [35, 12]]) p.ellipse(x, y, 1.6, 1.1, '.');
     });
   },
 

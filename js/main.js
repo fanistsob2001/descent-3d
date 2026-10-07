@@ -35,7 +35,7 @@ const MELODY_HINTS = [
 ];
 
 // Ένταση του ambient βουητού ανά κατάσταση.
-const AMBIENT = { play: 1, paused: 0.4, map: 0.4, shrine: 0.3, menu: 0.6, dead: 0.25, cutscene: 0.35, end: 0.5 };
+const AMBIENT = { play: 1, paused: 0.4, map: 0.4, shrine: 0.3, inventory: 0.4, menu: 0.6, dead: 0.25, cutscene: 0.35, end: 0.5 };
 
 // ---- Στοιχεία σελίδας ----
 const $ = (id) => document.getElementById(id);
@@ -44,6 +44,7 @@ let ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
   menu: $('menu'), settings: $('settings'), pause: $('pause'),
   endGood: $('end-good'), endBad: $('end-bad'), map: $('map-screen'), shrine: $('shrine'),
+  controls: $('controls'), inventory: $('inventory'),
 };
 const hudEl = $('hud');
 const jarBtn = $('btn-jar');
@@ -94,7 +95,7 @@ function resize() {
   document.body.classList.toggle('landscape', landscape);
   // PC: μεγαλύτερη ανάλυση και πιο ανοιχτό οπτικό πεδίο (παιχνίδι υπολογιστή, όχι κινητού).
   Pixel.resize(cssW, cssH, IS_TOUCH ? PIXEL_TARGET : PIXEL_TARGET_PC);
-  Raycast.fov = IS_TOUCH ? RC_FOV : RC_FOV_PC;
+  Raycast.fov = Settings.fov ? (Settings.fov * Math.PI) / 180 : IS_TOUCH ? RC_FOV : RC_FOV_PC;
   Raycast.slowMs = IS_TOUCH ? 7 : 10;
   Raycast.resize(Pixel.w, Pixel.h);
 }
@@ -106,7 +107,7 @@ function updatePlayer(dt) {
   // Το βλέμμα: σύρσιμο στο δεξί μισό, ποντίκι, ή ←/→.
   const sens = LOOK_MOUSE * Settings.mouse;
   let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
-  player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens));
+  player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens * (Settings.invert ? -1 : 1)));
   Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
   if ((Prologue.active && Prologue.lock) || Crossing.active || Hides.active || Throne.locked()) { player.walkSpeed *= 0.9; return; }
   if (a > Math.PI) a -= Math.PI * 2;
@@ -284,14 +285,13 @@ function playMelody() {
 function pickUp(it) {
   if (it.kind === 'jar') {
     Jars.left++;
-    Sound.jarPickup();
-    Notice.show(STORY.jar, gameTime, 6);   // χωρίς φωνή (μόνο κείμενο)
-    if (!jarsFound) Hints.push(JAR_HINTS);
+    Sound.jarPickup();   // χωρίς κείμενο (ο χρήστης δεν το θέλει κάθε φορά): μόνο ο ήχος και ο μετρητής
     jarsFound = true;
   } else if (it.kind === 'tablet') {
     // Πήλινη πινακίδα: τη διαβάζεις (χωρίς φωνή — γραμμένο κείμενο).
     Sound.jarPickup();
     Notice.show(STORY.tablets[it.n] || '', gameTime, 15, null, 'tablet');
+    Inventory.tablets.add(it.n);
   } else if (it.kind === 'obol') {
     hasObol = true;
     Sound.coin();
@@ -385,21 +385,89 @@ function updateInteract() {
   if (Hides.active) br.firstChild.style.width = Math.max(0, Hides.breath * 100).toFixed(0) + '%';
 }
 
-// Πάνω δεξιά κάτω: τι κρατάς (με το E), και πόσα.
+// Το εικονίδιο κάθε αντικειμένου (από τα sprites, μία φορά).
+const TOOL_ICON = { jar: 'lekythos', pebble: 'rocks', cake: 'cake', bell: 'bell' };
+const _icons = {};
+function toolIcon(t) {
+  if (!_icons[t]) _icons[t] = Sprites.getHD(TOOL_ICON[t], 0).c.toDataURL();
+  return _icons[t];
+}
+
+// Η μπάρα κάτω στη μέση: τα 4 αντικείμενα, με το επιλεγμένο τονισμένο (όπως στο Minecraft).
+let hotbarKey = '';
 function updateItemSlot() {
-  const el = $('item-slot');
+  const el = $('hotbar');
   const any = TOOL_ORDER.some((t) => Inventory.count(t) > 0);
   el.classList.toggle('hidden', !any || Prologue.active || state !== 'play');
   if (!any) return;
-  const t = Inventory.count(Inventory.sel) > 0 ? Inventory.sel : TOOL_ORDER.find((x) => Inventory.count(x) > 0);
-  Inventory.sel = t;
-  el.innerHTML = '';
-  const a = document.createElement('div');
-  a.textContent = STORY.tools[t] + ' \u00d7' + Inventory.count(t);
-  const b = document.createElement('div');
-  b.className = 'keys';
-  b.textContent = IS_TOUCH ? '' : 'E \u00b7 1\u20134';
-  el.append(a, b);
+  if (Inventory.count(Inventory.sel) <= 0) Inventory.sel = TOOL_ORDER.find((x) => Inventory.count(x) > 0);
+  const key = TOOL_ORDER.map((t) => Inventory.count(t)).join() + Inventory.sel;
+  if (key === hotbarKey) return;
+  hotbarKey = key;
+  el.textContent = '';
+  for (const t of TOOL_ORDER) el.appendChild(toolSlot(t, false));
+}
+
+function toolSlot(t, big) {
+  const n = Inventory.count(t);
+  const d = document.createElement('div');
+  d.className = 'slot' + (t === Inventory.sel ? ' sel' : '') + (n ? '' : ' empty');
+  const img = document.createElement('img');
+  img.src = toolIcon(t);
+  img.alt = STORY.tools[t];
+  const c = document.createElement('span');
+  c.className = 'n';
+  c.textContent = n ? String(n) : '';
+  d.append(img, c);
+  if (big) {
+    const s = document.createElement('small');
+    s.textContent = STORY.tools[t];
+    d.appendChild(s);
+    d.addEventListener('click', (e) => { e.preventDefault(); if (n) { Inventory.sel = t; hotbarKey = ''; fillInventory(); } });
+  }
+  return d;
+}
+
+// ---- Inventory (Tab / I, ή από την παύση) ----
+let invFrom = 'play';
+function openInventory() {
+  invFrom = state === 'paused' ? 'paused' : 'play';
+  setState('inventory');
+  stopInput();
+  fillInventory();
+  $('inv-read').textContent = '';
+  showScreen('inventory');
+}
+
+function closeInventory() {
+  if (state !== 'inventory') return;
+  if (invFrom === 'paused') { setState('paused'); showScreen('pause'); return; }
+  setState('play');
+  showScreen(null);
+  updateHud();
+}
+
+function fillInventory() {
+  const tools = $('inv-tools');
+  tools.textContent = '';
+  for (const t of TOOL_ORDER) tools.appendChild(toolSlot(t, true));
+  const list = (id, items) => {
+    const ul = $(id);
+    ul.textContent = '';
+    for (const [name, prog, done, onClick] of items) {
+      const li = document.createElement('li');
+      if (done) li.classList.add('done');
+      const a = document.createElement('span'); a.className = 'name'; a.textContent = name;
+      const b = document.createElement('span'); b.className = 'prog'; b.textContent = prog;
+      li.append(a, b);
+      if (onClick) { li.classList.add('link'); li.addEventListener('click', onClick); }
+      ul.appendChild(li);
+    }
+  };
+  list('inv-mats', MATERIALS.map((m) => [STORY.materials[m], String(Inventory.mats[m] || 0), !Inventory.mats[m]]));
+  list('inv-maps', CHAPTERS.map((c, i) => [c.numeral + '. ' + c.name, Inventory.maps.has(i) ? '\u2713' : '', !Inventory.maps.has(i)]));
+  list('inv-tablets', [...Inventory.tablets].sort((a, b) => a - b).map((n) => [STORY.tablets[n].split('.')[0].slice(0, 32) + '\u2026', '', false,
+    () => { $('inv-read').textContent = STORY.tablets[n]; }]));
 }
 
 let shrineAltar = -1;
@@ -1306,9 +1374,21 @@ function updateToggleLabels() {
   }
   for (const b of document.querySelectorAll('.mouse-toggle')) b.textContent = `Mouse: ${Settings.mouse}x`;
   for (const b of document.querySelectorAll('.voice-toggle')) b.textContent = Settings.voice === 'off' ? 'Voices: Off' : 'Voices: On';
+  for (const b of document.querySelectorAll('.invert-toggle')) b.textContent = 'Invert mouse: ' + (Settings.invert ? 'on' : 'off');
+  for (const b of document.querySelectorAll('.fov-toggle')) b.textContent = 'Field of view: ' + (Settings.fov || (IS_TOUCH ? 66 : 80));
+  for (const b of document.querySelectorAll('.bright-toggle')) b.textContent = 'Brightness: ' + Math.round(Settings.bright * 100) + '%';
+  for (const b of document.querySelectorAll('.subs-toggle')) b.textContent = 'Subtitles: ' + Settings.subs;
+  applySettings();
   for (const b of document.querySelectorAll('.vibration-toggle')) {
     b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
   }
+}
+
+// Οι ρυθμίσεις που φαίνονται: φωτεινότητα (φίλτρο στον καμβά), μέγεθος υποτίτλων.
+function applySettings() {
+  canvas.style.filter = Settings.bright === 1 ? '' : 'brightness(' + Settings.bright + ')';
+  document.body.classList.toggle('subs-small', Settings.subs === 'small');
+  document.body.classList.toggle('subs-large', Settings.subs === 'large');
 }
 
 function updateHud() {
@@ -1586,7 +1666,8 @@ function die() {
   Notice.clear();
   showScreen(null);
   Scare.prepare(killer ? killer.kind : 'shade');
-  Sound.scare(killer ? killer.kind : 'shade');
+  Sound.scare(killer && killer.kind === 'cerberus' ? 'shade' : killer ? killer.kind : 'shade');
+  if (killer && killer.kind === 'cerberus') CERB_PITCH.forEach((f, i) => Sound.bark(player.x + 20, player.y, f, i * 0.07));
   vibrate([250, 60, 500]);
 }
 
@@ -1623,13 +1704,28 @@ function goToMenu() {
   showScreen('menu');
 }
 
+let backTo = 'menu';   // πού γυρίζει το Back των Settings / Controls
 function doAction(action) {
   Sound.unlock();   // πρέπει να γίνει μέσα στο πάτημα του κουμπιού (iPhone)
   blurButtons();
   if (action === 'new') newGame();
   else if (action === 'continue' || action === 'retry') continueGame();
-  else if (action === 'settings') showScreen('settings');
-  else if (action === 'back') showScreen('menu');
+  else if (action === 'settings' || action === 'controls') {
+    // Από την παύση γυρίζει στην παύση, από το μενού στο μενού.
+    backTo = state === 'paused' ? 'pause' : 'menu';
+    showScreen(action);
+  }
+  else if (action === 'back') showScreen(backTo);
+  else if (action === 'inventory') openInventory();
+  else if (action === 'inventory-close') closeInventory();
+  else if (action === 'invert') { Settings.invert = !Settings.invert; Settings.store(); updateToggleLabels(); }
+  else if (action === 'fov') {
+    const cur = Settings.fov || (IS_TOUCH ? 66 : 80);
+    Settings.fov = SETTINGS_FOV[(SETTINGS_FOV.indexOf(cur) + 1) % SETTINGS_FOV.length];
+    Settings.store(); updateToggleLabels(); resize();
+  }
+  else if (action === 'bright') { Settings.bright = SETTINGS_BRIGHT[(SETTINGS_BRIGHT.indexOf(Settings.bright) + 1) % SETTINGS_BRIGHT.length]; Settings.store(); updateToggleLabels(); }
+  else if (action === 'subs') { Settings.subs = { small: 'medium', medium: 'large', large: 'small' }[Settings.subs]; Settings.store(); updateToggleLabels(); }
   else if (action === 'resume') resumeGame();
   else if (action === 'map-close') closeMap();
   else if (action === 'menu') goToMenu();
@@ -1718,12 +1814,23 @@ function init() {
       if (primary) doAction(primary.dataset.action);
     } else if (state === 'map' && (e.code === 'Escape' || e.code === 'KeyM' || e.code === 'KeyP')) {
       if (!e.repeat) closeMap();
+    } else if (e.code === 'Escape' && state === 'shrine') {
+      closeShrine();
+    } else if (e.code === 'Escape' && state === 'inventory') {
+      closeInventory();
+    } else if (e.code === 'Escape' && (visibleScreen() === screens.settings || visibleScreen() === screens.controls)) {
+      showScreen(backTo);
     } else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (state === 'play') pauseGame();
       // (όχι αμέσως: το Esc που ξεκλείδωσε το ποντίκι έβαλε ήδη παύση)
       else if (state === 'paused' && performance.now() - pausedAt > 300) resumeGame();
-    } else if (state === 'shrine' && (e.code === 'Escape' || e.code === 'KeyE')) {
+    } else if (state === 'shrine' && e.code === 'KeyE') {
       if (!e.repeat) closeShrine();
+    } else if (e.code === 'Tab' || e.code === 'KeyI') {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (state === 'inventory') closeInventory();
+      else if (state === 'play' && !Prologue.active && !Crossing.active) openInventory();
     } else if (e.code === 'KeyE' && !e.repeat) {
       interact();
     } else if (/^Digit[1-4]$/.test(e.code) && state === 'play') {

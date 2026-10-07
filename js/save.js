@@ -77,12 +77,18 @@ const Save = {
 
 // Ρυθμίσεις: ήχος, δόνηση, και (PC) ευαισθησία ποντικιού.
 const MOUSE_SENS = [0.5, 0.75, 1, 1.5, 2, 3];
+const SETTINGS_FOV = [66, 72, 80, 90, 100];
+const SETTINGS_BRIGHT = [0.8, 0.9, 1, 1.15, 1.3];
 const Settings = {
   KEY: 'descent-settings',
   sound: true,
   vibration: true,
   mouse: 1,          // πολλαπλασιαστής του βλέμματος με το ποντίκι (ένα από τα MOUSE_SENS)
   voice: 'on',       // φωνές των χαρακτήρων: 'on' | 'off' (οι υπότιτλοι μένουν πάντα)
+  invert: false,     // ποντίκι: πάνω-κάτω ανάποδα
+  fov: 0,            // οπτικό πεδίο σε μοίρες (0 = το προεπιλεγμένο: 80 στο PC, 66 στο κινητό)
+  bright: 1,         // φωτεινότητα (1 = κανονική)
+  subs: 'medium',    // μέγεθος υποτίτλων: small | medium | large
 
   load() {
     try {
@@ -92,13 +98,17 @@ const Settings = {
         this.vibration = d.vibration !== false;
         if (MOUSE_SENS.includes(d.mouse)) this.mouse = d.mouse;
         if (d.voice === 'off') this.voice = 'off';
+        this.invert = d.invert === true;
+        if (SETTINGS_FOV.includes(d.fov)) this.fov = d.fov;
+        if (SETTINGS_BRIGHT.includes(d.bright)) this.bright = d.bright;
+        if (['small', 'medium', 'large'].includes(d.subs)) this.subs = d.subs;
       }
     } catch (_) { /* - */ }
   },
 
   store() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice }));
+      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice, invert: this.invert, fov: this.fov, bright: this.bright, subs: this.subs }));
     } catch (_) { /* - */ }
   },
 };

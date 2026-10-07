@@ -28,6 +28,7 @@ const Inventory = {
   sel: 'jar',
   opened: new Set(),    // id των κιβωτίων που άνοιξες
   maps: new Set(),      // κεφάλαια των οποίων βρήκες τον χάρτη
+  tablets: new Set(),   // οι πινακίδες που διάβασες (STORY.tablets[n]) — ξαναδιαβάζονται στο Inventory
 
   reset(saved) {
     const inv = saved.inv || {};
@@ -39,10 +40,11 @@ const Inventory = {
     this.sel = TOOL_ORDER.includes(inv.sel) ? inv.sel : 'jar';
     this.opened = new Set(Array.isArray(inv.opened) ? inv.opened : []);
     this.maps = new Set(Array.isArray(inv.maps) ? inv.maps : []);
+    this.tablets = new Set(Array.isArray(inv.tablets) ? inv.tablets : []);
   },
 
   saveData() {
-    return { inv: { mats: { ...this.mats }, pebbles: this.pebbles, cakes: this.cakes, bells: this.bells, sel: this.sel, opened: [...this.opened], maps: [...this.maps] } };
+    return { inv: { mats: { ...this.mats }, pebbles: this.pebbles, cakes: this.cakes, bells: this.bells, sel: this.sel, opened: [...this.opened], maps: [...this.maps], tablets: [...this.tablets] } };
   },
 
   count(t) {

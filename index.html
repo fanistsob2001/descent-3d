@@ -16,10 +16,10 @@
   <!-- Κατά τη διάρκεια του παιχνιδιού -->
   <div id="hud" class="hidden">
     <div class="hud-left">
-      <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause" data-key="Esc">
+      <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
       </button>
-      <button id="btn-map" class="hud-btn" type="button" aria-label="Map" data-key="M">
+      <button id="btn-map" class="hud-btn" type="button" aria-label="Map">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg>
       </button>
     </div>
@@ -28,18 +28,18 @@
       <div id="strings-label"></div>
     </div>
     <div class="hud-right">
-      <button id="btn-melody" class="hud-btn hidden" type="button" aria-label="Play the lyre" data-key="Q">
+      <button id="btn-melody" class="hud-btn hidden" type="button" aria-label="Play the lyre">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M7 4c-3 3-3 9 0 13h10c3-4 3-10 0-13M7 4c1 2 1 4 0 6M17 4c-1 2-1 4 0 6M6 10h12M9 10v7M12 10v7M15 10v7M8 20h8"/></svg>
         <span id="melody-count" class="count">0</span>
       </button>
-      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar" data-key="E">
+      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M9 3h6M10 3v3c-4 2-5 7-3 11l2 3h6l2-3c2-4 1-9-3-11V3M7 10h10"/></svg>
         <span id="jar-count" class="count">0</span>
       </button>
     </div>
   </div>
   <div id="mission" class="hidden"></div>
-  <div id="item-slot" class="hidden"></div>
+  <div id="hotbar" class="hidden"></div>
   <div id="prompt" class="hidden"></div>
   <div id="breath" class="hidden"><div></div></div>
   <div id="hint"></div>
@@ -56,12 +56,11 @@
     <button id="btn-continue" class="btn" type="button" data-action="continue">Continue</button>
     <button id="btn-new" class="btn" type="button" data-action="new">New Game</button>
     <button class="btn" type="button" data-action="settings">Settings</button>
+    <button class="btn" type="button" data-action="controls">Controls</button>
     <p class="headphones">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg>
       Wear headphones
     </p>
-    <p class="controls touch-only">Left side: move &middot; Right side: look &middot; Lyre button: sound</p>
-    <p class="controls keys-only">WASD move &middot; Mouse look &middot; Left click / Space sound &middot; Right click / X cancel &middot; Shift sneak &middot; E jar &middot; Q lyre &middot; M map &middot; F fullscreen &middot; Esc pause</p>
   </div>
 
   <div id="settings" class="overlay hidden">
@@ -71,7 +70,53 @@
     <button class="btn vibration-toggle" type="button" data-action="vibration">Vibration: on</button>
     <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
     <button class="btn voice-toggle" type="button" data-action="voice">Voices: On</button>
+    <button class="btn invert-toggle keys-only" type="button" data-action="invert">Invert mouse: off</button>
+    <button class="btn fov-toggle" type="button" data-action="fov">Field of view: 80</button>
+    <button class="btn bright-toggle" type="button" data-action="bright">Brightness: 100%</button>
+    <button class="btn subs-toggle" type="button" data-action="subs">Subtitles: medium</button>
     <button class="btn primary" type="button" data-action="back">Back</button>
+  </div>
+
+  <!-- Χειρισμός (ο χρήστης δεν θέλει τα πλήκτρα πάνω στα εικονίδια ή στο μενού): εδώ, από το μενού και την παύση. -->
+  <div id="controls" class="overlay hidden">
+    <h2>Controls</h2>
+    <div class="meander"></div>
+    <dl class="controls-list keys-only">
+      <dt>W A S D</dt><dd>Move</dd>
+      <dt>Mouse</dt><dd>Look around</dd>
+      <dt>Left click / Space</dt><dd>Sing (hold for a bigger wave)</dd>
+      <dt>Right click / X</dt><dd>Cancel the wave while holding</dd>
+      <dt>Shift</dt><dd>Walk silently</dd>
+      <dt>E</dt><dd>Open, rest, hide, turn &mdash; or throw what you hold</dd>
+      <dt>1 &ndash; 4 / Wheel</dt><dd>Choose what you hold</dd>
+      <dt>Tab / I</dt><dd>Inventory</dd>
+      <dt>Q</dt><dd>Play the Melody</dd>
+      <dt>M</dt><dd>Map</dd>
+      <dt>F</dt><dd>Fullscreen</dd>
+      <dt>Esc / P</dt><dd>Pause</dd>
+    </dl>
+    <dl class="controls-list touch-only">
+      <dt>Left side</dt><dd>Move (a little: walk silently)</dd>
+      <dt>Right side</dt><dd>Look around</dd>
+      <dt>Lyre button</dt><dd>Sing (hold for a bigger wave, drag away to cancel)</dd>
+      <dt>Item button</dt><dd>Open, rest, hide &mdash; or throw what you hold</dd>
+    </dl>
+    <button class="btn primary" type="button" data-action="back">Back</button>
+  </div>
+
+  <!-- Inventory: τα αντικείμενα που κρατάς (διαλέγεις με κλικ), υλικά, χάρτες, πινακίδες. Το γεμίζει το js/main.js. -->
+  <div id="inventory" class="overlay hidden">
+    <div class="panel inventory-panel">
+      <div class="panel-head"><h2>Inventory</h2></div>
+      <div class="meander"></div>
+      <div class="inv-grid">
+        <section><h3>Held</h3><div id="inv-tools" class="inv-tools"></div></section>
+        <section><h3>Materials</h3><ul id="inv-mats" class="side-missions"></ul></section>
+        <section><h3>Maps</h3><ul id="inv-maps" class="side-missions"></ul></section>
+        <section><h3>Tablets</h3><ul id="inv-tablets" class="side-missions"></ul><p id="inv-read" class="inv-read"></p></section>
+      </div>
+      <div class="shrine-actions"><button class="btn primary" type="button" data-action="inventory-close">Back</button></div>
+    </div>
   </div>
 
   <!-- Ιερό του Ερμή (safe room): κατασκευή αντικειμένων και ξεκούραση (save). Το γεμίζει το js/main.js. -->
@@ -114,10 +159,9 @@
         </section>
         <section class="panel-actions">
           <button class="btn primary" type="button" data-action="resume">Resume</button>
-          <button class="btn sound-toggle" type="button" data-action="sound">Sound: on</button>
-          <button class="btn vibration-toggle touch-only" type="button" data-action="vibration">Vibration: on</button>
-          <button class="btn mouse-toggle keys-only" type="button" data-action="mouse">Mouse: 1x</button>
-          <button class="btn voice-toggle" type="button" data-action="voice">Voices: On</button>
+          <button class="btn" type="button" data-action="inventory">Inventory</button>
+          <button class="btn" type="button" data-action="settings">Settings</button>
+          <button class="btn" type="button" data-action="controls">Controls</button>
           <button class="btn prologue-only" type="button" data-action="skip-prologue">Skip prologue</button>
           <button class="btn" type="button" data-action="menu">Main menu</button>
         </section>
