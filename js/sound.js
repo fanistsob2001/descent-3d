@@ -420,6 +420,64 @@ const Sound = {
     src.start(t, Math.random()); src.stop(t + 0.4);
   },
 
+  // ---- Ο θόρυβος κάθε κεφαλαίου (δεν περνάει από το Echoes: οι σκιές δεν τον "ακούνε" ως ήχο) ----
+  // kind: 'wail' (Κωκυτός: θρήνοι από παντού) | 'fire' (Φλεγέθων: βουητό, ανάλογα με το πόσο κοντά είναι η λάβα)
+  // | null. near = 0..1 (για τη φωτιά).
+  regionTick(kind, near, now) {
+    if (!this.ready() || this.muted) return;
+    const ac = this.ctx;
+    // Φωτιά: συνεχής θόρυβος (μία φορά φτιαγμένος), η ένταση ακολουθεί την απόσταση.
+    if (!this._fire) {
+      const src = this.noiseSource(true), lp = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+      lp.type = 'lowpass'; lp.frequency.value = 520;
+      g.gain.value = 0;
+      lfo.frequency.value = 0.7; lg.gain.value = 140;
+      lfo.connect(lg); lg.connect(lp.frequency);
+      src.connect(lp); lp.connect(g); g.connect(this.sfx);
+      src.start(); lfo.start();
+      this._fire = g;
+    }
+    this._fire.gain.setTargetAtTime(kind === 'fire' ? 0.05 + 0.32 * near : 0, ac.currentTime, 0.4);
+    if (kind !== 'wail' || now < (this._wailAt || 0)) return;
+    // Θρήνος: μια φωνή (θόρυβος μέσα από φίλτρα φωνηέντων) που ανεβαίνει και πέφτει, από τυχαία κατεύθυνση.
+    this._wailAt = now + 1.8 + Math.random() * 3;
+    const t = ac.currentTime, d = 1.6 + Math.random() * 1.6, f0 = 200 + Math.random() * 260;
+    const o = ac.createOscillator(), src = this.noiseSource(), mix = ac.createGain(), g = ac.createGain(), p = ac.createStereoPanner();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.linearRampToValueAtTime(f0 * 1.35, t + d * 0.35);
+    o.frequency.linearRampToValueAtTime(f0 * 0.8, t + d);
+    const og = ac.createGain(); og.gain.value = 0.25;
+    o.connect(og); og.connect(mix); src.connect(mix);
+    for (const [f, q] of [[700, 6], [1150, 8]]) { const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; mix.connect(bp); bp.connect(g); }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.05 + Math.random() * 0.04, t + d * 0.4);
+    g.gain.linearRampToValueAtTime(0.0001, t + d);
+    p.pan.value = Math.random() * 1.8 - 0.9;
+    g.connect(p); p.connect(this.sfx);
+    const rv = ac.createGain(); rv.gain.value = 0.8; g.connect(rv); rv.connect(this.reverbSend);
+    o.start(t); o.stop(t + d + 0.05); src.start(t, Math.random()); src.stop(t + d + 0.05);
+  },
+
+  // Το κουπί του Χάροντα μπαίνει στο νερό: πλατσούρισμα και το ξύλο που τρίζει.
+  oar() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const src = this.noiseSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+    bp.type = 'bandpass'; bp.frequency.setValueAtTime(1300, t); bp.frequency.exponentialRampToValueAtTime(500, t + 0.5); bp.Q.value = 1.2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    src.connect(bp); bp.connect(g); g.connect(this.sfx);
+    const rv = ac.createGain(); rv.gain.value = 0.6; g.connect(rv); rv.connect(this.reverbSend);
+    src.start(t, Math.random()); src.stop(t + 0.75);
+    const o = ac.createOscillator(), og = ac.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(140, t + 0.4); o.frequency.linearRampToValueAtTime(110, t + 0.6);
+    this.envelope(og.gain, t + 0.4, 0.04, 0.02, 0.2);
+    o.connect(og); og.connect(this.sfx);
+    o.start(t + 0.4); o.stop(t + 0.7);
+  },
+
   // Ένταση του ambient (0..1), με ομαλή μετάβαση.
   setAmbient(level) {
     if (!this.ambient) return;
@@ -1357,7 +1415,7 @@ const Sound = {
       if (m) {
         const dx = m.x - this.listenerX, dy = m.y - this.listenerY;
         const p = Math.max(0, 1 - Math.hypot(dx, dy) / 380);
-        vol = p * p * 0.55;
+        vol = p * p * 0.55 * (this.mask || 1);
         // Πίσω από τοίχο: πνιχτό. Πίσω από την πλάτη σου: λίγο πιο πνιχτό.
         cutoff = (m.los ? 300 : 150) * (1 - 0.35 * this.behind(m.x, m.y));
         if (vol > 0.001) this.setPlace(g.pan, m.x, m.y);

@@ -41,7 +41,7 @@ const RC_AO = 0.3;                   // ως πόσο μακριά (σε κελ�
 const RC_RED_R = 1.8;                // ακτίνα (κελιά) της κόκκινης λάμψης κάτω από μια σκιά που φάνηκε
 
 // Ποια υφή τοίχου έχει κάθε κεφάλαιο: σπηλιά, λαξευμένη πέτρα, παλάτι (με μαίανδρο).
-const RC_THEMES_MAIN = ['rock', 'rock', 'rock', 'blocks', 'rock', 'blocks', 'palace', 'rock'];
+const RC_THEMES_MAIN = CHAPTERS.map((c) => c.theme || 'rock');   // τα θέματα του Κάτω Κόσμου (js/levels.js)
 let RC_THEMES = RC_THEMES_MAIN.slice();   // τα θέματα του κόσμου που είναι φορτωμένος (loadWorldData)
 
 // Ένα μοτίβο μαιάνδρου 6×6 (σε texels) — μαύρο πάνω σε πηλό, όπως στα μελανόμορφα αγγεία.
@@ -90,6 +90,10 @@ const Raycast = {
   waterFace: null,    // Uint8Array ανά (κελί*4 + πλευρά): 1 = υγρός τοίχος (νερό μπροστά), 2 = καταρράκτης
   foam: null,         // Uint8Array ανά κελί: νερό μπροστά σε καταρράκτη (αφρός)
   falls: [],          // κέντρα των καταρρακτών σε μονάδες κόσμου: [{ x, y }] (για τον ήχο του νερού)
+  fogDist: RC_FOG,    // πού έχει πέσει το φως στο ελάχιστο (η ομίχλη του ποταμού το μικραίνει: js/crossing.js)
+  fogMin: 0.3,        // το ελάχιστο (0 = τελείως σκοτεινό από εκεί και πέρα)
+  lava: null,         // Uint8Array ανά κελί: λάβα (το "νερό" στα κεφάλαια με θέμα fire)
+  lavaNear: null,     // Float32Array ανά κελί: απόσταση (κελιά) από την πιο κοντινή λάβα, ως 8
   wallH: null,        // Float32Array ανά κελί: ύψος του τοίχου σε κελιά (μόνο για αδιαφανή κελιά)
   ceilOn: null,       // Uint8Array ανά κελί: 1 = έχει ταβάνι (στενό πέρασμα)
   ambient: null,      // Float32Array ανά κελί: σταθερό φως (ύπαιθρο / φως ημέρας)
@@ -144,7 +148,7 @@ const Raycast = {
         if (!L.isOpaque(tx, ty)) continue;
         for (let side = 0; side < 4; side++) {
           const fx = tx + front[side][0], fy = ty + front[side][1];
-          if (L.terrainAt(fx, fy) !== T_WATER) continue;
+          if (L.terrainAt(fx, fy) !== T_WATER || RC_THEMES[L.region[fy * L.cols + fx]] === 'fire') continue;
           const fall = side === 3;
           this.waterFace[(ty * L.cols + tx) * 4 + side] = fall ? 2 : 1;
           if (fall) {
@@ -221,8 +225,26 @@ const Raycast = {
     }
     this.ceilOn = new Uint8Array(n);
     this.ambient = new Float32Array(n);
+    // Λάβα (Φλεγέθων): φωτίζει μόνη της και ό,τι είναι γύρω της (μέχρι ~4 κελιά, χωρίς να περνάει τοίχους).
+    this.lava = new Uint8Array(n);
+    this.lavaNear = new Float32Array(n).fill(99);
+    const lq = [];
+    for (let c = 0; c < n; c++) {
+      if (L.terrain[c] === T_WATER && RC_THEMES[L.region[c]] === 'fire') { this.lava[c] = 1; this.lavaNear[c] = 0; lq.push(c); }
+    }
+    for (let qi = 0; qi < lq.length; qi++) {
+      const c = lq[qi], d = this.lavaNear[c];
+      if (d >= 8) continue;
+      for (const o of [1, -1, cols, -cols]) {
+        const k = c + o;
+        if (k < 0 || k >= n || L.opaque[k] || this.lavaNear[k] <= d + 1) continue;
+        this.lavaNear[k] = d + 1;
+        lq.push(k);
+      }
+    }
     for (let c = 0; c < n; c++) {
       if (L.opaque[c]) continue;
+      if (this.lavaNear[c] < 4.5) this.ambient[c] = this.lava[c] ? 1 : 0.62 * Math.pow(1 - this.lavaNear[c] / 4.5, 1.4);
       const out = RC_OUTDOOR[L.region[c]];
       if (out) this.ambient[c] = out.light;
       else if (open[c] < RC_NARROW) this.ceilOn[c] = 1;
@@ -820,7 +842,7 @@ const Raycast = {
           light += this.ringAt(hx, hy, false, -1) * 0.8;
           glow = this.glow;
         }
-        const wfog = Math.max(0.3, 1 - (dist * TILE) / RC_FOG);
+        const wfog = Math.max(this.fogMin, 1 - (dist * TILE) / this.fogDist);
         light *= wfog;
         glow *= wfog;
         if (light < 0.01 && glow < 0.01) {
@@ -914,7 +936,7 @@ const Raycast = {
       const p = below ? y + 0.5 - hz : hz - y - 0.5;
       if (p < 0.5) continue;
       const rd = (this.focal * (below ? RC_EYE : 1 - RC_EYE)) / p;   // σε κελιά
-      const fog = Math.max(0.3, 1 - (rd * TILE) / RC_FOG) * (below ? 1 : RC_CEIL);
+      const fog = Math.max(this.fogMin, 1 - (rd * TILE) / this.fogDist) * (below ? 1 : RC_CEIL);
       const stX = (rd * 2 * planeX) / W, stY = (rd * 2 * planeY) / W;
       let wx = posX + rd * (dirX - planeX) + stX * 0.5;
       let wy = posY + rd * (dirY - planeY) + stY * 0.5;
@@ -966,7 +988,7 @@ const Raycast = {
         // Νερό: ο φωτισμένος τοίχος πίσω του καθρεφτίζεται (ανάποδα, κυματιστά), πιο αχνά όσο
         // πλησιάζει το νερό προς τον παίκτη — φαίνεται ακόμα κι όταν το ίδιο το νερό είναι σκοτεινό.
         let rr = 0, rg = 0, rb = 0;
-        if (t === T_WATER) {
+        if (t === T_WATER && !this.lava[c]) {
           const wb = this.wallBot[x];
           if (wb < H && y > wb) {
             const my = Math.round(2 * wb - y);
@@ -993,6 +1015,14 @@ const Raycast = {
           const ct = cellCeil[c];
           const i = (v * RC_TEX + u) * 3;
           r = ct[i]; g = ct[i + 1]; b = ct[i + 2];
+        } else if (t === T_WATER && this.lava[c]) {
+          // Λάβα: κινούμενα κύματα φωτιάς (σκούρο κόκκινο → πορτοκαλί → σχεδόν λευκό), φωτίζει μόνη της.
+          const X = wx * TILE, Y = wy * TILE;
+          const f = Math.sin(X * 0.11 + now * 1.3 + Math.sin(Y * 0.07)) * Math.sin(Y * 0.09 - now * 0.9) * 0.5 + 0.5;
+          const crust = Math.abs(Math.sin(X * 0.05 - Y * 0.04 + now * 0.25)) < 0.12;
+          if (crust) { r = 70; g = 20; b = 15; } else if (f > 0.78) { r = 255; g = 214; b = 130; } else if (f > 0.45) { r = 232; g = 120; b = 40; } else { r = 170; g = 34; b = 18; }
+          light = 1;
+          rr = rg = rb = 0;
         } else if (t === T_WATER) {
           // Σκούρο νερό με κυματάκια που κυλάνε αργά.
           const X = wx * TILE, Y = wy * TILE;
@@ -1125,7 +1155,7 @@ const Raycast = {
     pc.imageSmoothingEnabled = false;
     for (const { frame, o, p } of list) {
       const k = this.focal / (p.depth * TILE);    // art px ανά μονάδα κόσμου
-      const fog = o.fog === false ? 1 : Math.max(0.35, 1 - (p.depth * TILE) / RC_FOG);
+      const fog = o.fog === false ? 1 : Math.max(this.fogMin + 0.05, 1 - (p.depth * TILE) / this.fogDist);
       const alpha = Math.max(0, Math.min(1, (o.alpha === undefined ? 1 : o.alpha) * fog));
       if (alpha < 0.01) continue;
       const fh = frame ? frame.h : 1, fw = frame ? frame.w : 1;

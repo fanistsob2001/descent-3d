@@ -112,12 +112,23 @@ const STORY = {
   missionMain: [
     "Find the way down",
     "Cross the Acheron",
+    "Cross the River of Wailing",
     "Cross the waters of Lethe",
     "Cross the Asphodel Meadows",
+    "Walk the Fields of Mourning",
     "Cross the marshes of Styx",
+    "Cross the River of Fire",
     "Pass through Tartarus",
+    "Pass the Gate of Hades",
     "Reach the throne of Hades",
     "Lead Eurydice to the light. Do not look back.",
+  ],
+  // Πήλινες πινακίδες (STORY.md, ενότητα 12), με τη σειρά που βρίσκονται στον χάρτη (L).
+  tablets: [
+    "I came down alive, like you, with a friend and a foolish plan. Across this river the dead are blind, but they hear everything: a step, a breath, a song. Walk as if you do not exist. If you meet Theseus, tell him I am still waiting. \u2014 Pirithous",
+    "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer.",
+    "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed.",
+    "Phaedra. Love was the only monster I ever met, and it wore my own face.",
   ],
   sideMissions: [
     { id: 'strings', title: "Mend the lyre", text: "Find the three strings of your lyre." },

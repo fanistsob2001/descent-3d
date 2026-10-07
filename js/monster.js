@@ -85,7 +85,9 @@ class Monster {
     }
 
     if (!this.hears(wave)) return revealed;
-    const range = los ? wave.radius : wave.radius * MONSTER_MUFFLED_RANGE;
+    // Στον Κωκυτό / Φλεγέθοντα ο θόρυβος σκεπάζει τους ήχους: ακούει μόνο από πιο κοντά.
+    const mask = (CHAPTERS[this.region] && CHAPTERS[this.region].mask) || 1;
+    const range = (los ? wave.radius : wave.radius * MONSTER_MUFFLED_RANGE) * mask;
     if (d > range) return revealed;
     // Ήχοι από άλλο κεφάλαιο δεν την τραβάνε έξω από το δικό της.
     if (Level.regionAt(Math.floor(wave.x / TILE), Math.floor(wave.y / TILE)) !== this.region) return revealed;

@@ -296,6 +296,42 @@ that part is built. Until then, the game keeps the 8 chapters above.
   disappears, only the oar and the water are heard. When the fog lifts you are in chapter III, in the
   Underworld proper. From here on, the shades hunt you.
 
+### Texts of the chapters (first-person version, title / line / objective)
+
+The chapters of section 8 keep their texts; only their numbers change. New chapters are marked (new).
+
+**I. The Gate of Taenarum** — as in section 8.
+**II. The Shore of Acheron** — as in section 8.
+**III. The River of Wailing** (new)
+Line: Cocytus is made of tears. Every one of them is still crying.
+Objective: The weeping hides your steps, and hides theirs. Listen closely. Strings: X/3
+**IV. The Waters of Lethe** — as III in section 8.
+**V. The Asphodel Meadows** — as IV in section 8.
+**VI. The Fields of Mourning** (new)
+Line: Here walk those who died of love. They never stopped.
+Objective: No shade walks here. Read what the lovers left behind. Strings: X/3
+**VII. The Marshes of Styx** — as V in section 8.
+**VIII. The River of Fire** (new)
+Line: Phlegethon burns and roars. Down here, no one can hear you. Or them.
+Objective: The roar of the fire hides every sound. Watch the light. Strings: X/3
+**IX. The Pit of Tartarus** — as VI in section 8.
+**X. The Gate of Hades** (new)
+Line: Three heads. Six ears. One song.
+Objective: The gate of the palace is ahead. Strings: X/3
+**XI. The Palace of Hades** — as VII in section 8.
+**XII. The Ascent** — as VIII in section 8.
+
+Main missions (section 11) for the new chapters: III "Cross the River of Wailing", VI "Walk the Fields of Mourning",
+VIII "Cross the River of Fire", X "Pass the Gate of Hades".
+
+### Clay tablets (read when you pick them up)
+
+- The letter, on the shore of Acheron (II): "I came down alive, like you, with a friend and a foolish plan. Across this river the dead are blind, but they hear everything: a step, a breath, a song. Walk as if you do not exist. If you meet Theseus, tell him I am still waiting. — Pirithous"
+- Fields of Mourning (VI), three tablets:
+  - "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer."
+  - "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed."
+  - "Phaedra. Love was the only monster I ever met, and it wore my own face."
+
 ### Prologue (playable, chapter 0)
 
 A morning in Thrace, in full daylight and colour — the only time the player sees the world lit.

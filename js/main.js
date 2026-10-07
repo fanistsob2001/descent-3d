@@ -108,7 +108,7 @@ function updatePlayer(dt) {
   let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
   player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens));
   Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
-  if (Prologue.active && Prologue.lock) { player.walkSpeed *= 0.9; return; }
+  if ((Prologue.active && Prologue.lock) || Crossing.active) { player.walkSpeed *= 0.9; return; }
   if (a > Math.PI) a -= Math.PI * 2;
   if (a <= -Math.PI) a += Math.PI * 2;
   player.angle = a;
@@ -287,6 +287,10 @@ function pickUp(it) {
     Notice.show(STORY.jar, gameTime, 6);   // χωρίς φωνή (μόνο κείμενο)
     if (!jarsFound) Hints.push(JAR_HINTS);
     jarsFound = true;
+  } else if (it.kind === 'tablet') {
+    // Πήλινη πινακίδα: τη διαβάζεις (χωρίς φωνή — γραμμένο κείμενο).
+    Sound.jarPickup();
+    Notice.show(STORY.tablets[it.n] || '', gameTime, 15, null, 'tablet');
   } else if (it.kind === 'obol') {
     hasObol = true;
     Sound.coin();
@@ -315,6 +319,8 @@ function checkCharon() {
     const d = Voice.say(STORY.charonPaid, 'charon', { x: Charon.x, y: Charon.y, delay: 0.5 });
     Notice.show(STORY.charonPaid, gameTime, Math.max(6, d + 1.5), null, 'charon');
     Sound.charonPaid();
+    // Μπαίνεις στη βάρκα: το πέρασμα μέσα στην ομίχλη (js/crossing.js).
+    Crossing.start(gameTime);
   }
 }
 
@@ -456,6 +462,7 @@ function draw3D(pc, W, H) {
     Dread.drawVignette(pc, W, H, gameTime);
   }
   if (Prologue.active) Prologue.drawOverlay(pc, W, H, gameTime);
+  if (Crossing.active) Crossing.drawOverlay(pc, W, H, gameTime);
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
   if (showMap) drawMiniMap(pc, W, H);
   if (state === 'dead') drawDeathFlash(W, H);
@@ -590,7 +597,7 @@ function prepareMenuScene() {
   Echoes.init();
   Echoes.markSeen = false;
   monsters = [];
-  Altars.reset(6);
+  Altars.reset(CHAPTERS.length);
   Items.reset([]);
   Souls.reset();
   Eggs.reset();
@@ -945,6 +952,19 @@ function frame(t) {
     const follow = 1 - Math.pow(0.001, dt);
     camera.x += (player.x - camera.x) * follow;
     camera.y += (player.y - camera.y) * follow;
+  } else if (state === 'play' && Crossing.active) {
+    // Στη βάρκα: κοιτάζεις γύρω σου, δεν κινείσαι, ο κόσμος περιμένει.
+    gameTime += dt;
+    Input.update();
+    updatePlayer(dt);
+    Crossing.update(dt, gameTime);
+    Fx.update(dt, camera, cssW / 2 / scale, cssH / 2 / scale);
+    Echoes.update(dt, gameTime);
+    World3D.updateSparks(dt);
+    Hints.update(gameTime);
+    Notice.update(gameTime);
+    camera.x = player.x;
+    camera.y = player.y;
   } else if (state === 'play') {
     gameTime += dt;
     Input.update();
@@ -1040,6 +1060,12 @@ function updateWaterSound() {
     Sound.updateSnore(cb.x, cb.y, d < 300 ? d : -1, Level.lineOfSight(player.x, player.y, cb.x, cb.y));
   } else Sound.updateSnore(0, 0, -1, false);
   if (state === 'play') Sound.ambienceTick(gameTime);
+  const reg = Prologue.active ? -1 : playerRegion();
+  const ch = (state === 'play' || state === 'dead') && reg >= 0 ? CHAPTERS[reg] : null;
+  Sound.mask = ch && ch.mask ? ch.mask : 1;
+  const lc = Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE);
+  const lavaNear = Raycast.lavaNear && Raycast.lavaNear[lc] !== undefined ? Math.max(0, 1 - Raycast.lavaNear[lc] / 8) : 0;
+  Sound.regionTick(ch ? ch.sound || null : null, lavaNear, gameTime);
 }
 
 // ---- Οθόνες ----
@@ -1236,6 +1262,9 @@ function loadWorldData(chapters, outdoor = {}) {
 // chapter -1 = καινούργιο παιχνίδι (από την αφετηρία).
 function spawn(saved) {
   goFullscreen();
+  Crossing.active = false;
+  Raycast.fogDist = RC_FOG;
+  Raycast.fogMin = 0.3;
   chapter = saved.chapter;
   strings = saved.strings;
   hasObol = saved.obol;

@@ -8,8 +8,11 @@
 //   seen: τα κελιά που έχει δει ο παίκτης (Level.seenString) }
 // v2: 8 κεφάλαια. Τα παλιά saves (χωρίς v, 5 κεφάλαια) μετατρέπονται: τα κεφάλαια IV και V
 // έγιναν VII και VIII, και τα id των αντικειμένων μετά το III μετακινήθηκαν.
-const SAVE_VERSION = 2;
-const SAVE_V1_CHAPTERS = [0, 1, 2, 6, 7];   // παλιό κεφάλαιο → νέο
+// v3: 12 κεφάλαια με νέους χάρτες (μεγάλη επέκταση). Τα κεφάλαια του v2 βρίσκονται σε νέες θέσεις
+// (SAVE_V2_CHAPTERS)· τα αντικείμενα και ο χάρτης που είχες δει δεν μεταφέρονται (άλλοι χάρτες).
+const SAVE_VERSION = 3;
+const SAVE_V1_CHAPTERS = [0, 1, 2, 6, 7];   // v1 → v2
+const SAVE_V2_CHAPTERS = [0, 1, 3, 4, 6, 8, 10, 11];   // v2 → v3
 
 const Save = {
   KEY: 'descent-save',
@@ -43,15 +46,17 @@ const Save = {
   // Μετατρέπει ένα παλιό save (v1) στη μορφή του v2.
   migrate(d) {
     if (!d || d.v === SAVE_VERSION || !Number.isInteger(d.chapter)) return d;
+    if (d.v === 2) {
+      const ch = SAVE_V2_CHAPTERS[d.chapter];
+      return { ...d, v: SAVE_VERSION, chapter: ch === undefined ? -1 : ch, taken: [], seen: '', paid: d.paid || ch >= 2 };
+    }
     // Τα αντικείμενα του παλιού χάρτη, με τη σειρά τους: όσα ανήκουν στα παλιά κεφάλαια.
     const oldIds = [];
     Level.items.forEach((it, id) => { if (SAVE_V1_CHAPTERS.includes(it.region)) oldIds.push(id); });
-    return {
-      ...d,
-      v: SAVE_VERSION,
-      chapter: SAVE_V1_CHAPTERS[d.chapter] !== undefined ? SAVE_V1_CHAPTERS[d.chapter] : -1,
-      taken: Array.isArray(d.taken) ? d.taken.map((id) => oldIds[id]).filter(Number.isInteger) : [],
-    };
+    void oldIds;
+    const v2 = SAVE_V1_CHAPTERS[d.chapter];
+    const ch = v2 !== undefined ? SAVE_V2_CHAPTERS[v2] : -1;
+    return { ...d, v: SAVE_VERSION, chapter: ch, taken: [], seen: '', paid: d.paid || ch >= 2 };
   },
 
   exists() {

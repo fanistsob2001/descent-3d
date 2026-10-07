@@ -67,6 +67,9 @@ const Level = {
     // Κάθε κόσμος (ο πρόλογος, ο κάτω κόσμος) ξεκινάει χωρίς αφετηρία / έξοδο από τον προηγούμενο.
     this.start = { x: 0, y: 0 };
     this.exit = { tx: -10, ty: -10, x: -1e6, y: -1e6 };
+    this.landing = null;   // εκεί που αράζει η βάρκα του Χάροντα (K)
+    this.boss = null;      // ο Κέρβερος (B)
+    let tablets = 0;
     this.monsters = [];
     this.altars = [];
     this.items = [];
@@ -100,8 +103,10 @@ const Level = {
           if (c === 'F') this.monsters.push({ x: cx, y: cy, guard: true, region: r, kind: 'erinys' });
           if (c === 'E') { this.exit.tx = wx; this.exit.ty = wy; this.exit.x = cx; this.exit.y = cy; }
           if (c === 'w') this.gates.push({ tx: wx, ty: wy, x: cx, y: cy, open: true });
-          const kind = { o: 'obol', s: 'string', j: 'jar' }[c];
-          if (kind) this.items.push({ kind, x: cx, y: cy, region: r });
+          const kind = { o: 'obol', s: 'string', j: 'jar', L: 'tablet' }[c];
+          if (kind) this.items.push({ kind, x: cx, y: cy, region: r, n: kind === 'tablet' ? tablets++ : -1 });
+          if (c === 'K') this.landing = { x: cx, y: cy };
+          if (c === 'B') this.boss = { x: cx, y: cy, region: r };
           if (c >= '1' && c <= '9') this.souls.push({ n: Number(c), x: cx, y: cy });
           if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
           if (c === 'D') this.eggs.cerberus = { x: cx, y: cy };

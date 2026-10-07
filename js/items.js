@@ -13,7 +13,7 @@ const Items = {
   reset(taken) {
     const gone = new Set(taken);
     this.list = Level.items.map((it, id) => ({
-      id, kind: it.kind, x: it.x, y: it.y, taken: gone.has(id),
+      id, kind: it.kind, x: it.x, y: it.y, n: it.n, taken: gone.has(id),
       revealTime: -1e6, revealStrength: 0,
       onHear(wave, d, los) {
         if (!los || this.taken) return;
@@ -53,7 +53,7 @@ const Items = {
       const twinkle = 0.75 + 0.25 * Math.sin(now * 6 + it.id);
 
       // Λάμψη γύρω του, στο χρώμα του αντικειμένου.
-      const color = { obol: POT.light, string: POT.cream, jar: POT.terra }[it.kind];
+      const color = { obol: POT.light, string: POT.cream, jar: POT.terra, tablet: POT.light }[it.kind];
       const g = ctx.createRadialGradient(it.x, it.y, 0, it.x, it.y, 16);
       g.addColorStop(0, `rgba(${color},${(a * 0.35 * twinkle).toFixed(3)})`);
       g.addColorStop(1, `rgba(${color},0)`);

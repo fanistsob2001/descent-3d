@@ -33,8 +33,19 @@ const Creatures = {
     F.handShoulder = [Sprites.build(this.handShoulder(), dk)];
     // Ο πρόλογος (js/prologue.js): δέντρα, η επιτύμβια στήλη.
     F.cypress = [Sprites.build(this.cypress(), dk)];
+    F.tablet = [Sprites.build(this.tablet(), dk)];
     F.olive = [0, 1].map((f) => Sprites.build(this.olive(f), dk));
     F.stele = [0, 1].map((f) => Sprites.build(this.stele(f), dk));
+  },
+
+  // Πήλινη πινακίδα ακουμπισμένη στο έδαφος, με χαραγμένες γραμμές γραφής.
+  tablet() {
+    return paintGrid(16, 14, (p) => {
+      p.poly([[2, 3], [14, 1], [15, 12], [1, 13]], 'A');
+      p.line(2, 3, 14, 1, 1, 'f');
+      for (let k = 0; k < 4; k++) p.line(4, 5 + k * 2, 12, 4 + k * 2, 1, 'C');
+      p.px(9, 12, 'C'); p.px(3, 11, 'C');
+    });
   },
 
   // Κυπαρίσσι: ψηλή, στενή φλόγα από σκούρο φύλλωμα με "τούφες".

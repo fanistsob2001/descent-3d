@@ -159,10 +159,10 @@ const World3D = {
       const a = Math.min(1, 0.35 + it.revealStrength) * (1 - age / ITEM_REVEAL_TIME);
       const tw = 0.75 + 0.25 * Math.sin(now * 6 + it.id);
       const bob = Math.sin(now * 2.5 + it.id) * 1.5;
-      const color = { obol: POT.light, string: POT.cream, jar: POT.terra }[it.kind];
-      const frame = { obol: 'obol', string: 'stringCoil', jar: 'lekythos' }[it.kind];
+      const color = { obol: POT.light, string: POT.cream, jar: POT.terra, tablet: POT.light }[it.kind];
+      const frame = { obol: 'obol', string: 'stringCoil', jar: 'lekythos', tablet: 'tablet' }[it.kind];
       R.sprite(S(frame), {
-        x: it.x, y: it.y, z: it.kind === 'jar' ? 0 : 5 + bob, alpha: a, scale: it.kind === 'jar' ? 0.9 : 0.8,
+        x: it.x, y: it.y, z: it.kind === 'jar' || it.kind === 'tablet' ? 0 : 5 + bob, alpha: a, scale: it.kind === 'jar' ? 0.9 : it.kind === 'tablet' ? 0.55 : 0.8,
         glow: { r: 14, color, a: a * 0.4 * tw },
       });
     }
@@ -330,6 +330,7 @@ const World3D = {
     }
 
     if (typeof Prologue !== 'undefined' && Prologue.active) Prologue.sprites(R, now);
+    if (typeof Crossing !== 'undefined') Crossing.sprites(R, now);
     R.flushSprites(pc);
     this.drawSparks(pc, now);
     this.drawDrips(pc, now);
@@ -448,30 +449,36 @@ const World3D = {
         const sc = 0.85 + hash(tx, ty, 6) * 0.45;
         const toWall = wall.length ? wall[Math.floor(h3 * wall.length)] : null;
         const wx = toWall ? toWall[0] * 0.3 : jx, wy = toWall ? toWall[1] * 0.3 : jy;
-        const cave = r === 0 || r === 1 || r === 2 || r === 4 || r === 7;
-        if (cave) {
-          if (water.length && (r === 4 ? h1 < 0.55 : r === 1 && h1 < 0.22)) {
+        const ch = CHAPTERS[r] || {};
+        const fire = RC_THEMES[r] === 'fire';
+        if (ch.decor === 'cave') {
+          if (!fire && water.length && ch.reeds && h1 < 0.4) {
             const w = water[0];
             put('reeds', tx, ty, w[0] * 0.3, w[1] * 0.3, sc, false, c);
           } else if (toWall && h1 < 0.17) put('stalagmite', tx, ty, wx, wy, sc, false, c);
           else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
           else if (r !== 0 && h1 < 0.255) put('bones', tx, ty, jx, jy, 0.9, false, c);
           else if (r !== 0 && h1 < 0.27) put('skull', tx, ty, jx, jy, 0.55, false, c);
-          // Από το ταβάνι: ρίζες κοντά στην επιφάνεια (Ταίναρο, Άνοδος), αλλού σταλακτίτες.
-          if ((r === 0 || r === 7) && h2 < 0.13) put('roots', tx, ty, jx, jy, sc, true, c);
-          else if (h2 < 0.15) put('stalactite', tx, ty, (hash(tx, ty, 7) - 0.5) * 0.6, (hash(tx, ty, 8) - 0.5) * 0.6, sc, true, c);
-        } else if (r === 3) {
+          // Από πάνω: ρίζες κοντά στην επιφάνεια (Ταίναρο, Άνοδος), αλλού σταλακτίτες (όχι πάνω από τη φωτιά).
+          if (ch.roots && h2 < 0.13) put('roots', tx, ty, jx, jy, sc, true, c);
+          else if (!fire && h2 < 0.15) put('stalactite', tx, ty, (hash(tx, ty, 7) - 0.5) * 0.6, (hash(tx, ty, 8) - 0.5) * 0.6, sc, true, c);
+        } else if (ch.decor === 'mourning') {
+          // Οι Αγροί του Πένθους: ασφόδελοι, σπασμένα αγγεία, αγάλματα στους τοίχους — ήσυχα.
+          if (h1 < 0.2) put('asphodel', tx, ty, jx, jy, sc * 0.75, false, c);
+          else if (toWall && h1 < 0.25) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1, false, c);
+          else if (toWall && h1 < 0.3) put('amphoraBroken', tx, ty, wx, wy, 0.85, false, c);
+        } else if (ch.decor === 'asphodel') {
           if (h1 < 0.33) put('asphodel', tx, ty, jx, jy, sc * 0.8, false, c);
           else if (toWall && h1 < 0.39) put('amphoraBroken', tx, ty, wx, wy, 0.9, false, c);
           else if (h1 < 0.43) put('bones', tx, ty, jx, jy, 0.9, false, c);
           else if (h1 < 0.45) put('skull', tx, ty, jx, jy, 0.55, false, c);
-        } else if (r === 5) {
+        } else if (ch.decor === 'tartarus') {
           if (toWall && h1 < 0.06) put('skullpile', tx, ty, wx, wy, 0.9, false, c);
           else if (h1 < 0.14) put('bones', tx, ty, jx, jy, 0.9, false, c);
           else if (h1 < 0.19) put('skull', tx, ty, jx, jy, 0.55, false, c);
           else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
           if (h2 < 0.12) put('chain', tx, ty, jx, jy, 0.5 + hash(tx, ty, 10) * 0.12, true, c);
-        } else if (r === 6) {
+        } else if (ch.decor === 'palace') {
           if (toWall && h1 < 0.07) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1.05, false, c);
           else if (toWall && h1 < 0.15) put('amphora', tx, ty, wx, wy, 0.85, false, c);
           else if (toWall && h1 < 0.17) put('amphoraBroken', tx, ty, wx, wy, 0.85, false, c);
