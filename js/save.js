@@ -10,7 +10,9 @@
 // έγιναν VII και VIII, και τα id των αντικειμένων μετά το III μετακινήθηκαν.
 // v3: 12 κεφάλαια με νέους χάρτες (μεγάλη επέκταση). Τα κεφάλαια του v2 βρίσκονται σε νέες θέσεις
 // (SAVE_V2_CHAPTERS)· τα αντικείμενα και ο χάρτης που είχες δει δεν μεταφέρονται (άλλοι χάρτες).
-const SAVE_VERSION = 3;
+// v4: οι χάρτες μεγάλωσαν (×1.5) και οι καταδιώξεις άλλαξαν: το κεφάλαιο μένει, τα αντικείμενα / κιβώτια /
+// χάρτες που είχες δει όχι.
+const SAVE_VERSION = 4;
 const SAVE_V1_CHAPTERS = [0, 1, 2, 6, 7];   // v1 → v2
 const SAVE_V2_CHAPTERS = [0, 1, 3, 4, 6, 8, 10, 11];   // v2 → v3
 
@@ -49,6 +51,10 @@ const Save = {
   // Μετατρέπει ένα παλιό save (v1) στη μορφή του v2.
   migrate(d) {
     if (!d || d.v === SAVE_VERSION || !Number.isInteger(d.chapter)) return d;
+    if (d.v === 3) {
+      const inv = d.inv && typeof d.inv === 'object' ? { ...d.inv, opened: [], maps: [] } : {};
+      return { ...d, v: SAVE_VERSION, taken: [], seen: '', inv };
+    }
     if (d.v === 2) {
       const ch = SAVE_V2_CHAPTERS[d.chapter];
       return { ...d, v: SAVE_VERSION, chapter: ch === undefined ? -1 : ch, taken: [], seen: '', paid: d.paid || ch >= 2 };

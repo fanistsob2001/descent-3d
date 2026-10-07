@@ -137,6 +137,22 @@ const Boulder = {
 const Chases = {
   styx: null,       // { done, chaser }
   tartarus: null,
+  // Checkpoint: εκεί που άρχισε η καταδίωξη — αν πεθάνεις, ξαναρχίζεις από εκεί (όχι από το ιερό).
+  // Μένει μετά από θάνατο (spawn), σβήνει όταν τελειώσει η καταδίωξη ή βγεις στο μενού.
+  checkpoint: null,
+
+  // Τρέχει τώρα κάποια καταδίωξη;
+  active() {
+    return !!((this.styx && this.styx.chaser) || (this.tartarus && this.tartarus.active));
+  },
+
+  // Πόσο κοντά είναι ο κυνηγός / η πέτρα (0 = μακριά, 1 = πάνω σου): για το τρέμουλο της κάμερας.
+  danger() {
+    let d = Infinity;
+    if (this.styx && this.styx.chaser) d = Math.hypot(this.styx.chaser.x - player.x, this.styx.chaser.y - player.y);
+    if (Boulder.active) d = Math.min(d, Math.hypot(Boulder.x - player.x, Boulder.y - player.y));
+    return Math.max(0, 1 - d / 320);
+  },
 
   reset() {
     this.styx = { done: false, chaser: null };
@@ -159,6 +175,7 @@ const Chases = {
       monsters.push(c);
       Echoes.listeners.push(c);
       S.chaser = c;
+      this.checkpoint = { x: player.x, y: player.y, angle: player.angle, region };
       CERB_PITCH.forEach((f, i) => Sound.bark(c.x, c.y, f, i * 0.3));
       Notice.show(STORY.chaseStyx, now, 4);
     }
@@ -167,11 +184,13 @@ const Chases = {
       monsters.splice(monsters.indexOf(S.chaser), 1);
       S.chaser = null;
       S.done = true;
+      this.checkpoint = null;
       Notice.show(STORY.chaseStyxEnd, now, 6);
     }
     // Τάρταρος: οι Ερινύες ξυπνάνε όλες μαζί, και η πέτρα κατρακυλάει από πάνω.
     if (kind === 'furies' && !T.done && !T.active) {
       T.active = true;
+      this.checkpoint = { x: player.x, y: player.y, angle: player.angle, region };
       const back = this.behind(region, 16);
       const exit = this.exitCell(region);
       if (exit) Boulder.start(back.x, back.y, exit[0], exit[1]);
@@ -194,6 +213,7 @@ const Chases = {
       if (!CHAPTERS[region] || CHAPTERS[region].chase !== 'furies') {
         T.active = false;
         T.done = true;
+        this.checkpoint = null;
         Boulder.stop();
         for (const m of monsters) if (m.huntPlayer) { m.huntPlayer = false; m.speeds = ERINYS_SPEED; m.state = 'search'; }
       }

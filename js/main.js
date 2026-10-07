@@ -674,6 +674,12 @@ function draw3D(pc, W, H) {
   Pixel.bloom(Prologue.active ? 0.1 : 0.55, World3D.lights);
 
   let [shakeX, shakeY] = state === 'play' ? Dread.shake() : [0, 0];
+  if (state === 'play' && Chases.active()) {
+    // Ο κυνηγός / η πέτρα πλησιάζει: η κάμερα τρέμει.
+    const k = Chases.danger();
+    shakeX += (Math.random() - 0.5) * 6 * k;
+    shakeY += (Math.random() - 0.5) * 6 * k;
+  }
   if (state === 'dead') {
     const k = Math.max(0, 1 - (gameTime - endTime - SCARE_TIME) / (DEATH_DELAY - SCARE_TIME));
     shakeX = (Math.random() - 0.5) * 10 * k;
@@ -1212,6 +1218,13 @@ function frame(t) {
     const safeHere = Level.safe[Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE)] === 1;
     const here = playerRegion();
     Chases.update(dt, gameTime, here);
+    // Καταδίωξη: το οπτικό πεδίο ανοίγει όσο τρέχεις, βαριά ανάσα.
+    const chasing = Chases.active();
+    const kick = chasing && Input.running && Math.hypot(Input.moveX, Input.moveY) > 0.1 ? 0.16 : 0;
+    fovKick += (kick - fovKick) * Math.min(1, dt * 3);
+    const baseFov = Settings.fov ? (Settings.fov * Math.PI) / 180 : IS_TOUCH ? RC_FOV : RC_FOV_PC;
+    if (Math.abs(Raycast.fov - (baseFov + fovKick)) > 0.002) Raycast.setFov(baseFov + fovKick);
+    if (chasing !== wasChasing) { Sound.breath(chasing, 2.6); wasChasing = chasing; }
     Throne.update(dt, gameTime, here);
     killer = safeHere || Hides.active ? null : monsters.find((m) => m.touches(player)) || (Boulder.touches(player) ? Boulder : null);
     if (Hides.update(dt, monsters)) {
@@ -1281,6 +1294,8 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+let spaceOpen = 0.5;
+let fovKick = 0, wasChasing = false;
 // Ο ήχος του πιο κοντινού καταρράκτη (μόνο όσο παίζεις): από τη θέση του, πνιχτός πίσω από τοίχο.
 function updateWaterSound() {
   let best = null, bd = Infinity;
@@ -1306,6 +1321,11 @@ function updateWaterSound() {
   const lc = Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE);
   const lavaNear = Raycast.lavaNear && Raycast.lavaNear[lc] !== undefined ? Math.max(0, 1 - Raycast.lavaNear[lc] / 8) : 0;
   Sound.regionTick(ch ? ch.sound || null : null, lavaNear, gameTime);
+  // Η ηχώ ακολουθεί τον χώρο γύρω σου (ομαλά): μεγάλα σπήλαια, στενά περάσματα, ύπαιθρο.
+  if (Raycast.open && Raycast.open[lc] !== undefined) {
+    spaceOpen += ((Raycast.open[lc] - 0.25) / 0.6 - spaceOpen) * 0.05;
+    Sound.setSpace(spaceOpen, !!RC_OUTDOOR[Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE))]);
+  }
 }
 
 // ---- Οθόνες ----
@@ -1584,12 +1604,15 @@ function spawn(saved) {
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;
   player.y = camera.y = at.y;
+  // Πέθανες σε καταδίωξη: ξαναρχίζεις από την αρχή της (και αρχίζει ξανά), όχι από το ιερό.
+  const cp = Chases.checkpoint;
+  if (cp && cp.region >= chapter) { player.x = camera.x = cp.x; player.y = camera.y = cp.y; }
   player.stepDist = 0;
   // Αρχική κατεύθυνση: προς τον πρώτο ανοιχτό διάδρομο (προτιμάει κάτω και δεξιά).
   const stx = Math.floor(player.x / TILE), sty = Math.floor(player.y / TILE);
   const open = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => !Level.isWall(stx + dx, sty + dy));
   [player.fx, player.fy] = open || [0, 1];
-  player.angle = Math.atan2(player.fy, player.fx);
+  player.angle = cp && cp.region >= chapter ? cp.angle : Math.atan2(player.fy, player.fx);
   player.pitch = 0;
 
   stopInput();
@@ -1621,6 +1644,7 @@ function playCutscene(lines, style, art, then, who) {
 // Νέο παιχνίδι: ο playable πρόλογος (js/prologue.js) — οι γραμμές του intro εμφανίζονται μέσα σε αυτόν.
 function newGame() {
   Save.clear();
+  Chases.checkpoint = null;
   Level.seen.fill(0);
   goFullscreen();
   Prologue.start();
@@ -1696,6 +1720,7 @@ function resumeGame() {
 
 function goToMenu() {
   Prologue.abort();
+  Chases.checkpoint = null;
   menuScene.ready = false;
   setState('menu');
   stopInput();

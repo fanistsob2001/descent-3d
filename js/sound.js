@@ -79,6 +79,8 @@ const Sound = {
     damp.connect(fb);
     fb.connect(delay);
     damp.connect(this.master);
+    this._delay = delay;
+    this._fb = fb;
 
     // Reverb από "τεχνητή" απόκριση χώρου: θόρυβος που σβήνει εκθετικά.
     this.reverbSend = ac.createGain();
@@ -89,6 +91,7 @@ const Sound = {
     this.reverbSend.connect(conv);
     conv.connect(revOut);
     revOut.connect(this.master);
+    this._revOut = revOut;
 
     this.noiseBuffer = this.makeNoise(2);
     this.buildAmbient();
@@ -509,7 +512,7 @@ const Sound = {
   },
 
   // Κρυψώνα: η ανάσα σου, κρατημένη (σιγανό, κοντά στο αυτί). on = false: σταματάει.
-  breath(on) {
+  breath(on, k = 1) {
     if (!this.ready()) return;
     const ac = this.ctx;
     if (!this._breath) {
@@ -522,7 +525,7 @@ const Sound = {
       src.start(); lfo.start();
       this._breath = g;
     }
-    this._breath.gain.setTargetAtTime(on ? 0.014 : 0, ac.currentTime, 0.3);
+    this._breath.gain.setTargetAtTime(on ? 0.014 * k : 0, ac.currentTime, 0.3);
   },
 
   // Η ανάσα τελείωσε: ένα δυνατό, απότομο λαχάνιασμα.
@@ -578,6 +581,16 @@ const Sound = {
     this.envelope(og.gain, t + 0.4, 0.04, 0.02, 0.2);
     o.connect(og); og.connect(this.sfx);
     o.start(t + 0.4); o.stop(t + 0.7);
+  },
+
+  // Ο χώρος γύρω σου αλλάζει την ηχώ: open = 0 (στενό πέρασμα: κοντή, "κλειστή") .. 1 (τεράστιο
+  // σπήλαιο: μακριά, αργή ηχώ, πολύ reverb). outdoor = ύπαιθρο (σχεδόν καθόλου ηχώ).
+  setSpace(open, outdoor) {
+    if (!this.ctx || !this._delay) return;
+    const t = this.ctx.currentTime, k = Math.max(0, Math.min(1, open));
+    this._delay.delayTime.setTargetAtTime(outdoor ? 0.18 : 0.12 + 0.32 * k, t, 0.5);
+    this._fb.gain.setTargetAtTime(outdoor ? 0.08 : 0.18 + 0.36 * k, t, 0.5);
+    this._revOut.gain.setTargetAtTime(outdoor ? 0.12 : 0.28 + 0.55 * k, t, 0.5);
   },
 
   // Ένταση του ambient (0..1), με ομαλή μετάβαση.
