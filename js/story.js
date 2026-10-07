@@ -117,7 +117,15 @@ const STORY = {
   resinUsed: "The lyre can play once more.",
   holdBreath: "You hold your breath.",
   gasp: "You gasp for air!",
-  prompts: { open: "Open", shrine: "Shrine", hide: "Hide", leave: "Come out" },
+  prompts: { open: "Open", shrine: "Shrine", hide: "Hide", leave: "Come out", play: "Play", turn: "Turn around" },
+  // Οι μεγάλες σκηνές (STORY.md, ενότητα 12, "Texts of the set pieces").
+  chaseStyx: "Chains snap somewhere in the marsh. Three voices howl.",
+  chaseStyxEnd: "Behind you, the hound stops at the edge of the fire. He will wait for you at the gate.",
+  chaseTartarus: "The Furies wake. Above you, a great stone begins to roll.",
+  headSleeps: "One head sleeps.",
+  bossAsleep: "The last head sighs and sleeps. The gate of Hades stands open.",
+  goHome: "Go home.",
+  playAtGrave: "Play the lyre at her grave.",
 
   // Πρώτο πρόσωπο: ο Άδης και η Περσεφόνη στους θρόνους τους (STORY.md, ενότητα 8).
   hadesHall: "Another living soul in my halls. Come closer, singer.",
@@ -152,7 +160,7 @@ const STORY = {
     { id: 'souls', title: "Voices of the lost", text: "Hear all nine lost souls." },
     { id: 'jars', title: "Libations", text: "Find every libation jar." },
     { id: 'altars', title: "Rekindle the flames", text: "Light every altar." },
-    { id: 'cerberus', title: "The guardian sleeps", text: "Wake the hound of Hades.", secret: true },
+    { id: 'cerberus', title: "The guardian sleeps", text: "Lull the hound of Hades to sleep." },
     { id: 'stuck', title: "Three thousand years", text: "Find the shade that walks into the wall.", secret: true },
   ],
   missionComplete: (t) => "Mission complete: " + t,

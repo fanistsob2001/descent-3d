@@ -108,7 +108,7 @@ function updatePlayer(dt) {
   let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
   player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens));
   Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
-  if ((Prologue.active && Prologue.lock) || Crossing.active || Hides.active) { player.walkSpeed *= 0.9; return; }
+  if ((Prologue.active && Prologue.lock) || Crossing.active || Hides.active || Throne.locked()) { player.walkSpeed *= 0.9; return; }
   if (a > Math.PI) a -= Math.PI * 2;
   if (a <= -Math.PI) a += Math.PI * 2;
   player.angle = a;
@@ -179,6 +179,7 @@ function emitCall(held) {
   Sound.voice(c, strings >= 3);
   Hints.notify('call');
   Prologue.onCall(c);
+  Throne.onCall(gameTime);
   if (c >= LOOK_BACK_CHARGE && lookBackRuleActive()) lookBack();
 }
 
@@ -316,6 +317,7 @@ function shrineHere() {
 
 // E: ό,τι είναι δίπλα σου (κρυψώνα, ιερό, κιβώτιο) — αλλιώς χρησιμοποιείς το αντικείμενο που κρατάς.
 function interact() {
+  if (state === 'play' && Prologue.active) { Prologue.interact(); return; }
   if (state !== 'play' || Prologue.active || Crossing.active) {
     if (state === 'play' && !Prologue.active && !Crossing.active) throwJar();
     return;
@@ -361,14 +363,18 @@ function useItem() {
 let promptText = '';
 function updateInteract() {
   let t = '';
-  if (state === 'play' && !Prologue.active && !Crossing.active) {
+  if (state === 'play' && Prologue.active) {
+    // (μόνο το "Turn around" του τέλους)
+  } else if (state === 'play' && !Crossing.active) {
     const P = STORY.prompts;
-    if (Hides.active) t = P.leave;
+    if (Throne.prompt()) t = (IS_TOUCH ? '' : 'Space \u2014 ') + Throne.prompt();
+    else if (Hides.active) t = P.leave;
     else if (shrineHere() >= 0) t = P.shrine;
     else if (Chests.near(player)) t = P.open;
     else if (Hides.near(player)) t = P.hide;
   }
-  const full = t ? (IS_TOUCH ? t : 'E \u2014 ' + t) : '';
+  if (Prologue.active && Prologue.prompt()) t = Prologue.prompt();
+  const full = t ? (IS_TOUCH || t.includes('\u2014') ? t : 'E \u2014 ' + t) : '';
   if (full !== promptText) {
     promptText = full;
     $('prompt').textContent = full;
@@ -1101,6 +1107,7 @@ function frame(t) {
     Hints.update(gameTime);
     Notice.update(gameTime);
     Prologue.update(dt, gameTime);
+    updateInteract();
     const follow = 1 - Math.pow(0.001, dt);
     camera.x += (player.x - camera.x) * follow;
     camera.y += (player.y - camera.y) * follow;
@@ -1135,7 +1142,10 @@ function frame(t) {
 
     // Στο ιερό του Ερμή ή κρυμμένος (όσο κρατάς την ανάσα σου) δεν σε πιάνουν.
     const safeHere = Level.safe[Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE)] === 1;
-    killer = safeHere || Hides.active ? null : monsters.find((m) => m.touches(player)) || null;
+    const here = playerRegion();
+    Chases.update(dt, gameTime, here);
+    Throne.update(dt, gameTime, here);
+    killer = safeHere || Hides.active ? null : monsters.find((m) => m.touches(player)) || (Boulder.touches(player) ? Boulder : null);
     if (Hides.update(dt, monsters)) {
       // Τελείωσε η ανάσα: λαχανιάζεις δυνατά και βγαίνεις από την κρυψώνα.
       Hides.exit();
@@ -1324,6 +1334,17 @@ function updateHud() {
   $('strings-label').textContent = Math.max(r, chapter) >= 1 || strings > 0 ? `Strings: ${strings}/3` : '';
 }
 
+// Μια γραμμή αφήγησης στη μέση της οθόνης (πρόλογος, αίθουσα του θρόνου, τέλη) — χωρίς φωνή.
+function showNarration(text) {
+  const el = $('level-intro');
+  $('intro-number').textContent = '';
+  $('intro-name').textContent = '';
+  $('intro-line').textContent = text;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+}
+
 // Τίτλος κεφαλαίου στη μέση της οθόνης (καλείται από την ουρά μηνυμάτων).
 function showChapterTitle(ch) {
   const el = $('level-intro');
@@ -1460,8 +1481,24 @@ function spawn(saved) {
   Inventory.reset(saved);
   Chests.reset();
   Hides.reset();
+  Chases.reset();
+  Throne.reset(chapter >= CHAPTERS.length - 1);
+  // Ο Κέρβερος στην Πύλη του Άδη (αν δεν τον έχεις ήδη αποκοιμίσει).
+  if (Level.boss && !Missions.secrets.has('cerberus')) {
+    Level.setBars(false);
+    const c = new Cerberus(Level.boss.x, Level.boss.y, Level.boss.region);
+    c.voice = 'shade';
+    c.onAsleep = () => {
+      Level.setBars(true);
+      Missions.secrets.add('cerberus');
+      Notice.show(STORY.bossAsleep, gameTime, 6);
+      Sound.win();
+    };
+    monsters.push(c);
+  } else if (Level.boss) Level.setBars(true);
   // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
   Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
+  Boulder.stop();
   Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners(), ...World3D.listeners(), ...Chests.list, ...Hides.list];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
@@ -1557,11 +1594,8 @@ function die() {
 function reachedExit() {
   const good = Eurydice.following();
   if (good) Sound.win(); else Sound.gameOver();
-  const kind = good ? 'good' : 'bad';
-  playCutscene(good ? STORY.good : STORY.bad, kind, kind, () => {
-    setState('end');
-    showScreen(good ? 'endGood' : 'endBad');
-  });
+  // Τα τέλη είναι playable, στον πάνω κόσμο του προλόγου (js/prologue.js).
+  Prologue.startEnding(good);
 }
 
 let pausedAt = 0;

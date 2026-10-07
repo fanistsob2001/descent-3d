@@ -244,7 +244,7 @@ Side missions (title: description):
 - Voices of the lost: Hear all nine lost souls.
 - Libations: Find every libation jar.
 - Rekindle the flames: Light every altar.
-- The guardian sleeps (secret): Wake the hound of Hades.
+- The guardian sleeps: Lull the hound of Hades to sleep. (First-person version; before: secret, "Wake the hound of Hades.")
 - Three thousand years (secret): Find the shade that walks into the wall.
 
 A secret mission shows as "???" until it is completed. When a side mission is completed: Mission complete: (title)
@@ -421,6 +421,19 @@ Interface text, not voiced.
 - Using lyre resin: The lyre can play once more.
 - Hiding: You hold your breath. · When the breath runs out: You gasp for air!
 - Prompts: Open · Shrine · Hide · Come out
+
+### Texts of the set pieces (interface / narration, not voiced)
+
+- Chase in the Styx (VII), when it starts: Chains snap somewhere in the marsh. Three voices howl.
+- When you reach the river of fire: Behind you, the hound stops at the edge of the fire. He will wait for you at the gate.
+- Chase in Tartarus (IX): The Furies wake. Above you, a great stone begins to roll.
+- Cerberus (X), each head that falls asleep: One head sleeps. · The last one: The last head sighs and sleeps. The gate of Hades stands open.
+- The throne room (XI): prompt "Play". The lines of the middle cutscene (section 8) appear one by one while you play;
+  then Eurydice's shade appears and follows you.
+- Endings: objectives "Go home." and (bad ending) "Play the lyre at her grave."; prompt "Turn around".
+  The lines of the good / bad ending (section 8) appear during the walk, at the door, and at the grave.
+
+The side mission "The guardian sleeps" (section 11) is no longer secret: Lull the hound of Hades to sleep.
 
 ### Lost souls with requests
 

@@ -70,6 +70,8 @@ const Level = {
     this.landing = null;   // εκεί που αράζει η βάρκα του Χάροντα (K)
     this.chests = [];      // { x, y, region, map } — Q / q (q = με το κομμάτι του χάρτη)
     this.hides = [];       // { x, y, region } — κρυψώνες (h)
+    this.chases = [];      // { x, y, region } — εκεί που αρχίζει μια καταδίωξη (c)
+    this.bars = [];        // { tx, ty, x, y } — τα κάγκελα της Πύλης του Άδη (b)
     this.boss = null;      // ο Κέρβερος (B)
     let tablets = 0;
     this.monsters = [];
@@ -110,6 +112,9 @@ const Level = {
           if (c === 'K') this.landing = { x: cx, y: cy };
           if (c === 'Q' || c === 'q') this.chests.push({ x: cx, y: cy, region: r, map: c === 'q' });
           if (c === 'h') this.hides.push({ x: cx, y: cy, region: r });
+          if (c === 'c') this.chases.push({ x: cx, y: cy, region: r });
+          // Κάγκελα: δεν περνάς (ο ήχος περνάει) ώσπου να ανοίξουν (setBars).
+          if (c === 'b') { this.bars.push({ tx: wx, ty: wy, x: cx, y: cy }); this.grid[i] = 1; }
           if (c === 'B') this.boss = { x: cx, y: cy, region: r };
           if (c >= '1' && c <= '9') this.souls.push({ n: Number(c), x: cx, y: cy });
           if (c === 'X') this.eggs.stuck = { x: cx, y: cy };
@@ -159,6 +164,12 @@ const Level = {
     this.segFade = this.segBaseFade.slice();
     this.regionFade = chapters.map((c) => c.fade);
     this.gates.forEach((g, i) => this.setGate(i, false));
+  },
+
+  // Τα κάγκελα της Πύλης του Άδη: ανοιχτά = περνάς.
+  setBars(open) {
+    this.barsOpen = open;
+    for (const b of this.bars) this.grid[b.ty * this.cols + b.tx] = open ? 0 : 1;
   },
 
   // Ανοίγει / κλείνει μια πύλη: αλλάζει το πλέγμα και (απ)ενεργοποιεί τα κομμάτια της.

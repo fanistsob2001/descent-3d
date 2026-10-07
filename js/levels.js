@@ -19,6 +19,8 @@
 //         E = η τελική έξοδος (μόνο στο XII)   B = ο Κέρβερος (X — στάδιο 5)
 //         o = οβολός   s = χορδή της λύρας   j = αγγείο σπονδής   L = πήλινη πινακίδα (STORY.tablets, με τη σειρά)
 //         1..9 = μήνυμα χαμένης ψυχής (STORY.souls[n-1])
+//         Q / q = κιβώτιο / κιβώτιο με το κομμάτι του χάρτη   h = κρυψώνα   c = αρχίζει η καταδίωξη (chase)
+//         b = χάλκινα κάγκελα (X: ανοίγουν όταν κοιμηθεί ο Κέρβερος)
 //         X = easter egg: σκιά κολλημένη στον τοίχο (IV)   H / P = ο Άδης / η Περσεφόνη στους θρόνους (XI)
 //
 // objective(strings): το κείμενο του στόχου, με τον πραγματικό αριθμό χορδών.
@@ -27,6 +29,7 @@
 // decor:  διακοσμητικά (world3d.js): cave | asphodel | mourning | tartarus | palace· roots / reeds: ρίζες / καλάμια.
 // mask:   πόσο "σκεπάζει" ο θόρυβος του κεφαλαίου τους ήχους (Κωκυτός, Φλεγέθων): οι σκιές ακούνε μόνο μέσα σε
 //         τόσο μέρος της ακτίνας, και τα γρυλίσματά τους ακούγονται τόσο πιο σιγά. sound: ο θόρυβος ('wail' | 'fire').
+// chase:  'cerberus' (VII) | 'furies' (IX) — η καταδίωξη του κεφαλαίου (js/events.js).
 // hints:  οδηγίες μετά τον στόχο (ίδια μορφή με το js/hints.js).
 const CHAPTERS = [
   {
@@ -89,7 +92,10 @@ const CHAPTERS = [
     line: 'The ferryman takes no one for free. Not even the dead.',
     objective: (s) => `Find an obol to pay the ferryman. A string lies somewhere along the shore. Strings: ${s}/3`,
     fade: 1.5, theme: 'rock', decor: 'cave', reeds: true,
-    hints: [],
+    hints: [
+      { touch: 'Tap the item button to open chests, to rest at a shrine and to hide.',
+        keys: 'Press E to open chests, to rest at a shrine and to hide. Choose what you throw with 1-4 or the mouse wheel.', time: 10 },
+    ],
     // MAP II
     map: [
       '################################^###########',
@@ -329,7 +335,7 @@ const CHAPTERS = [
     name: 'The Marshes of Styx',
     line: 'Even the gods fear this water. They swear their oaths on it.',
     objective: (s) => `Sound carries far over the water. Cross the causeways quietly. Strings: ${s}/3`,
-    fade: 1.5, theme: 'rock', decor: 'cave', reeds: true,
+    fade: 1.5, theme: 'rock', decor: 'cave', reeds: true, chase: 'cerberus',
     hints: [],
     // MAP VII
     map: [
@@ -354,7 +360,7 @@ const CHAPTERS = [
       '##~~~~~~~~~~..M~~~~~~~~~~~~~~~~...Q.~~~~~~##',
       '##~~~~~~~~~~~...~~~~~~~~~~~~~~~~.~~~~~~~~~~#',
       '###~~~~~~~~~~~...~~~~~~~~~~~~~~~.~~~~~~~~~~#',
-      '###~~~~~~~~~~.......~~~~~~~~~~~..~~~~~~~~~~#',
+      '###~~~~~~~~~~....c..~~~~~~~~~~~..~~~~~~~~~~#',
       '####~~q.........h.....~~~~~~~~..~~~~~~~~~~~#',
       '####~..........~~~.......~~~~..~~~~~~~~~~~##',
       '#####..8...~~~~~~~~~..........~~~~~~~~~~~###',
@@ -429,7 +435,7 @@ const CHAPTERS = [
     name: 'The Pit of Tartarus',
     line: 'Below everything, the Furies keep watch over the damned.',
     objective: (s) => `The Furies hear only loud sounds, but nothing is faster. Keep your voice low. Strings: ${s}/3`,
-    fade: 1.5, theme: 'blocks', decor: 'tartarus',
+    fade: 1.5, theme: 'blocks', decor: 'tartarus', chase: 'furies',
     hints: [],
     // MAP IX
     map: [
@@ -445,7 +451,7 @@ const CHAPTERS = [
       '#####################...####################',
       '#####################......#################',
       '###############..................###########',
-      '##########..........................########',
+      '##########............c.............########',
       '########..............................######',
       '#######............:::.::.........h....#####',
       '######............::::.:::::.............###',
@@ -513,7 +519,7 @@ const CHAPTERS = [
       '#####...............................Q..#####',
       '#####..................................#####',
       '#####..................................#####',
-      '###################......###################',
+      '###################bbbbbb###################',
       '###################......###################',
       '###################......###################',
       '###################......###################',

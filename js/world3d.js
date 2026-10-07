@@ -197,6 +197,15 @@ const World3D = {
       }
     }
 
+    // ---- Η πέτρα του Σίσυφου (πάντα λίγο ορατή: τη φωτίζει ο θόρυβός της) και τα κάγκελα της Πύλης ----
+    if (Boulder.active) R.sprite(S('boulder', Math.floor(Boulder.roll) % 2), { x: Boulder.x, y: Boulder.y, scale: 0.85, fog: false });
+    if (!Level.barsOpen) {
+      for (const b of Level.bars) {
+        const a = Math.max(0.25, Math.min(1, (Raycast.cellLight[b.ty * Level.cols + b.tx] || 0) * 1.5));
+        R.sprite(S('bars'), { x: b.x, y: b.y - TILE * 0.45, alpha: a, scale: 0.55 });
+      }
+    }
+
     // ---- Κιβώτια και κρυψώνες: φαίνονται όσο τα φωτίζει ο ήχος (ή το φως του κελιού) ----
     const cellLit = (x, y) => Raycast.cellLight[Math.floor(y / TILE) * Level.cols + Math.floor(x / TILE)] || 0;
     for (const c of Chests.list) {
@@ -215,7 +224,7 @@ const World3D = {
     for (const m of monsters) {
       if (m === killer && deathAlpha !== undefined) {
         this.monster(m, now, m.x, m.y, deathAlpha, Math.floor(now * 5), false);
-      } else if (m.isFrozen()) {
+      } else if (m.isFrozen() && m.kind !== 'cerberus') {
         // Παγωμένη από τη Μελωδία: χλωμή, ήρεμη ψυχή στη θέση της.
         const left = m.frozenUntil - now;
         const a = Math.min(1, left / 1.2) * (0.55 + 0.1 * Math.sin(now * 3));
@@ -310,7 +319,7 @@ const World3D = {
         R.sprite(S('hades3d'), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
         R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 26, alpha: a, scale: 0.3 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
       } else {
-        R.sprite(S('persephone3d', 1), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
+        R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
       }
     }
 
@@ -383,6 +392,15 @@ const World3D = {
     const R = Raycast;
     const p = R.project(x, y);
     if (!p) return;
+    if (m.kind === 'cerberus') {
+      // Ο Κέρβερος: τα κεφάλια που κοιμούνται δεν γαβγίζουν· όταν κυνηγάει, γαβγίζουν με τη σειρά.
+      const hunting = m.state === 'hunt' && !m.isFrozen();
+      const k = Math.floor(now * 3) % 3;
+      const barking = [0, 1, 2].map((i) => hunting && i >= m.asleep && i === k);
+      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, scale: 0.62,
+        glow: { r: 40, color: POT.red, a: a * 0.45 } });
+      return;
+    }
     const flip = p.sx > R.W / 2;   // κοιτάζει προς τα εσένα
     const erinys = m.kind === 'erinys';
     // Στο 3D η σκιά είναι η λεπτομερής μορφή "ghoul" (μισό μέγεθος στον κόσμο: είναι 2× πιο λεπτομερής).

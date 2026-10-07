@@ -539,6 +539,28 @@ const Sound = {
     src.start(t, Math.random()); src.stop(t + 0.65);
   },
 
+  // Η πέτρα του Σίσυφου που κατρακυλάει: βαθύ βουητό από τη θέση της (on = false: σταματάει).
+  rumble(on, x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx;
+    if (!this._rumble) {
+      const src = this.noiseSource(true), lp = ac.createBiquadFilter(), g = ac.createGain(), pan = ac.createStereoPanner();
+      lp.type = 'lowpass'; lp.frequency.value = 140;
+      g.gain.value = 0;
+      src.connect(lp); lp.connect(g); g.connect(pan); pan.connect(this.sfx);
+      src.start();
+      this._rumble = { g, pan };
+    }
+    let v = 0;
+    if (on) {
+      const d = Math.hypot(x - this.listenerX, y - this.listenerY);
+      v = Math.max(0, 1 - d / 700) * 0.9;
+      const a = Math.atan2(y - this.listenerY, x - this.listenerX) - (this.listenerAngle || 0);
+      this._rumble.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, Math.sin(a))), ac.currentTime, 0.1);
+    }
+    this._rumble.g.gain.setTargetAtTime(v, ac.currentTime, 0.15);
+  },
+
   // Το κουπί του Χάροντα μπαίνει στο νερό: πλατσούρισμα και το ξύλο που τρίζει.
   oar() {
     if (!this.ready()) return;

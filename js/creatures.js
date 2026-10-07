@@ -39,6 +39,9 @@ const Creatures = {
     F.cake = [Sprites.build(paintGrid(12, 8, (p) => { p.ellipse(6, 4.5, 5.5, 3, 'Y'); p.ellipse(6, 3.6, 4.5, 2, 'y'); p.px(4, 3, 'b'); p.px(7, 4, 'b'); p.px(8, 3, 'b'); }), dk)];
     F.bell = [Sprites.build(paintGrid(10, 12, (p) => { p.line(5, 0, 5, 2, 1, 'J'); p.poly([[3, 2], [7, 2], [9, 10], [1, 10]], 'V'); p.line(1, 10, 9, 10, 1, 'D'); p.line(3, 4, 3, 9, 1, 'D'); p.px(5, 11, 'J'); }), dk)];
     F.niche = [Sprites.build(this.niche(), dk)];
+    // Στάδιο 5: τα χάλκινα κάγκελα της Πύλης, η πέτρα του Σίσυφου.
+    F.bars = [Sprites.build(paintGrid(20, 40, (p) => { for (let x = 1; x < 20; x += 4) { p.line(x, 2, x, 39, 1, 'V'); p.px(x, 1, 'y'); p.px(x, 0, 'Y'); } p.line(0, 6, 19, 6, 1, 'D'); p.line(0, 30, 19, 30, 1, 'D'); }), dk)];
+    F.boulder = [0, 1].map((f) => Sprites.build(paintGrid(30, 28, (p) => { p.ellipse(15, 14, 14, 13, 'l'); p.ellipse(11, 9, 7, 5, 'i'); p.ellipse(19, 20, 9, 6, 'L'); for (const [x, y] of f ? [[8, 16], [20, 8], [14, 22], [24, 15]] : [[10, 20], [22, 12], [16, 6], [6, 12]]) p.line(x, y, x + 3, y + 2, 1, 'L'); }), dk));
     F.olive = [0, 1].map((f) => Sprites.build(this.olive(f), dk));
     F.stele = [0, 1].map((f) => Sprites.build(this.stele(f), dk));
   },

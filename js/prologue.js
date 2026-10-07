@@ -26,7 +26,7 @@ const PROLOGUE_MAPS = [
       '#..=___S___=........,........#',
       '#..=_______=..f...,,....f....#',
       '#..=_____a_=.....,,..........#',
-      '#..====_====...,,......f.....#',
+      '#..====d====...,,......f.....#',
       '#......,,,,,,,,,.............#',
       '#O.....,.....%%%%%%..%%%%%..O#',
       '#......,.....%f....f.....%...#',
@@ -132,6 +132,9 @@ const PRO_PICK = 20;        // τόσο κοντά = μαζεύεις λουλο
 
 const Prologue = {
   active: false,
+  loaded: false,        // ο κόσμος του προλόγου είναι φορτωμένος (και μετά τα τέλη, ώσπου να βγεις στο μενού)
+  mode: 'prologue',     // 'prologue' | 'good' | 'bad' (τα τέλη: STORY.md, ενότητα 12)
+  turnReady: false,
   step: '',
   stepAt: 0,
   objective: '',
@@ -152,9 +155,20 @@ const Prologue = {
 
   // ---- Έναρξη / τέλος ----
   start() {
+    this.mode = 'prologue';
+    this.setupWorld(PROLOGUE_SKY);
+    this.beginPlay(Level.start, Math.PI / 2);
+    this.setStep('find');
+    Sound.nature('day');
+    Hints.start(CHAPTERS[0].hints.filter((h) => h.until === 'move'), gameTime);
+  },
+
+  // Φορτώνει τον πάνω κόσμο (πρόλογος ή τέλος) και διαβάζει τα σημάδια των χαρτών.
+  setupWorld(sky) {
     this.active = true;
+    this.loaded = true;
     document.body.classList.add('prologue');
-    loadWorldData(PROLOGUE_MAPS, PROLOGUE_SKY);
+    loadWorldData(PROLOGUE_MAPS, sky);
     const L = Level;
     // Οι ειδικοί χαρακτήρες του προλόγου, από τους χάρτες (με τη θέση κάθε μπλοκ στον κόσμο).
     this.marks = {};
@@ -181,7 +195,7 @@ const Prologue = {
           if (ch === 'a') block('amphora', 0, 0.85);
           if (ch === 'g') { block('stele', 0, 0.75); this.marks.grave = { x: cx, y: cy }; }
           if (ch === 'f') this.flowers.push({ x: cx + (Math.sin(c) * 6), y: cy + (Math.cos(c) * 6), taken: false });
-          const names = { U: 'spring', e: 'eury', k: 'lie', z: 'snake', n: 'graveStart', r: 'roadStart', m: 'mouth', q: 'slip' };
+          const names = { U: 'spring', e: 'eury', k: 'lie', z: 'snake', n: 'graveStart', r: 'roadStart', m: 'mouth', q: 'slip', d: 'door' };
           if (names[ch]) this.marks[names[ch]] = { x: cx, y: cy };
           // Στα σκαλιά: λίγο φως του φεγγαριού από το στόμιο, που σβήνει προς τα κάτω.
           if (r === 4 && !L.opaque[c]) ambientCave.push([c, Math.max(0, 0.22 - y * 0.03)]);
@@ -199,8 +213,13 @@ const Prologue = {
     this.snake = null;
     this.eury = { x: this.marks.eury.x, y: this.marks.eury.y, mode: 'idle', path: [], dist: 0, face: 1, target: null, stepDist: 0 };
     this.fade = { from: 1, to: 0, t0: gameTime, dur: 2.5 };
+    this.turnReady = false;
+    this.slipAt = 0;
+  },
 
-    // Ο παίκτης: στο σπίτι, με ολόκληρη τη λύρα.
+  // Ο παίκτης στη θέση at, με ολόκληρη τη λύρα, και τα υπόλοιπα του Κάτω Κόσμου άδεια.
+  beginPlay(at, angle) {
+    const L = Level;
     Echoes.init();
     Echoes.markSeen = false;
     Echoes.listeners = [];
@@ -225,23 +244,113 @@ const Prologue = {
     Hides.reset();
     Eurydice.reset('none', Level.start);
     Notice.clear();
-    player.x = camera.x = L.start.x;
-    player.y = camera.y = L.start.y;
-    player.angle = Math.PI / 2;
-    player.fx = 0; player.fy = 1;
+    Chases.reset();
+    Throne.reset(true);
+    player.x = camera.x = at.x;
+    player.y = camera.y = at.y;
+    player.angle = angle;
+    player.fx = Math.cos(angle); player.fy = Math.sin(angle);
     player.pitch = 0;
+    void L;
     stopInput();
     Dread.reset();
     setState('play');
     showScreen(null);
-    this.setStep('find');
-    Sound.nature('day');
-    Hints.start(CHAPTERS[0].hints.filter((h) => h.until === 'move'), gameTime);
+  },
+
+  // ---- Τα τέλη (playable): βγαίνεις στο φως, και είναι το λιβάδι του προλόγου ----
+  startEnding(good) {
+    this.mode = good ? 'good' : 'bad';
+    const day = PROLOGUE_SKY[0], dusk = PROLOGUE_SKY[2];
+    this.setupWorld(good ? { 0: day, 1: day, 2: dusk, 3: PROLOGUE_SKY[3] } : { 0: dusk, 1: dusk, 2: dusk, 3: PROLOGUE_SKY[3] });
+    for (const f of this.flowers) f.taken = true;
+    if (!good) this.props.find((q) => q.name === 'stele').frame = 1;
+    this.beginPlay({ x: this.marks.lie.x, y: this.marks.lie.y + TILE }, -Math.PI / 2);
+    this.eury.mode = good ? 'behind' : 'gone';
+    Sound.nature(good ? 'day' : 'dusk');
+    this.setStep('');
+    this.objective = STORY.goHome;
+    updateHud();
+    const L = good ? STORY.good : STORY.bad;
+    showNarration(L[0]);
+    this.after(4.5, () => showNarration(L[1]));
+    if (!good) this.after(9, () => showNarration(L[2]));
+    this.endStep = 'home';
+  },
+
+  // Η προτροπή του τέλους ("Turn around").
+  prompt() {
+    return this.mode === 'good' && this.turnReady ? STORY.prompts.turn : '';
+  },
+
+  // E στο τέλος: γυρίζεις — για πρώτη φορά επιτρέπεται — και τη βλέπεις.
+  interact() {
+    if (this.mode !== 'good' || !this.turnReady) return;
+    this.turnReady = false;
+    this.turnFrom = player.angle;
+    this.turnAt = gameTime;
+    const e = this.eury;
+    e.mode = 'stand';
+    const L = STORY.good;
+    this.after(1.6, () => showNarration(L[3]));
+    this.after(6.2, () => showNarration(L[4]));
+    this.after(10.8, () => showNarration(L[5]));
+    this.after(14.5, () => this.fadeTo(1, 2.5));
+    this.after(17.5, () => this.finishEnding());
+  },
+
+  updateEnding(dt, now) {
+    const p = player, e = this.eury;
+    // Πίσω σου, πάντα έξω από το βλέμμα σου (δεν μπορείς να τη δεις ώσπου να γυρίσεις στην πόρτα).
+    if (e.mode === 'behind') {
+      e.x = p.x - Math.cos(p.angle) * 40;
+      e.y = p.y - Math.sin(p.angle) * 40;
+      e.moving = false;
+    }
+    if (this.turnAt) {
+      const k = Math.min(1, (now - this.turnAt) / 1.3);
+      p.angle = this.turnFrom + Math.PI * (k * k * (3 - 2 * k));
+      p.fx = Math.cos(p.angle); p.fy = Math.sin(p.angle);
+      if (k >= 1) this.turnAt = 0;
+    }
+    const door = this.marks.door;
+    if (this.endStep === 'home' && Math.hypot(door.x - p.x, door.y - p.y) < 55) {
+      this.endStep = 'door';
+      this.lock = true;
+      this.objective = '';
+      updateHud();
+      if (this.mode === 'good') {
+        showNarration(STORY.good[2]);
+        this.after(3.5, () => { this.turnReady = true; });
+      } else {
+        // Το σπίτι είναι άδειο. Μετά, ο τάφος της.
+        showNarration(STORY.bad[3]);
+        this.after(5, () => this.fadeTo(1, 2));
+        this.after(7.2, () => {
+          this.teleport(this.marks.graveStart, -Math.PI / 2);
+          this.fadeTo(0, 2.5);
+          this.lock = false;
+          this.objective = STORY.playAtGrave;
+          this.endStep = 'grave';
+          updateHud();
+        });
+      }
+    }
+  },
+
+  finishEnding() {
+    const good = this.mode === 'good';
+    this.active = false;
+    document.body.classList.remove('prologue');
+    Sound.nature(null);
+    setState('end');
+    showScreen(good ? 'endGood' : 'endBad');
   },
 
   // Τέλος του προλόγου (ή Skip): πίσω ο Κάτω Κόσμος, και το παιχνίδι ξεκινάει από το κεφάλαιο I.
   finish() {
     this.active = false;
+    this.loaded = false;
     document.body.classList.remove('prologue');
     Sound.nature(null);
     Voice.stop();
@@ -252,7 +361,8 @@ const Prologue = {
 
   // Βγήκε στο μενού στη μέση του προλόγου: ξαναφορτώνεται ο Κάτω Κόσμος (για τη σκηνή του μενού).
   abort() {
-    if (!this.active) return;
+    if (!this.loaded) return;
+    this.loaded = false;
     this.active = false;
     document.body.classList.remove('prologue');
     Sound.nature(null);
@@ -285,13 +395,7 @@ const Prologue = {
 
   // Αφήγηση στη μέση της οθόνης (οι γραμμές του intro).
   narrate(i) {
-    const el = $('level-intro');
-    $('intro-number').textContent = '';
-    $('intro-name').textContent = '';
-    $('intro-line').textContent = STORY.intro[i];
-    el.classList.remove('show');
-    void el.offsetWidth;
-    el.classList.add('show');
+    showNarration(STORY.intro[i]);
   },
 
   fadeTo(to, dur) {
@@ -311,6 +415,16 @@ const Prologue = {
 
   // Ο παίκτης έπαιξε λύρα (κύμα). charge = 0..1.
   onCall(charge) {
+    if (this.active && this.mode === 'bad' && this.endStep === 'grave' && Math.hypot(this.marks.grave.x - player.x, this.marks.grave.y - player.y) < 140) {
+      // Παίζεις στον τάφο της. Τίποτα δεν απαντάει.
+      this.endStep = 'played';
+      this.objective = '';
+      updateHud();
+      this.after(2.5, () => showNarration(STORY.bad[4]));
+      this.after(7.5, () => this.fadeTo(1, 2.5));
+      this.after(10.5, () => this.finishEnding());
+      return;
+    }
     if (!this.active || this.step !== 'play') return;
     if (Math.hypot(this.eury.x - player.x, this.eury.y - player.y) > 180 || charge < 0.25) return;
     this.setStep('');
@@ -326,6 +440,7 @@ const Prologue = {
       if (now >= this.timers[i].at) { const t = this.timers[i]; this.timers.splice(i, 1); t.fn(); }
     }
     Sound.natureTick(now);
+    if (this.mode !== 'prologue') { this.updateEnding(dt, now); return; }
     const e = this.eury, p = player;
     const dE = Math.hypot(e.x - p.x, e.y - p.y);
 
@@ -539,7 +654,7 @@ const Prologue = {
     for (const f of this.flowers) if (!f.taken && near(f)) R.sprite(D(S('asphodel', 0)), { x: f.x, y: f.y, scale: 1.1, fog: false, glow: { r: 10, color: '255,246,228', a: 0.25 } });
     // Η Ευρυδίκη.
     const e = this.eury;
-    if (e && e.mode !== 'gone') {
+    if (e && e.mode !== 'gone' && e.mode !== 'behind') {
       if (e.mode === 'lying') {
         R.sprite(D(S('euryLying', 0)), { x: e.x, y: e.y, scale: 0.39, fog: false });
       } else {
