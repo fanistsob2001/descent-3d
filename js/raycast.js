@@ -1241,6 +1241,8 @@ const Raycast = {
   },
 
   flushSprites(pc) {
+    // Η μηχανή WebGL ζωγράφισε τον κόσμο: οι μορφές μπαίνουν κι αυτές εκεί, με το βάθος του (js/gl3d.js).
+    if (typeof GL3D !== 'undefined' && GL3D.pending) { GL3D.flushSprites(pc); return; }
     const list = this.sprites;
     // Από τα πιο μακρινά στα πιο κοντινά (bias: για μορφές στην ίδια θέση, π.χ. ο Χάροντας μπροστά από τη βάρκα).
     list.sort((a, b) => (b.p.depth - (b.o.bias || 0)) - (a.p.depth - (a.o.bias || 0)));

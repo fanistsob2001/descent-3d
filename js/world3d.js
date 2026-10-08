@@ -77,8 +77,10 @@ const World3D = {
       return { c, f: c, w, h, ctx: c.getContext('2d') };
     };
     this.flame = canvas(28, 50);
+    this.flame.c._dyn = true;   // ξαναζωγραφίζεται κάθε καρέ (η μηχανή WebGL ξαναφορτώνει την υφή του)
     this.buildScenery();
     this.cerb = canvas(64, 32);
+    this.cerb.c._dyn = true;
   },
 
   // Καλείται σε κάθε spawn.

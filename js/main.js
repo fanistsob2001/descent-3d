@@ -819,6 +819,7 @@ function draw3D(pc, W, H) {
   }
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
+  GL3D.composite(pc);   // (αν για κάποιο λόγο δεν ζωγραφίστηκαν μορφές: ο κόσμος του WebGL στον καμβά)
   // Ό,τι λάμπει "ξεχειλίζει" απαλά (κύματα, φλόγες, φως της ημέρας).
   // (Στο φως της ημέρας του προλόγου πολύ λιγότερο, αλλιώς ο ουρανός "καίγεται" στο λευκό.)
   Pixel.bloom(Prologue.active ? 0.1 : 0.55, World3D.lights);
@@ -1020,6 +1021,7 @@ function drawMenu3D(pc, W, H) {
   Raycast.monsters = monsters;
   (GL3D.use() ? GL3D : Raycast).render(pc, c.x, c.y, c.angle, menuScene.t, Raycast.focal * Math.tan(0.05));
   World3D.draw(pc, menuScene.t);
+  GL3D.composite(pc);
   Pixel.bloom(0.55, World3D.lights);
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
   Pottery.meander(pc, 0, H - 7, W, 7, POT.terra, 0.35, 1);
