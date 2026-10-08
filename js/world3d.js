@@ -337,7 +337,11 @@ const World3D = {
       } else if (d.kind === 'hades') {
         // Οι δύο θρόνοι δίπλα δίπλα (σε διπλανά κελιά, και λίγο πιο κοντά ο ένας στον άλλο: ~2 μ.).
         R.sprite(S('hades3d'), { x: d.x, y: d.y + THRONE_NEAR, alpha: a, scale: 0.44, yaw: Math.PI });
-        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 18, alpha: a, h: 10, yaw: Math.PI });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
+        // Ο Κέρβερος, όρθιος δίπλα στον θρόνο (από την άλλη μεριά της Περσεφόνης): μεγαλύτερος από τον Άδη στον θρόνο.
+        // Γρυλίζει (ανοίγει τα στόματα με τη σειρά) όσο τον φωτίζει ο ήχος· ησυχάζει όταν παίζεις τη λύρα.
+        const calm = typeof Throne !== 'undefined' && (Throne.playedAt || Throne.done);
+        const k = Math.floor(now * 2.5) % 6;
+        R.sprite(Sprites.cerberusHD([0, 1, 2].map((i) => !calm && i === k), Math.sin(now * 1.6) > 0 ? 1 : 0, calm ? 'lie' : 'stand', 0, 0), { x: d.x + 6, y: d.y - TILE * 1.25, alpha: a, h: CERB_BOSS_H * 0.88, bias: -0.02 });
       } else {
         R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y - THRONE_NEAR, alpha: a, yaw: Math.PI, scale: 0.44 });
       }
@@ -382,6 +386,7 @@ const World3D = {
 
     if (typeof Prologue !== 'undefined' && Prologue.active) Prologue.sprites(R, now);
     if (typeof Crossing !== 'undefined') Crossing.sprites(R, now);
+    if (typeof Fauna !== 'undefined') Fauna.sprites(R, now);
     R.flushSprites(pc);
     this.drawSparks(pc, now);
     this.drawDrips(pc, now);
@@ -419,7 +424,9 @@ const World3D = {
       const down = s === 'tired' || s === 'lulled' || s === 'asleep';
       const breath = down ? (Math.sin(now * (s === 'tired' ? 7 : 1.4)) > 0 ? 1 : 0) : Math.sin(now * 1.6) > 0 ? 1 : 0;
       const shake = s === 'windup' ? (Math.random() - 0.5) * 2 : 0;
-      R.sprite(Sprites.cerberusHD(barking, breath), { x: x + shake, y, z: down ? -3 : 0, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
+      // Η ζωγραφιά: ξαπλωμένος (κουρασμένος / κοιμάται), τρέχει (ορμή, γύρω από τις κολόνες), αλλιώς όρθιος.
+      const pose = down ? 'lie' : s === 'charge' || s === 'prowl' ? 'run' : 'stand';
+      R.sprite(Sprites.cerberusHD(barking, breath, pose, m.asleep, Math.floor(now * (s === 'charge' ? 9 : 6)) % 2), { x: x + shake, y, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
         glow: { r: 46, color: s === 'windup' || s === 'charge' ? '255,60,40' : POT.red, a: (s === 'windup' ? 0.3 + 0.2 * Math.sin(now * 20) : 0.18) * a },
         after: (pc, b) => {
           if (s !== 'stunned' && s !== 'tired' && s !== 'lulled') return;
@@ -429,7 +436,8 @@ const World3D = {
           for (let i = 0; i < 5; i++) {
             const t = now * 3 + (i * Math.PI * 2) / 5;
             const r = b.w * 0.28;
-            pc.fillRect(Math.round(b.sx + Math.cos(t) * r), Math.round(b.top + b.h * 0.08 + Math.sin(t) * r * 0.25), Math.max(1, Math.round(b.k * 2)), Math.max(1, Math.round(b.k * 2)));
+            const sz = Math.max(1, Math.min(2, Math.round(b.k * 0.6)));
+            pc.fillRect(Math.round(b.sx + Math.cos(t) * r), Math.round(b.top + b.h * 0.3 + Math.sin(t) * r * 0.25), sz, sz);
           }
           pc.globalCompositeOperation = 'source-over';
         } });
@@ -440,7 +448,8 @@ const World3D = {
       const hunting = m.state === 'hunt' && !m.isFrozen();
       const k = Math.floor(now * 3) % 3;
       const barking = [0, 1, 2].map((i) => hunting && i >= m.asleep && i === k);
-      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
+      const pose = m.asleep >= 3 ? 'lie' : hunting || m.chase ? 'run' : 'stand';
+      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0, pose, m.asleep, Math.floor(now * 8) % 2), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
         glow: { r: 40, color: POT.red, a: a * 0.45 } });
       return;
     }
@@ -450,23 +459,25 @@ const World3D = {
     const ghoul = m.kind === 'shade';
     const fr = Sprites.getHD(ghoul ? 'ghoul' : erinys ? 'erinys3d' : m.kind, frame);
     const hover = m.fly ? 10 + Math.sin(now * 4 + m.homeTx) * 3 : 0;
-    // Θέση των ματιών σε pixels του (HD) καρέ.
-    const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 18, '255,210,90'] : [45, 15, '255,250,235'];
+    // Θέση των ματιών σε pixels του καρέ (οι ζωγραφιές τα ξέρουν: fr.eyes).
+    const eyes = fr.eyes || [erinys ? [fr.w / 2, 18] : [45, 15]];
+    const eyeColor = erinys ? '255,210,90' : '255,250,235';
     R.sprite(fr, {
       x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : erinys ? 0.48 : 1, ent: m,
       glow: { r: 30, color: POT.red, a: a * 0.5 },
       after: (pc, b) => {
         const s = b.h / fr.h;   // art px ανά pixel του sprite
-        if (b.model) { if (icon && m.revealState !== 'wander') Sprites.blit(pc, m.revealState === 'hunt' ? 'iconHear' : 'iconSearch', 0, b.sx, b.top - 2, { alpha: a * (0.65 + 0.35 * Math.sin(now * 10)), scale: Math.max(1, Math.min(3, Math.round(s * 0.6))) }); return; }
-        const ex = b.left + (flip ? fr.w - eyeX : eyeX) * s, ey = b.top + eyeY * s;
-        if (!R.visible(ex, b.depth)) return;
         pc.globalCompositeOperation = 'lighter';
-        const r = Math.max(2, s * 2.2);
-        const g = pc.createRadialGradient(ex, ey, 0, ex, ey, r);
-        g.addColorStop(0, `rgba(${eyeColor},${(a * 0.55).toFixed(3)})`);
-        g.addColorStop(1, `rgba(${eyeColor},0)`);
-        pc.fillStyle = g;
-        pc.fillRect(ex - r, ey - r, r * 2, r * 2);
+        for (const [eyeX, eyeY] of eyes) {
+          const ex = b.left + (flip ? fr.w - eyeX : eyeX) * s, ey = b.top + eyeY * s;
+          if (!R.visible(ex, b.depth)) continue;
+          const r = Math.max(2, s * 3);
+          const g = pc.createRadialGradient(ex, ey, 0, ex, ey, r);
+          g.addColorStop(0, `rgba(${eyeColor},${(a * 0.55).toFixed(3)})`);
+          g.addColorStop(1, `rgba(${eyeColor},0)`);
+          pc.fillStyle = g;
+          pc.fillRect(ex - r, ey - r, r * 2, r * 2);
+        }
         pc.globalCompositeOperation = 'source-over';
         if (icon && m.revealState !== 'wander') {
           const name = m.revealState === 'hunt' ? 'iconHear' : 'iconSearch';

@@ -643,6 +643,7 @@ function cerberusGrid(barking, breath) {
 const Sprites = {
   frames: {},   // name → [{ c: canvas (δεξιά), f: canvas (αριστερά), w, h }]
   hdFrames: {}, // name → τα ίδια καρέ σε διπλή ανάλυση με σκίαση (για το 3D), hd = 2
+  art: {},      // name → οι λεπτομερείς 2D ζωγραφιές του 3D κόσμου (js/art.js) — προτιμώνται από το getHD
 
   init() {
     // Ορφέας: κάθε καρέ σε 4 εκδοχές (0..3 χορδές στη λύρα).
@@ -732,6 +733,13 @@ const Sprites = {
   // "σκαλοπάτια") και μετά φως από πάνω-αριστερά / σκιά κάτω-δεξιά στη σειρά pixels μέσα από το
   // περίγραμμα — οι μορφές αποκτούν όγκο, σαν ζωγραφισμένες σε περισσότερους τόνους.
   getHD(name, i = 0) {
+    const art = this.art[name];
+    if (art) return art[((i % art.length) + art.length) % art.length];
+    return this.getOld(name, i);
+  },
+
+  // Τα παλιά καρέ σε διπλή ανάλυση (οι cutscenes και ό,τι δεν έχει ζωγραφιά στο js/art.js).
+  getOld(name, i = 0) {
     let list = this.hdFrames[name];
     if (!list) {
       list = this.hdFrames[name] = this.frames[name].map((fr) => {
@@ -799,13 +807,19 @@ const Sprites = {
   },
 
   // Ο Κέρβερος σε διπλή ανάλυση, για κάθε συνδυασμό κεφαλιών που γαβγίζουν (και ανάσας).
-  cerberusHD(barking, breath) {
+  // pose: 'stand' | 'run' | 'lie' (js/art-beasts.js), sleep = πόσα κεφάλια κοιμούνται, gallop = καρέ του τρεξίματος.
+  cerberusHD(barking, breath, pose, sleep, gallop) {
+    if (typeof Art !== 'undefined' && Art.cerberus) return Art.cerberus(barking, breath, pose || 'stand', sleep || 0, gallop || 0);
+    return this.cerberusOld(barking, breath);
+  },
+  // Το παλιό pixel sprite (οι cutscenes).
+  cerberusOld(barking, breath) {
     const key = barking.map(Number).join('') + breath;
     this._cerb = this._cerb || {};
     if (!this._cerb[key]) {
       const fr = this.build(cerberusGrid(barking, breath), POT.terra);
       const c = this.hdify(fr.c);
-      this._cerb[key] = { c, f: c, w: c.width, h: c.height, hd: 2, name: 'cerberus', bark: barking.slice() };   // (name: το 3D μοντέλο στο WebGL)
+      this._cerb[key] = { c, f: c, w: c.width, h: c.height, hd: 2 };
     }
     return this._cerb[key];
   },

@@ -436,7 +436,7 @@ Interface text, not voiced.
   after crafting: Made: (item).; after resting, the checkpoint message of section 8.
 - Using lyre resin: The lyre can play once more.
 - Hiding: You hold your breath. · When the breath runs out: You gasp for air!
-- Prompts: Open · Shrine · Hide · Come out
+- Prompts: Open · Shrine · Hide · Come out · Draw water (the well, in the prologue)
 - What each item does (shown in the Inventory and next to each recipe at the shrine):
   - Lyre: Hold it to play: the wave shows you the world. With three strings, it can play the Melody.
   - Libation jar: Thrown: it shatters with a loud sound, and the shades run to it.

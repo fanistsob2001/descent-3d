@@ -310,6 +310,7 @@ const Prologue = {
       });
     });
     for (const [c, a] of ambientCave) Raycast.ambient[c] = a;
+    Fauna.resetPrologue(this.mode);   // χωρικοί, παιδιά, βοσκός, ζώα, πουλιά (js/fauna.js)
     this.picked = 0;
     this.hasWater = false;
     this.lookedAt = false;
@@ -322,6 +323,7 @@ const Prologue = {
     this.fade = { from: 1, to: 0, t0: gameTime, dur: 2.5 };
     this.turnReady = false;
     this.slipAt = 0;
+    this.drawAt = 0;
   },
 
   // Ο παίκτης στη θέση at, με ολόκληρη τη λύρα, και τα υπόλοιπα του Κάτω Κόσμου άδεια.
@@ -329,7 +331,7 @@ const Prologue = {
     const L = Level;
     Echoes.init();
     Echoes.markSeen = false;
-    Echoes.listeners = [];
+    Echoes.listeners = Fauna.listeners();
     monsters = [];
     killer = null;
     chapter = -1;
@@ -385,13 +387,42 @@ const Prologue = {
     this.endStep = 'home';
   },
 
-  // Η προτροπή του τέλους ("Turn around").
+  // Η προτροπή: στο πηγάδι ("Draw water"), στο τέλος ("Turn around").
   prompt() {
+    if (this.mode === 'prologue') return this.nearWell() ? STORY.prompts.water : '';
     return this.mode === 'good' && this.turnReady ? STORY.prompts.turn : '';
+  },
+
+  nearWell() {
+    const w = this.marks.well;
+    return this.step === 'water' && !this.drawAt && w && Math.hypot(w.x - player.x, w.y - player.y) < 62;
+  },
+
+  // Στο πηγάδι: κατεβάζεις τον κουβά, γεμίζει, τον τραβάς πάνω με το σχοινί (η τροχαλία τρίζει) και γεμίζεις το κανάτι.
+  drawWater() {
+    const w = this.marks.well, now = gameTime;
+    this.drawAt = now;
+    this.lock = true;
+    this.setStep('');
+    const well = this.props.find((q) => q.name === 'well');
+    Sound.creak(w.x, w.y);
+    this.after(0.9, () => Sound.drip(w.x, w.y, true));
+    this.after(1.2, () => Sound.drip(w.x, w.y, true));
+    this.after(1.5, () => Sound.creak(w.x, w.y));
+    this.after(2.4, () => { if (well) well.frame = 1; Sound.drip(w.x, w.y, true); });
+    this.after(3, () => {
+      Sound.jarPickup();
+      this.hasWater = true;
+      this.lock = false;
+      this.drawAt = 0;
+      this.setStep('bring');
+    });
+    this.after(9, () => { if (well) well.frame = 0; });
   },
 
   // E στο τέλος: γυρίζεις — για πρώτη φορά επιτρέπεται — και τη βλέπεις.
   interact() {
+    if (this.mode === 'prologue') { if (this.nearWell()) this.drawWater(); return; }
     if (this.mode !== 'good' || !this.turnReady) return;
     this.turnReady = false;
     this.turnFrom = player.angle;
@@ -535,7 +566,11 @@ const Prologue = {
     if (!this.active || this.step !== 'play') return;
     if (Math.hypot(this.eury.x - player.x, this.eury.y - player.y) > 180 || charge < 0.25) return;
     this.setStep('');
-    this.after(1.4, () => this.say('played', () => this.say('askFlowers', () => {
+    // Το τραγούδι του για εκείνη (όχι η Μελωδία του αντικειμένου)· τα πουλιά σωπαίνουν όσο παίζει.
+    const d = Sound.song('love');
+    Sound.hushUntil = gameTime + d + 1;
+    this.songUntil = gameTime + d;
+    this.after(Math.max(1.4, d + 0.6), () => this.say('played', () => this.say('askFlowers', () => {
       this.eury.mode = 'follow';
       this.setStep('flowers');
     })));
@@ -554,11 +589,6 @@ const Prologue = {
     if (this.step === 'find' && dE < PRO_NEAR) {
       this.setStep('');
       this.say('greet', () => this.setStep('water'));
-    } else if (this.step === 'water' && Math.hypot(this.marks.well.x - p.x, this.marks.well.y - p.y) < 62) {
-      this.hasWater = true;
-      Sound.drip(this.marks.well.x, this.marks.well.y);
-      Sound.jarPickup();
-      this.setStep('bring');
     } else if (this.step === 'bring' && dE < PRO_NEAR) {
       this.setStep('');
       this.say('water', () => this.say('askPlay', () => {

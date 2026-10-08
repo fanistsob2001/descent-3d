@@ -321,6 +321,8 @@ const Sound = {
   natureTick(now) {
     const mode = this.natureMode;
     if (!mode || !this.ready() || this.muted || now < (this._natureAt || 0)) return;
+    // Όσο ο Ορφέας παίζει το τραγούδι του, τα πουλιά και τα τζιτζίκια σωπαίνουν και ακούνε (hushUntil, σε gameTime).
+    if (now < (this.hushUntil || 0)) { this._natureAt = this.hushUntil + 0.8 + Math.random(); return; }
     const ac = this.ctx, t = ac.currentTime;
     const out = ac.createGain();
     out.gain.value = 1;
@@ -910,6 +912,64 @@ const Sound = {
     this.pluck(146.83, t, 0.3);
   },
 
+  // Τα τραγούδια του Ορφέα (όχι η Μελωδία του αντικειμένου): μια πραγματική μελωδία στη λύρα, με μπάσο και
+  // ένα απαλό χαλί από κάτω. 'love' = για την Ευρυδίκη στον πρόλογο (Ρε δώριος, τρυφερό, ~11 δευτ.)·
+  // 'lament' = ο θρήνος μπροστά στον Άδη και την Περσεφόνη (Ρε φρύγιος, αργός, δύο φορές, ~30 δευτ.).
+  // Επιστρέφει πόσο κρατάει (δευτ.).
+  song(name) {
+    if (!this.ready()) return 0;
+    const ac = this.ctx, t0 = ac.currentTime + 0.05;
+    const D4 = 293.66, f = (st) => D4 * Math.pow(2, st / 12);
+    // [ημιτόνια από το Ρε4, χτύποι]· null = παύση. bass: [ημιτόνια, ανά πόσους χτύπους].
+    const SONGS = {
+      love: { beat: 0.42, vol: 0.42,
+        notes: [[7, 1], [5, 0.5], [3, 0.5], [5, 1], [7, 1], [12, 2], [10, 1], [7, 0.5], [5, 0.5], [3, 1], [2, 1], [0, 2], [null, 1],
+          [3, 1], [5, 0.5], [7, 0.5], [9, 1], [7, 1], [5, 0.5], [3, 0.5], [2, 1], [3, 1], [0, 3]],
+        bass: [[-12, 3], [-9, 3], [-14, 3], [-12, 3], [-7, 3], [-9, 3], [-14, 3], [-12, 3]] },
+      lament: { beat: 0.62, vol: 0.4, repeat: 2,
+        notes: [[7, 2], [8, 1], [7, 1], [5, 2], [3, 1], [1, 1], [0, 3], [null, 1], [3, 1], [5, 1], [7, 2], [10, 1], [8, 1], [7, 2],
+          [5, 1], [3, 1], [5, 2], [1, 1], [0, 3], [null, 1]],
+        bass: [[-12, 4], [-16, 4], [-11, 4], [-12, 4], [-9, 4], [-4, 4], [-7, 4], [-12, 4]] },
+    };
+    const S = SONGS[name];
+    if (!S) return 0;
+    let t = t0;
+    for (let r = 0; r < (S.repeat || 1); r++) {
+      const shift = r ? -12 : 0;                              // η δεύτερη φορά μια οκτάβα πιο χαμηλά, πιο βαριά
+      const start = t;
+      for (const [st, b] of S.notes) {
+        if (st !== null) {
+          this.pluck(f(st + (r && st > 6 ? shift : 0)), t, S.vol);
+          if (b >= 2) this.pluck(f(st + 7 + (r ? shift : 0)), t + S.beat * 0.5, S.vol * 0.35);   // ένα αρπίσιμο στις μεγάλες νότες
+        }
+        t += b * S.beat;
+      }
+      // Το μπάσο, κατά μήκος του κομματιού.
+      let bt = start, i = 0;
+      while (bt < t - 0.01) {
+        const [st, every] = S.bass[i % S.bass.length];
+        this.pluck(f(st), bt, S.vol * 0.55);
+        this.pluck(f(st + 7), bt + S.beat, S.vol * 0.25);
+        bt += every * S.beat;
+        i++;
+      }
+    }
+    // Απαλό χαλί: δύο τριγωνικοί τόνοι (Ρε και Λα από κάτω) που φουσκώνουν και σβήνουν σιγά σιγά.
+    const end = t + 1.5;
+    for (const st of [-24, -17]) {
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      o.type = 'triangle'; o.frequency.value = f(st);
+      lp.type = 'lowpass'; lp.frequency.value = 600;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(name === 'lament' ? 0.05 : 0.03, t0 + 2.5);
+      g.gain.setValueAtTime(name === 'lament' ? 0.05 : 0.03, end - 2.5);
+      g.gain.linearRampToValueAtTime(0.0001, end);
+      o.connect(lp); lp.connect(g); g.connect(this.sfx); g.connect(this.reverbSend);
+      o.start(t0); o.stop(end + 0.1);
+    }
+    return end - t0;
+  },
+
   // Τα βήματα της Ευρυδίκης: πιο απαλά και πιο "ελαφριά" από του παίκτη,
   // από τη θέση της (πίσω σου) — χωρίς ηχώ, για να μένουν κοντινά και προσωπικά.
   softStep(x, y) {
@@ -1485,6 +1545,62 @@ const Sound = {
   },
 
   // Μια σταγόνα που πέφτει από το ταβάνι: ένα σύντομο "πλιπ" (ψηλός τόνος που πέφτει), με ηχώ.
+  // Τα ζώα (js/fauna.js) — κανένας από αυτούς τους ήχους δεν περνάει από το Echoes.emit (τα τέρατα δεν τους ακούνε).
+  // Φτερούγισμα: γρήγορα χτυπήματα θορύβου (πουλιά που πετάνε, νυχτερίδες). n = πόσα φτερά.
+  flutter(x, y, n = 1) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (Math.hypot(x - this.listenerX, y - this.listenerY) > 420) return;
+    const out = this.spatial(x, y, 0.5, 440);
+    const beats = 6 + Math.min(10, n * 3);
+    for (let k = 0; k < beats; k++) {
+      const at = t + k * (0.045 + Math.random() * 0.03);
+      const src = this.noiseSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = 700 + Math.random() * 900; bp.Q.value = 0.8;
+      this.envelope(g.gain, at, 0.05 * (1 - k / beats * 0.6), 0.004, 0.04);
+      src.connect(bp); bp.connect(g); g.connect(out);
+      src.start(at, Math.random()); src.stop(at + 0.07);
+    }
+  },
+  // Τσίριγμα αρουραίου: ψηλός τόνος που τρεμοπαίζει.
+  squeak(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (Math.hypot(x - this.listenerX, y - this.listenerY) > 300) return;
+    const out = this.spatial(x, y, 0.35, 320);
+    for (let k = 0; k < 2 + Math.floor(Math.random() * 2); k++) {
+      const at = t + k * 0.11, o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(3200 + Math.random() * 600, at);
+      o.frequency.exponentialRampToValueAtTime(2400, at + 0.06);
+      this.envelope(g.gain, at, 0.025, 0.004, 0.06);
+      o.connect(g); g.connect(out); o.start(at); o.stop(at + 0.09);
+    }
+  },
+  // Κακάρισμα κότας / βέλασμα προβάτου: τόνος με formant που "σπάει".
+  animal(x, y, kind) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    if (Math.hypot(x - this.listenerX, y - this.listenerY) > 380) return;
+    const out = this.spatial(x, y, kind === 'sheep' ? 0.35 : 0.28, 400);
+    const n = kind === 'sheep' ? 1 : 3 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < n; k++) {
+      const at = t + k * (kind === 'sheep' ? 0 : 0.13 + Math.random() * 0.06);
+      const o = ac.createOscillator(), bp = ac.createBiquadFilter(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+      o.type = 'sawtooth';
+      const f = kind === 'sheep' ? 260 + Math.random() * 60 : 540 + Math.random() * 120;
+      o.frequency.setValueAtTime(f, at);
+      if (kind !== 'sheep') o.frequency.exponentialRampToValueAtTime(f * (k === n - 1 ? 1.5 : 0.85), at + 0.08);
+      lfo.frequency.value = kind === 'sheep' ? 7 : 30; lg.gain.value = f * 0.05;
+      lfo.connect(lg); lg.connect(o.frequency);
+      bp.type = 'bandpass'; bp.frequency.value = kind === 'sheep' ? 900 : 1400; bp.Q.value = 2;
+      const len = kind === 'sheep' ? 0.7 : 0.09;
+      this.envelope(g.gain, at, 0.07, 0.01, len);
+      o.connect(bp); bp.connect(g); g.connect(out);
+      o.start(at); o.stop(at + len + 0.1); lfo.start(at); lfo.stop(at + len + 0.1);
+    }
+  },
+
   drip(x, y, onWater) {
     if (!this.ready()) return;
     const ac = this.ctx, t = ac.currentTime;

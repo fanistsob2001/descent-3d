@@ -53,8 +53,11 @@ const RC_REAL_H = {
   // αντικείμενα
   chest: 8, niche: 26, bars: 44, boulder: 44, tablet: 6, lekythos: 5, bell: 3, tripod: 14, obol: 3,
   stringCoil: 3.5, shard: 1.5,
+  // ζώα και άνθρωποι του προλόγου, ζωάκια της σπηλιάς, χλωρίδα
+  villagerF: 22, shepherd: 23, child: 14, sheep: 10, dog: 9, hen: 5, bird: 4, sparrow: 1.8, bat: 2.6, rat: 1.4,
+  bush: 9, flowers: 4, grass: 3,
 };
-const CERB_BOSS_H = 34;              // ο Κέρβερος: ένα τεράστιο σκυλί (~2.5 μ.)
+const CERB_BOSS_H = 50;              // ο Κέρβερος: ένα τεράστιο σκυλί (~3.7 μ. ως τα αυτιά — διπλάσιος από άνθρωπο)
 const RC_DAY = [255, 236, 190];      // το φως της ημέρας στην έξοδο
 const RC_AO = 0.3;                   // ως πόσο μακριά (σε κελιά) από τοίχο σκοτεινιάζει το δάπεδο/ταβάνι
 const RC_RED_R = 1.8;                // ακτίνα (κελιά) της κόκκινης λάμψης κάτω από μια σκιά που φάνηκε

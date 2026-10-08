@@ -1352,6 +1352,7 @@ function frame(t) {
     Hints.update(gameTime);
     Notice.update(gameTime);
     Prologue.update(dt, gameTime);
+    Fauna.update(dt, gameTime, player);
     updateInteract();
     const follow = 1 - Math.pow(0.001, dt);
     camera.x += (player.x - camera.x) * follow;
@@ -1380,6 +1381,7 @@ function frame(t) {
     Echoes.update(dt, gameTime);
     World3D.updateSparks(dt);
     World3D.updateDrips(dt, gameTime, player);
+    Fauna.update(dt, gameTime, player);
     Hints.update(gameTime);
     Missions.update(gameTime);
     updateLookBackWarning();
@@ -1818,7 +1820,9 @@ function spawn(saved) {
   // Αν ξαναβγαίνεις στον βωμό του V, εκείνη σε ακολουθεί ήδη.
   Eurydice.reset(chapter >= CHAPTERS.length - 1 ? 'following' : 'none', chapter >= 0 ? Level.altars[chapter] : Level.start);
   Boulder.stop();
-  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners(), ...World3D.listeners(), ...Chests.list, ...Hides.list];
+  Fauna.reset();
+  for (const m of monsters) if (m.kind === 'cerberus') Art.warmCerberus(m.asleep || 0);
+  Echoes.listeners = [...monsters, ExitDoor, Charon, ...Altars.list, ...Items.list, ...Souls.list, ...Eggs.listeners(), ...World3D.listeners(), ...Chests.list, ...Hides.list, ...Fauna.listeners()];
 
   const at = chapter >= 0 ? Level.altars[chapter] : Level.start;
   player.x = camera.x = at.x;
@@ -2145,7 +2149,7 @@ function init() {
   CutArt.init();      // οι ζωγραφιές των cutscenes (μετά τις μορφές)
   Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
-  Models.init();      // τα 3D μοντέλα των χαρακτήρων (js/models.js)
+  Art.init();         // οι λεπτομερείς 2D ζωγραφιές των μορφών του 3D κόσμου (js/art*.js, μετά τα sprites)
   GL3D.init();
   updateToggleLabels();   // (το κουμπί "Graphics" φαίνεται μόνο αν υπάρχει WebGL)
   Hands.init();

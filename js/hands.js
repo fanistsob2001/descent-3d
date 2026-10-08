@@ -21,6 +21,11 @@ const Hands = {
     this.art = [false, true].map((pluck) => this.build(pluck));
     // Διπλή ανάλυση με σκίαση (όπως οι μορφές): λείες γραμμές, όγκος στα χέρια.
     this.artHD = this.art.map((a) => ({ c: Sprites.hdify(a.c), s: Sprites.hdify(a.s) }));
+    // Οι ζωγραφιές του js/art-people.js (ίδια γεωμετρία, πιο λεπτομερείς), όταν υπάρχουν.
+    if (typeof Art !== 'undefined' && Art.hands) {
+      this.artHD = Art.hands.art;
+      this.hold = Art.hands.hold;
+    }
   },
 
   build(pluck) {

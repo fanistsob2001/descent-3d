@@ -139,6 +139,7 @@ class CerberusBoss extends Cerberus {
 
   headSleeps(now) {
     this.asleep++;
+    if (typeof Art !== 'undefined' && Art.warmCerberus) Art.warmCerberus(this.asleep);   // (οι ζωγραφιές με ένα κεφάλι ακόμα κοιμισμένο)
     if (this.asleep >= 3) {
       this.bstate = 'asleep';
       this.fight = false;
@@ -443,7 +444,7 @@ const Throne = {
   onCall(now) {
     if (!this.active || this.playedAt) return;
     this.playedAt = now;
-    Sound.melody();
+    Sound.song('lament');   // ο θρήνος του Ορφέα (όχι η Μελωδία του αντικειμένου)
     const L = STORY.middle;
     L.forEach((line, i) => this.timers.push({ at: now + 1 + i * 4.6, fn: () => {
       showNarration(line);

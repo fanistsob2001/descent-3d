@@ -664,14 +664,12 @@ const GL3D = {
   // ---- Στάδιο 2: οι μορφές (billboards) μέσα στο WebGL ----
   // Κάθε Raycast.sprite γίνεται ένα τετράγωνο που κοιτάζει την κάμερα, στη θέση του στον κόσμο, με το βάθος του
   // κόσμου: κρύβεται σωστά πίσω από χαμηλούς τοίχους, σκαλοπάτια, κάγκελα (ανά pixel, όχι ανά στήλη όπως πριν).
-  // Τα "τορνευτά" αντικείμενα (αμφορείς, λήκυθοι, σταλαγμίτες, πέτρες...) γίνονται αληθινά 3D σώματα εκ
-  // περιστροφής από τη ζωγραφιά τους (lathe), με φως από το πλάι — φαίνονται στρογγυλά από κάθε γωνία.
   // Οι λάμψεις (glow) και ό,τι ζωγραφίζεται πάνω στις μορφές (after: μάτια, εικονίδια) μένουν στο 2D, μετά.
   initSprites() {
     const gl = this.gl;
     const vs = `
 attribute vec3 aPos;
-attribute vec4 aUV;       // u, v, άλφα, φωτεινότητα (lathe: σκίαση από το πλάι)
+attribute vec4 aUV;       // u, v, άλφα, φωτεινότητα
 uniform vec3 uEye;
 uniform vec2 uDir;
 uniform vec4 uProj;
@@ -715,71 +713,40 @@ void main() {
     for (const n of ['aPos', 'aUV']) this.sloc[n] = gl.getAttribLocation(p, n);
     for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uTex', 'uCut']) this.sloc[n] = gl.getUniformLocation(p, n);
     this.svbo = gl.createBuffer();
-    // Τα 3D μοντέλα: θέση, κάθετο διάνυσμα, χρώμα (+ "λάμπει μόνο του"). Φως από την πλευρά της κάμερας και
-    // λίγο από πάνω (σαν τις μορφές), και στις δύο όψεις των τριγώνων.
-    const mvs = `
-attribute vec3 aPos;
-attribute vec3 aNorm;
-attribute vec4 aCol;
-uniform vec3 uEye;
-uniform vec2 uDir;
-uniform vec4 uProj;
-uniform vec2 uPitch;
-varying vec3 vN;
-varying vec4 vCol;
-void main() {
-  vec2 d = aPos.xy - uEye.xy;
-  float xc = dot(d, vec2(-uDir.y, uDir.x));
-  float zc0 = dot(d, uDir), yc0 = aPos.z - uEye.z;
-  float zc = zc0 * uPitch.x + yc0 * uPitch.y;
-  float yc = yc0 * uPitch.x - zc0 * uPitch.y;
-  float n = 0.02, f = 60.0;
-  gl_Position = vec4(uProj.x * xc, uProj.y * yc + uProj.z * zc, zc * (f + n) / (f - n) - 2.0 * f * n / (f - n), zc);
-  vN = aNorm; vCol = aCol;
-}`;
-    const mfs = `
-precision mediump float;
-varying vec3 vN;
-varying vec4 vCol;
-uniform vec3 uLight;
-uniform float uAlpha, uGhost, uAmb;
-void main() {
-  // Ομαλή σκίαση: κύριο φως από την πλευρά της κάμερας / πάνω, λίγο φως και από πίσω (ώστε να μη γίνεται μαύρο).
-  float d = dot(normalize(vN), uLight);
-  float l = uAmb + 0.82 * max(d, 0.0) + 0.14 * max(-d, 0.0);
-  vec3 c = (vCol.a > 0.5 || uGhost > 0.5) ? vCol.rgb : vCol.rgb * l;
-  gl_FragColor = vec4(c * uAlpha, uAlpha);
-}`;
-    const mp = gl.createProgram();
-    gl.attachShader(mp, sh(gl.VERTEX_SHADER, mvs));
-    gl.attachShader(mp, sh(gl.FRAGMENT_SHADER, mfs));
-    gl.linkProgram(mp);
-    if (!gl.getProgramParameter(mp, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(mp));
-    this.mprog = mp;
-    this.mloc = {};
-    for (const n of ['aPos', 'aNorm', 'aCol']) this.mloc[n] = gl.getAttribLocation(mp, n);
-    for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uLight', 'uAlpha', 'uGhost', 'uAmb']) this.mloc[n] = gl.getUniformLocation(mp, n);
-    this.mvbo = gl.createBuffer();
-    this.mcache = new Map();      // τα ακίνητα σκηνικά: τρίγωνα στον κόσμο, μία φορά
-    this.track = new WeakMap();    // ανά χαρακτήρα: προς τα πού πηγαίνει και πόσο γρήγορα (για το γύρισμα και το βάδισμα)
     this.stex = new WeakMap();     // καμβάς → υφή WebGL
-    this.lathes = {};              // όνομα sprite → πλέγμα τορνευτού σώματος
   },
 
-  // Η υφή ενός καμβά (μία φορά· οι καμβάδες που ξαναζωγραφίζονται κάθε καρέ — με _dyn — ξανά κάθε καρέ).
+  // Η υφή ενός καμβά: { tex, um, vm } (um / vm = ως πού φτάνει η ζωγραφιά μέσα στην υφή).
+  // Οι σταθερές ζωγραφιές μπαίνουν σε υφή με διαστάσεις δύναμη του 2 (πάνω αριστερά) και mipmaps: από μακριά μικραίνουν
+  // ομαλά αντί να "τρεμοπαίζουν" (η παλέτα στο τέλος τις ξανακάνει pixel art). Οι καμβάδες που ξαναζωγραφίζονται
+  // κάθε καρέ (_dyn: η φλόγα) ανεβαίνουν όπως είναι, κάθε καρέ.
   texFor(cv) {
     const gl = this.gl;
     let t = this.stex.get(cv);
-    if (t && !cv._dyn) return t.tex;
+    if (t && !cv._dyn) return t;
     if (!t) {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      t = { tex, frame: -1 };
+      t = { tex, frame: -1, um: 1, vm: 1 };
       this.stex.set(cv, t);
+      if (!cv._dyn) {
+        const P = (n) => { let k = 1; while (k < n) k *= 2; return k; };
+        const pw = P(cv.width), ph = P(cv.height);
+        const pot = document.createElement('canvas');
+        pot.width = pw; pot.height = ph;
+        pot.getContext('2d').drawImage(cv, 0, 0);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pot);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        t.um = cv.width / pw; t.vm = cv.height / ph;
+        return t;
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }
     if (t.frame !== this.frameNo) {
       gl.bindTexture(gl.TEXTURE_2D, t.tex);
@@ -788,176 +755,7 @@ void main() {
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
       t.frame = this.frameNo;
     }
-    return t.tex;
-  },
-
-  // Σώμα εκ περιστροφής από τη ζωγραφιά ενός sprite: για κάθε γραμμή, η μισή της πλάτος γίνεται ακτίνα· η υφή
-  // απλώνεται γύρω γύρω (η μπροστινή όψη της ζωγραφιάς μπροστά και πίσω). Σε μονάδες "1 = ύψος", κέντρο στη βάση.
-  latheFor(fr) {
-    const key = fr.name;
-    if (this.lathes[key] !== undefined) return this.lathes[key];
-    const cv = fr.c, w = cv.width, h = cv.height;
-    const data = cv.getContext('2d').getImageData(0, 0, w, h).data;
-    const rows = [];
-    const step = Math.max(1, Math.round(h / 24));
-    for (let y = 0; y < h; y += step) {
-      let l = -1, r = -1;
-      for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 100) { if (l < 0) l = x; r = x; }
-      rows.push(l < 0 ? null : { y, l, r });
-    }
-    const N = 12, tris = [];
-    const cx = w / 2;
-    for (let i = 0; i + 1 < rows.length; i++) {
-      const a = rows[i], b = rows[i + 1];
-      if (!a || !b) continue;
-      const ra = Math.max(Math.abs(a.l - cx), Math.abs(a.r + 1 - cx)) / h, rb = Math.max(Math.abs(b.l - cx), Math.abs(b.r + 1 - cx)) / h;
-      const za = 1 - a.y / h, zb = 1 - b.y / h;
-      for (let k = 0; k < N; k++) {
-        const t0 = (k / N) * Math.PI * 2, t1 = ((k + 1) / N) * Math.PI * 2;
-        // υφή: η ζωγραφιά "τυλίγεται": u από το κέντρο προς τις άκρες όπως φαίνεται από μπροστά (|sin|)
-        const u = (t, rr) => (cx + Math.sin(t) * rr * h) / w;
-        const c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
-        const P = (c, s2, rr, z, t) => [c * rr, s2 * rr, z, u(t, rr), 1 - z, c, s2];
-        const p00 = P(c0, s0, ra, za, t0), p10 = P(c1, s1, ra, za, t1), p01 = P(c0, s0, rb, zb, t0), p11 = P(c1, s1, rb, zb, t1);
-        tris.push(p00, p10, p11, p00, p11, p01);
-      }
-    }
-    const res = tris.length ? { tris, aspect: w / h } : null;
-    this.lathes[key] = res;
-    return res;
-  },
-
-  // Τα 3D μοντέλα: προς τα πού κοιτάζουν (από την κίνησή τους, ή προς την κάμερα, ή o.yaw), η στάση τους
-  // (βάδισμα, γαβγίσματα, ξαπλωμένος, κάθεται / γέρνει), και ζωγράφισμα. solid = αδιαφανή (γράφουν βάθος).
-  drawModels(list, solid) {
-    if (!list.length) return;
-    const gl = this.gl, R = Raycast, W = R.W, H = R.H, U = this.mloc;
-    gl.useProgram(this.mprog);
-    gl.uniform3f(U.uEye, R.posX, R.posY, RC_EYE);
-    gl.uniform2f(U.uDir, R.dirX, R.dirY);
-    gl.uniform4f(U.uProj, (2 * R.focal) / W, (2 * R.focal) / H, 1 - (2 * R.horizon) / H, 0);
-    gl.uniform2f(U.uPitch, R.pc, R.ps);
-    const rx = -R.dirY, ry = R.dirX;
-    const L = [-R.dirX * 0.6 - rx * 0.35, -R.dirY * 0.6 - ry * 0.35, 0.7], ll = Math.hypot(...L);
-    gl.uniform3f(U.uLight, L[0] / ll, L[1] / ll, L[2] / ll);
-    // Στο ύπαιθρο (μέρα) περισσότερο φως από παντού.
-    const outd = typeof Level !== 'undefined' && RC_OUTDOOR[Level.regionAt(Math.floor(R.posX), Math.floor(R.posY))];
-    gl.uniform1f(U.uAmb, outd ? 0.3 + 0.35 * outd.light : 0.3);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.mvbo);
-    gl.enableVertexAttribArray(U.aPos);
-    gl.enableVertexAttribArray(U.aNorm);
-    gl.enableVertexAttribArray(U.aCol);
-    gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 40, 0);
-    gl.vertexAttribPointer(U.aNorm, 3, gl.FLOAT, false, 40, 12);
-    gl.vertexAttribPointer(U.aCol, 4, gl.FLOAT, false, 40, 24);
-    gl.depthMask(solid);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    const now = typeof gameTime !== 'undefined' ? gameTime : performance.now() / 1000;
-    if (!solid) list.sort((a, b) => b.depth - a.depth);
-    for (const m of list) {
-      const o = m.o, ent = o.ent;
-      // Προς τα πού κοιτάζει: η κίνησή του (ομαλά), αλλιώς o.yaw, αλλιώς προς την κάμερα.
-      let yaw = o.yaw, walk = 0, tr = null;
-      const toCam = Math.atan2(R.posY - m.y, R.posX - m.x);
-      if (ent) {
-        tr = this.track.get(ent);
-        if (!tr) { tr = { x: ent.x, y: ent.y, yaw: toCam, speed: 0, phase: 0, f: this.frameNo }; this.track.set(ent, tr); }
-        if (tr.f !== this.frameNo) {
-          const dx = ent.x - tr.x, dy = ent.y - tr.y, d = Math.hypot(dx, dy);
-          tr.speed += (Math.min(1, d / 2) - tr.speed) * 0.2;
-          if (d > 0.15) {
-            let da = Math.atan2(dy, dx) - tr.yaw;
-            da = Math.atan2(Math.sin(da), Math.cos(da));
-            tr.yaw += da * 0.25;
-          } else if (tr.speed < 0.05 && !ent.boss && ent.kind === undefined) {
-            // (μορφές που στέκονται, π.χ. η Ευρυδίκη: γυρίζουν σιγά σιγά προς εσένα)
-            let da = toCam - tr.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); tr.yaw += da * 0.05;
-          }
-          tr.phase += d * 0.16;
-          tr.x = ent.x; tr.y = ent.y; tr.f = this.frameNo;
-        }
-        if (ent.boss) tr.yaw = ent.facing !== undefined && ['windup', 'charge', 'prowl'].includes(ent.bstate) ? ent.facing : tr.yaw;
-        yaw = tr.yaw;
-        walk = tr.speed;
-      }
-      const stat = MODEL_STATIC.has(m.name);
-      if (yaw === undefined && stat) yaw = MHASH(m.x * 3.1, m.y * 1.7) * Math.PI * 2;
-      if (m.name === 'obol' || m.name === 'stringCoil') yaw = now * 2.2;
-      if (yaw === undefined) yaw = m.name === 'boat3d' ? toCam + Math.PI / 2 : toCam;
-      if (m.name === 'euryLying') yaw = 0.6;
-      const frameIdx = Math.max(0, (Sprites.hdFrames[m.frame.name] || []).indexOf(m.frame));
-      // Τα ακίνητα σκηνικά: τα τρίγωνά τους φτιάχνονται μία φορά (cache) — δεν κινούνται.
-      if (stat) {
-        const key = m.name + '|' + frameIdx + '|' + m.x.toFixed(2) + '|' + m.y.toFixed(2) + '|' + m.z.toFixed(2) + '|' + m.h.toFixed(3) + '|' + (m.frame.dim || 1) + '|' + yaw.toFixed(2);
-        let arr = this.mcache.get(key);
-        if (!arr) {
-          const out = [];
-          Models.emit(m.name, { x: m.x, y: m.y, z: m.z }, yaw, m.h, Models.pose(m.name, { t: 0, walk: 0, phase: 0, frame: frameIdx }), out, m.frame.dim || 1);
-          arr = new Float32Array(out);
-          if (this.mcache.size > 3000) this.mcache.clear();
-          this.mcache.set(key, arr);
-        }
-        gl.uniform1f(U.uAlpha, m.alpha);
-        gl.uniform1f(U.uGhost, 0);
-        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STREAM_DRAW);
-        gl.drawArrays(gl.TRIANGLES, 0, arr.length / 10);
-        continue;
-      }
-      const pose = Models.pose(m.name, {
-        t: now + (m.x * 7.1 + m.y * 3.3) % 10, walk: m.name === 'cerberus' && ent && ent.bstate === 'charge' ? 1 : walk,
-        phase: tr ? tr.phase : now * 4, frame: frameIdx, scare: m.scare || 0,
-        bark: m.frame.bark ? m.frame.bark.map(Number) : null,
-        lie: ent && ['tired', 'lulled', 'asleep'].includes(ent.bstate), asleep: ent && ent.asleep >= 3, sleepHeads: ent ? ent.asleep : 0,
-      });
-      // (το "frame" των sprites: η Περσεφόνη που γέρνει, ο Χάροντας που ζητάει τον οβολό, το φίδι που σφυρίζει)
-      if (m.name === 'persephone3d' && typeof Throne !== 'undefined' && Throne.lean) pose.body = [0, 0.32];
-      if (m.name === 'charon3d' && typeof Charon !== 'undefined' && !Charon.paid) pose.armL = [-1.2, 0];
-      const out = [];
-      Models.emit(m.name, { x: m.x, y: m.y, z: m.z }, yaw, m.h, pose, out, m.frame.dim || 1);
-      gl.uniform1f(U.uAlpha, m.alpha);
-      gl.uniform1f(U.uGhost, MODEL_GHOST.has(m.name) ? 1 : 0);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.STREAM_DRAW);
-      gl.drawArrays(gl.TRIANGLES, 0, out.length / 10);
-    }
-    gl.disableVertexAttribArray(U.aNorm);
-    gl.disableVertexAttribArray(U.aCol);
-    gl.depthMask(true);
-  },
-
-  // ---- Το jump scare με το 3D μοντέλο του τέρατος (js/scare.js το καλεί όταν ζωγραφίζει το WebGL) ----
-  // Το τέρας ορμάει από το βάθος ως ακριβώς μπροστά στα μάτια σου, ανοίγει το στόμα / τα σαγόνια, απλώνει τα χέρια
-  // (ή χτυπάει τα φτερά). Ζωγραφίζεται στον καμβά του WebGL (διάφανο φόντο)· επιστρέφει πού πέφτουν τα μάτια του.
-  renderScare(kind, t, lunge, shakeX, shakeY) {
-    if (!this.ok) return null;
-    const gl = this.gl, R = Raycast, W = R.W, H = R.H;
-    if (this.W !== W || this.H !== H) this.resize(W, H);
-    if (!this.sprog) this.initSprites();
-    const name = { shade: 'ghoul', erinys: 'erinys3d', cerberus: 'cerberus' }[kind] || 'ghoul';
-    const spec = { ghoul: [0.72, 0.84, 0.25], erinys3d: [0.78, 0.93, 0.05], cerberus: [0.9, 0.88, 1.0] }[name];   // ύψος (κελιά), ύψος προσώπου, μπροστά
-    const save = {};
-    for (const k of ['posX', 'posY', 'dirX', 'dirY', 'planeX', 'planeY', 'horizon', 'pc', 'ps']) save[k] = R[k];
-    const plane = (W / 2) / R.focal;
-    Object.assign(R, { posX: 0, posY: 0, dirX: 1, dirY: 0, planeX: 0, planeY: plane, horizon: H / 2, pc: 1, ps: 0 });
-    const h = spec[0], face = spec[1] * h;
-    const d = 2.8 - 2.62 * lunge + spec[2] * h;                // η μουσούδα του σκύλου είναι πιο μπροστά από το κεφάλι
-    const m = { name, x: d + shakeX * 0.004, y: shakeY * 0.004, z: RC_EYE - face, h, alpha: 1, depth: d, o: { yaw: Math.PI }, frame: { name: '' },
-      scare: t < 0.13 ? 0.2 : t < 0.22 ? 0.6 : 1 };
-    gl.viewport(0, 0, W, H);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.BLEND);
-    this.frameNo = (this.frameNo || 0) + 1;
-    this.drawModels([m], true);
-    gl.disable(gl.BLEND);
-    // Τα μάτια (για τη λάμψη τους): από το μοντέλο, χωρίς τη στάση.
-    const eyes = [].map(([ex, ey, ez]) => {
-      const wx = m.x - ey * h, wy = m.y - ex * h;              // yaw = π: μπροστά = −x, δεξιά = −y
-      const p = R.project(wx * TILE, wy * TILE, (m.z + ez * h) * TILE);
-      return p ? [p.sx, p.sy] : null;
-    }).filter(Boolean);
-    Object.assign(R, save);
-    return { canvas: this.canvas, eyes };
+    return t;
   },
 
   // Αντί για το Raycast.flushSprites όταν ζωγραφίζει το WebGL.
@@ -967,7 +765,7 @@ void main() {
     if (!this.sprog) this.initSprites();
     const W = R.W, H = R.H;
     const rx = -R.dirY, ry = R.dirX;           // το "δεξιά" της κάμερας (κελιά)
-    const opaque = [], blend = [], models = [];
+    const opaque = [], blend = [];
     const boxes = [];
     for (const it of list) {
       const { frame, o, p } = it;
@@ -983,16 +781,8 @@ void main() {
       const hpx = pt && pb ? Math.max(1, pb.sy - pt.sy) : hu * k, wpx = (hu * k * fw) / fh;
       boxes.push({ o, p, box: { left: Math.round(sx - wpx / 2), top: Math.round(bottom - hpx), w: wpx, h: hpx, k, sx, depth: p.depth, alpha } });
       if (!frame) continue;
-      const mname = frame.name && MODEL_OF[frame.name];
-      if (mname && Settings.models !== 'off') {
-        boxes[boxes.length - 1].box.model = true;
-        models.push({ name: mname, o, frame, x: o.x / TILE, y: o.y / TILE, z: (o.z || 0) / TILE, h: hu / TILE, alpha, depth: p.depth });
-        continue;
-      }
       const cv = o.flip ? frame.f : frame.c;
       const e = { cv, flip: false, o, x: o.x / TILE, y: o.y / TILE, z: (o.z || 0) / TILE, h: hu / TILE, w: (hu / TILE) * (fw / fh), alpha, depth: p.depth - (o.bias || 0) };
-      // Τορνευτό αντικείμενο: αληθινό 3D σώμα (μόνο για τα στρογγυλά αντικείμενα, όχι μορφές / λάμψεις).
-      if (!o.add && frame.name && GL_LATHE.has(frame.name)) e.lathe = this.latheFor(frame);
       if (o.add || alpha < 0.995) blend.push(e); else opaque.push(e);
     }
     blend.sort((a, b) => b.depth - a.depth);
@@ -1016,21 +806,13 @@ void main() {
     gl.enable(gl.BLEND);
     const draw = (e) => {
       const v = [];
-      if (e.lathe) {
-        // Σκίαση: το φως έρχεται από την κάμερα και λίγο από πάνω-αριστερά (σαν τις μορφές).
-        const lx = -R.dirX * 0.8 - rx * 0.4, ly = -R.dirY * 0.8 - ry * 0.4;
-        for (const t of e.lathe.tris) {
-          const nd = Math.max(0, t[5] * lx + t[6] * ly);
-          v.push(e.x + t[0] * e.h, e.y + t[1] * e.h, e.z + t[2] * e.h, t[3], t[4], e.alpha, 0.45 + 0.65 * nd);
-        }
-      } else {
-        const hw = e.w / 2;
-        const ax = e.x - rx * hw, ay = e.y - ry * hw, bx = e.x + rx * hw, by = e.y + ry * hw;
-        const z0 = e.z, z1 = e.z + e.h;
-        const q = [[ax, ay, z0, 0, 1], [bx, by, z0, 1, 1], [bx, by, z1, 1, 0], [ax, ay, z1, 0, 0]];
-        for (const i of [0, 1, 2, 0, 2, 3]) v.push(q[i][0], q[i][1], q[i][2], q[i][3], q[i][4], e.alpha, 1);
-      }
-      gl.bindTexture(gl.TEXTURE_2D, this.texFor(e.cv));
+      const t = this.texFor(e.cv);
+      const hw = e.w / 2;
+      const ax = e.x - rx * hw, ay = e.y - ry * hw, bx = e.x + rx * hw, by = e.y + ry * hw;
+      const z0 = e.z, z1 = e.z + e.h;
+      const q = [[ax, ay, z0, 0, t.vm], [bx, by, z0, t.um, t.vm], [bx, by, z1, t.um, 0], [ax, ay, z1, 0, 0]];
+      for (const i of [0, 1, 2, 0, 2, 3]) v.push(q[i][0], q[i][1], q[i][2], q[i][3], q[i][4], e.alpha, 1);
+      gl.bindTexture(gl.TEXTURE_2D, t.tex);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STREAM_DRAW);
       gl.drawArrays(gl.TRIANGLES, 0, v.length / 7);
     };
@@ -1040,22 +822,12 @@ void main() {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.uniform1f(U.uCut, 0.5);
     for (const e of opaque) draw(e);
-    // Τα 3D μοντέλα (αδιαφανή με βάθος· τα φαντάσματα / όσα σβήνουν, διάφανα, μαζί με τα υπόλοιπα διάφανα).
-    const ghosts = this.drawModels(models.filter((m) => m.alpha >= 0.995 && !MODEL_GHOST.has(m.name)), true);
-    gl.useProgram(this.sprog);
-    gl.enableVertexAttribArray(U.aPos);
-    gl.enableVertexAttribArray(U.aUV);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.svbo);
-    gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 28, 0);
-    gl.vertexAttribPointer(U.aUV, 4, gl.FLOAT, false, 28, 12);
-    void ghosts;
     gl.depthMask(false);
     gl.uniform1f(U.uCut, 0.02);
     for (const e of blend) {
       gl.blendFunc(gl.ONE, e.o.add ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
       draw(e);
     }
-    this.drawModels(models.filter((m) => m.alpha < 0.995 || MODEL_GHOST.has(m.name)), false);
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 
@@ -1090,6 +862,3 @@ void main() {
     list.length = 0;
   },
 };
-
-// Τα αντικείμενα που γίνονται αληθινά 3D σώματα εκ περιστροφής (στρογγυλά από κάθε γωνία).
-const GL_LATHE = new Set(['amphora', 'lekythos', 'stalagmite', 'stalactite', 'bell', 'well', 'boulder']);

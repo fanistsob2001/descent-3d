@@ -229,7 +229,7 @@ const CutArt = {
   // pixel της εικόνας. (x, y) = κάτω-κέντρο. o: { flip, alpha, tint (σιλουέτα), rot (ακτίνια) }.
   // Επιστρέφει το πλαίσιο, και pt(gx, gy) = πού πέφτει ένα pixel του πλέγματος.
   fig(c, name, i, x, y, scale, o = {}) {
-    const fr = typeof name === 'string' ? Sprites.getHD(name, i) : name;
+    const fr = typeof name === 'string' ? Sprites.getOld(name, i) : name;
     const w = (fr.w * scale) / 2, h = (fr.h * scale) / 2;
     let src = o.flip ? fr.f : fr.c;
     if (o.tint) src = this.tinted(src, o.tint);
@@ -616,7 +616,7 @@ const CUT_SCENES = {
       for (const x of [16, 56, 200, 240]) caColumn(c, x, 28, 104, 12, 0.5);
       this.fig(c, 'hades3d', 0, 112, 100, 0.95);
       this.fig(c, 'persephone3d', 0, 148, 100, 0.95);
-      this.fig(c, Sprites.cerberusHD([false, false, false], 0), 0, 86, 101, 0.42);
+      this.fig(c, Sprites.cerberusOld([false, false, false], 0), 0, 86, 101, 0.42);
       for (const x of [80, 180]) caBrazier(c, x, 102, 1.6);
     },
     fg(c, t) {
@@ -669,7 +669,7 @@ const CUT_SCENES = {
       for (const x of [22, 234]) caFire(c, x, 129, 2.4, t + x);
       this.fig(c, 'hades3d', 0, 104, 148, 2.05);
       this.fig(c, 'persephone3d', t > 0.8 ? 1 : 0, 164, 148, 2.05);
-      this.fig(c, Sprites.cerberusHD([false, false, false], Math.sin(t * 1.6) > 0 ? 1 : 0), 0, 52, 146, 0.9);
+      this.fig(c, Sprites.cerberusOld([false, false, false], Math.sin(t * 1.6) > 0 ? 1 : 0), 0, 52, 146, 0.9);
       caVignette(c, 0.65);
     },
   },
