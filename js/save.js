@@ -121,6 +121,7 @@ const Settings = {
   fov: 0,            // οπτικό πεδίο σε μοίρες (0 = το προεπιλεγμένο: 80 στο PC, 66 στο κινητό)
   bright: 1,         // φωτεινότητα (1 = κανονική)
   subs: 'medium',    // μέγεθος υποτίτλων: small | medium | large
+  renderer: 'gl',    // 'gl' = η μηχανή WebGL (js/gl3d.js) | 'classic' = ο raycaster
 
   load() {
     try {
@@ -134,13 +135,14 @@ const Settings = {
         if (SETTINGS_FOV.includes(d.fov)) this.fov = d.fov;
         if (SETTINGS_BRIGHT.includes(d.bright)) this.bright = d.bright;
         if (['small', 'medium', 'large'].includes(d.subs)) this.subs = d.subs;
+        if (d.renderer === 'classic') this.renderer = 'classic';
       }
     } catch (_) { /* - */ }
   },
 
   store() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice, invert: this.invert, fov: this.fov, bright: this.bright, subs: this.subs }));
+      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice, invert: this.invert, fov: this.fov, bright: this.bright, subs: this.subs, renderer: this.renderer }));
     } catch (_) { /* - */ }
   },
 };

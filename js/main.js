@@ -766,8 +766,12 @@ function draw3D(pc, W, H) {
   Raycast.exitA = World3D.exitAlpha(gameTime, player);
   Raycast.monsters = monsters;
   const t0 = performance.now();
-  Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
-  if (state === 'play') Raycast.measure(performance.now() - t0);
+  // Η μηχανή WebGL (αληθινή γεωμετρία, js/gl3d.js) ή ο παλιός raycaster (ρύθμιση "Renderer").
+  if (GL3D.use()) GL3D.render(pc, player.x, player.y, player.angle, gameTime, bob);
+  else {
+    Raycast.render(pc, player.x, player.y, player.angle, gameTime, bob);
+    if (state === 'play') Raycast.measure(performance.now() - t0);
+  }
   // Οι μορφές (billboards). Μετά τον θάνατο, αυτή που σε έπιασε φαίνεται ολόκληρη.
   World3D.draw(pc, gameTime, killer, state === 'dead' ? Math.max(0.25, 1 - deathFade() * 0.6) : undefined);
   // Ό,τι λάμπει "ξεχειλίζει" απαλά (κύματα, φλόγες, φως της ημέρας).
@@ -959,7 +963,7 @@ function drawMenu3D(pc, W, H) {
   const c = menuCamera();
   Raycast.exitA = 0;
   Raycast.monsters = monsters;
-  Raycast.render(pc, c.x, c.y, c.angle, menuScene.t, Raycast.focal * Math.tan(0.05));
+  (GL3D.use() ? GL3D : Raycast).render(pc, c.x, c.y, c.angle, menuScene.t, Raycast.focal * Math.tan(0.05));
   World3D.draw(pc, menuScene.t);
   Pixel.bloom(0.55, World3D.lights);
   Pottery.meander(pc, 0, 0, W, 7, POT.terra, 0.35, 1);
@@ -1516,6 +1520,11 @@ function updateToggleLabels() {
   for (const b of document.querySelectorAll('.fov-toggle')) b.textContent = 'Field of view: ' + (Settings.fov || (IS_TOUCH ? 66 : 80));
   for (const b of document.querySelectorAll('.bright-toggle')) b.textContent = 'Brightness: ' + Math.round(Settings.bright * 100) + '%';
   for (const b of document.querySelectorAll('.subs-toggle')) b.textContent = 'Subtitles: ' + Settings.subs;
+  // Γραφικά: η μηχανή WebGL ("3D") ή ο παλιός raycaster ("Classic"). Χωρίς WebGL: μόνο Classic.
+  for (const b of document.querySelectorAll('.renderer-toggle')) {
+    b.textContent = 'Graphics: ' + (GL3D.use() ? '3D' : 'Classic');
+    b.classList.toggle('hidden', !GL3D.ok);
+  }
   applySettings();
   for (const b of document.querySelectorAll('.vibration-toggle')) {
     b.textContent = Settings.vibration ? 'Vibration: on' : 'Vibration: off';
@@ -1899,6 +1908,7 @@ function doAction(action) {
     Settings.store(); updateToggleLabels(); resize();
   }
   else if (action === 'bright') { Settings.bright = SETTINGS_BRIGHT[(SETTINGS_BRIGHT.indexOf(Settings.bright) + 1) % SETTINGS_BRIGHT.length]; Settings.store(); updateToggleLabels(); }
+  else if (action === 'renderer') { Settings.renderer = Settings.renderer === 'classic' ? 'gl' : 'classic'; Settings.store(); updateToggleLabels(); }
   else if (action === 'subs') { Settings.subs = { small: 'medium', medium: 'large', large: 'small' }[Settings.subs]; Settings.store(); updateToggleLabels(); }
   else if (action === 'resume') resumeGame();
   else if (action === 'map-close') closeMap();
@@ -2068,6 +2078,8 @@ function init() {
   CutArt.init();      // οι ζωγραφιές των cutscenes (μετά τις μορφές)
   Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
+  GL3D.init();
+  updateToggleLabels();   // (το κουμπί "Graphics" φαίνεται μόνο αν υπάρχει WebGL)
   Hands.init();
   resize();
   showScreen('menu');

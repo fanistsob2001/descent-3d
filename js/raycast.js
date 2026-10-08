@@ -128,6 +128,7 @@ const Raycast = {
   // Μία φορά, αφού φορτωθεί ο κόσμος.
   init() {
     const L = Level;
+    this._world = (this._world || 0) + 1;   // νέος κόσμος: η μηχανή WebGL ξαναφτιάχνει τη γεωμετρία (js/gl3d.js)
     this.segPer = Math.round(TILE / WALL_SAMPLE_STEP);
     const len = TILE / this.segPer;
     // Κάθε κομμάτι τοίχου ανήκει σε μία πλευρά ενός αδιαφανούς κελιού:
@@ -715,23 +716,10 @@ const Raycast = {
     }
   },
 
-  // Ζωγραφίζει τον κόσμο από τα μάτια του παίκτη. angle = προς τα πού κοιτάει (ακτίνια),
-  // bob = μετατόπιση του ορίζοντα (βηματισμός), σε art pixels.
-  render(pc, px, py, angle, now, bob) {
-    const L = Level, W = this.W, H = this.H, buf = this.buf;
-    const cols = L.cols, rows = L.rows;
-    buf.fill(0xff000000);
-    // Στο ύπαιθρο: ουρανός πάνω από τον ορίζοντα (αλλιώς σκοτάδι — στις σπηλιές δεν φαίνεται τίποτα από πάνω).
-    const outdoor = RC_OUTDOOR[L.regionAt(Math.floor(px / TILE), Math.floor(py / TILE))];
-    if (outdoor) this.fillSky(outdoor, H * 0.5 + bob, angle);
-
-    const posX = px / TILE, posY = py / TILE;
-    const dirX = Math.cos(angle), dirY = Math.sin(angle);
-    const plane = (W / 2) / this.focal;
-    const planeX = -dirY * plane, planeY = dirX * plane;
-    const hz = H * 0.5 + bob;
-    Object.assign(this, { posX, posY, dirX, dirY, planeX, planeY, horizon: hz });
-
+  // Το φως αυτού του καρέ (κοινό για τον raycaster και τη μηχανή WebGL, js/gl3d.js): φως κάθε κελιού
+  // δαπέδου (cellLight), βωμοί (segExtra), φως της ημέρας στην έξοδο, κόκκινη λάμψη κάτω από τις σκιές.
+  prepareLight(now) {
+    const L = Level, cols = L.cols, rows = L.rows;
     // Το φως κάθε κελιού δαπέδου αυτό το καρέ.
     const cl = this.cellLight;
     for (let c = 0; c < cl.length; c++) {
@@ -792,8 +780,59 @@ const Raycast = {
       }
     }
 
+    if (Echoes.waves.length) this.prepareWaves();
+  },
+
+  // Μόνο η απόσταση του πρώτου τοίχου ανά στήλη (zbuf, wallTop/Bot): για τις μορφές όταν τον κόσμο τον
+  // ζωγραφίζει η μηχανή WebGL (js/gl3d.js). Η κάμερα (posX, dirX, planeX, horizon...) πρέπει να έχει μπει.
+  castZ() {
+    const L = Level, W = this.W, cols = L.cols, rows = L.rows, gateAt = this.gateAt;
+    const { posX, posY, dirX, dirY, planeX, planeY } = this;
+    const hz = this.horizon;
+    for (let x = 0; x < W; x++) {
+      const cam = (2 * (x + 0.5)) / W - 1;
+      const rdx = dirX + planeX * cam, rdy = dirY + planeY * cam;
+      let tx = Math.floor(posX), ty = Math.floor(posY);
+      const ddx = Math.abs(1 / rdx), ddy = Math.abs(1 / rdy);
+      const sx = rdx < 0 ? -1 : 1, sy = rdy < 0 ? -1 : 1;
+      let sdx = (rdx < 0 ? posX - tx : tx + 1 - posX) * ddx;
+      let sdy = (rdy < 0 ? posY - ty : ty + 1 - posY) * ddy;
+      let dist = RC_MAX;
+      while (true) {
+        let d;
+        if (sdx < sdy) { d = sdx; sdx += ddx; tx += sx; } else { d = sdy; sdy += ddy; ty += sy; }
+        if (d >= RC_MAX) break;
+        if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) { dist = d; break; }
+        const ci = ty * cols + tx;
+        if (L.opaque[ci] === 1 && gateAt[ci] < 0 && this.wallH[ci] >= RC_EYE) { dist = d; break; }
+      }
+      this.zbuf[x] = dist;
+      const lineH = this.focal / dist;
+      this.wallTop[x] = hz - lineH * (1 - RC_EYE);
+      this.wallBot[x] = hz + lineH * RC_EYE;
+    }
+  },
+
+  // Ζωγραφίζει τον κόσμο από τα μάτια του παίκτη. angle = προς τα πού κοιτάει (ακτίνια),
+  // bob = μετατόπιση του ορίζοντα (βηματισμός), σε art pixels.
+  render(pc, px, py, angle, now, bob) {
+    const L = Level, W = this.W, H = this.H, buf = this.buf;
+    const cols = L.cols, rows = L.rows;
+    buf.fill(0xff000000);
+    // Στο ύπαιθρο: ουρανός πάνω από τον ορίζοντα (αλλιώς σκοτάδι — στις σπηλιές δεν φαίνεται τίποτα από πάνω).
+    const outdoor = RC_OUTDOOR[L.regionAt(Math.floor(px / TILE), Math.floor(py / TILE))];
+    if (outdoor) this.fillSky(outdoor, H * 0.5 + bob, angle);
+
+    const posX = px / TILE, posY = py / TILE;
+    const dirX = Math.cos(angle), dirY = Math.sin(angle);
+    const plane = (W / 2) / this.focal;
+    const planeX = -dirY * plane, planeY = dirX * plane;
+    const hz = H * 0.5 + bob;
+    Object.assign(this, { posX, posY, dirX, dirY, planeX, planeY, horizon: hz });
+
+    this.prepareLight(now);
+    const cl = this.cellLight, se = this.segExtra, exA = this.exitA, red = this.redCell, rs = this._redSrc;
     const hasWaves = Echoes.waves.length > 0;
-    if (hasWaves) this.prepareWaves();
     const gateAt = this.gateAt;
     const per = this.segPer;
 
