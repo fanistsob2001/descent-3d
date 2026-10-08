@@ -20,7 +20,6 @@ class Cerberus extends Monster {
     this.earMul = 1.3;          // ακούει από πιο μακριά από μια σκιά
     this.asleep = 0;            // πόσα κεφάλια κοιμούνται (3 = τέλος)
     this.lastLull = -1e6;
-    this.eatUntil = 0;
     this.chase = false;         // κυνηγάει τον παίκτη κατευθείαν (καταδίωξη)
     this.nextRepath = 0;
     this.barkAt = 0;
@@ -31,12 +30,12 @@ class Cerberus extends Monster {
     return this.asleep < 3 && !this.chase;
   }
 
-  // Η Μελωδία (ή η μελόπιτα): ένα κεφάλι αποκοιμιέται. Ζαλίζεται για λίγο και ξυπνάει πιο θυμωμένος.
+  // Η Μελωδία: ένα κεφάλι αποκοιμιέται. Ζαλίζεται για λίγο και ξυπνάει πιο θυμωμένος.
   freeze() {
     const now = Echoes.now;
     if (this.asleep >= 3 || now - this.lastLull < 2.5 || this.chase) return;
-    // Μόνο από κοντά, και όχι όσο σε κυνηγάει (πρώτα τον ξεγελάς με έναν ήχο ή μια μελόπιτα).
-    if (this.eatUntil <= now && (this.state === 'hunt' || Math.hypot(player.x - this.x, player.y - this.y) > 170)) return;
+    // Μόνο από κοντά, και όχι όσο σε κυνηγάει (πρώτα τον ξεγελάς με έναν ήχο).
+    if ((this.state === 'hunt' || Math.hypot(player.x - this.x, player.y - this.y) > 170)) return;
     this.lull(now);
   }
 
@@ -58,19 +57,6 @@ class Cerberus extends Monster {
 
   update(dt, now) {
     if (this.asleep >= 3) return;
-    // Η μελόπιτα: αν είναι δίπλα του, την τρώει (4 δευτ.) — και η παπαρούνα αποκοιμίζει ένα κεφάλι.
-    if (!this.chase && now >= this.eatUntil) {
-      for (const it of Jars.items) {
-        if (it.kind !== 'cake' || it.brokenAt < 0 || it.eaten) continue;
-        if (Math.hypot(it.x - this.x, it.y - this.y) > 34) continue;
-        it.eaten = true;
-        it.brokenAt = now - 11;      // σβήνει σε λίγο
-        this.eatUntil = now + 4;
-        this.frozenUntil = now + 4;
-        setTimeout(() => this.freeze(), 4000);
-        break;
-      }
-    }
     if (this.chase && now >= this.nextRepath && !this.isFrozen()) {
       // Καταδίωξη: πάει κατευθείαν προς τον παίκτη (όχι προς τους ήχους).
       this.nextRepath = now + 0.5;
@@ -94,17 +80,17 @@ class Cerberus extends Monster {
 // ---- Ο Κέρβερος ως boss (X), σαν τη μάχη με τον Tiny Tiger του Crash Bandicoot ----
 // Δεν βλέπει, αλλά σε μυρίζει: γυρίζει προς το μέρος σου, γρυλίζει και ξύνει το χώμα (προειδοποίηση), και
 // ορμάει σε ευθεία εκεί που ήσουν. Δεν μπορεί να στρίψει: αν παραμερίσεις, χτυπάει στην πέτρα και ζαλίζεται.
-// Μετά από 3 ορμές ξαπλώνει λαχανιασμένος (tired): τότε μόνο τρώει μια μελόπιτα (που πέταξες κοντά του —
-// τρώει και όσες είναι ήδη κάτω) → ένα κεφάλι κοιμάται (η μπάρα ζωής πέφτει κατά ένα τρίτο). Ένας μόνο τρόπος
-// (ο χρήστης το ζήτησε): η Μελωδία δεν τον πιάνει. Κάθε φάση πιο γρήγορος. Σκοτώνει μόνο όσο ορμάει ή όταν πέσεις πάνω του ξύπνιο.
+// Μετά από 3 ορμές ξαπλώνει λαχανιασμένος (tired): τότε, όπως στον μύθο, τον αποκοιμίζει η μουσική — παίζεις τη
+// λύρα (κύμα με τη λύρα στο χέρι, ή τη Μελωδία) από κοντά → ακούει (lulled) → ένα κεφάλι κοιμάται (η μπάρα ζωής
+// πέφτει κατά ένα τρίτο). Ένας μόνο τρόπος (ο χρήστης το ζήτησε): η λύρα. Κάθε φάση πιο γρήγορος. Σκοτώνει μόνο όσο ορμάει ή όταν πέσεις πάνω του ξύπνιο.
 const BOSS = {
   windup: [1.25, 1.0, 0.8],       // δευτ. προειδοποίησης ανά φάση (κεφάλια που κοιμούνται: 0, 1, 2)
   charge: [235, 275, 315],        // ταχύτητα ορμής (ο παίκτης τρέχει με 115)
   tired: [7, 6, 5.5],             // πόσο μένει ξαπλωμένος
   charges: 3,                     // ορμές πριν κουραστεί
   stun: 1.1,                      // ζάλη μετά από κάθε χτύπημα σε τοίχο
-  eatReach: 230,                  // μελόπιτα τόσο κοντά του = την τρώει (όσο είναι κουρασμένος)
-  eat: 1.6,
+  songReach: 240,                 // παίζεις λύρα τόσο κοντά του (όσο είναι κουρασμένος) = ακούει
+  lull: 1.8,                      // πόσο ακούει πριν κοιμηθεί το κεφάλι
   rise: 1.8,
 };
 
@@ -113,13 +99,12 @@ class CerberusBoss extends Cerberus {
     super(x, y, region);
     this.boss = true;
     this.guard = true;
-    this.bstate = 'idle';       // idle | windup | charge | prowl | stunned | tired | eating | rise | asleep
+    this.bstate = 'idle';       // idle | windup | charge | prowl | stunned | tired | lulled | rise | asleep
     this.bUntil = 0;
     this.dirX = 0; this.dirY = 1;
     this.facing = Math.PI / 2;
     this.chargesDone = 0;
     this.fight = false;
-    this.cake = null;
     // Η αρένα: τα κελιά του κεφαλαίου κάτω από τον διάδρομο (εκεί που ξεκινάει ο μεγάλος χώρος).
     this.arenaTop = Math.floor(y / TILE) - 3;
     this.homeX = x; this.homeY = y;
@@ -132,8 +117,16 @@ class CerberusBoss extends Cerberus {
     return ty >= this.arenaTop && Level.regionAt(tx, ty) === this.region && !Level.isWall(tx, ty);
   }
 
-  // Η Μελωδία δεν τον αποκοιμίζει (μόνο η μελόπιτα).
-  freeze() {}
+  // Η Μελωδία (Melody.play καλεί freeze σε όσα τέρατα είναι κοντά): κι αυτή είναι η λύρα.
+  freeze() {
+    this.onSong(Echoes.now);
+  }
+
+  // Ο παίκτης έπαιξε τη λύρα (main.js, emitCall / Melody): αν είναι ξαπλωμένος και κοντά, ακούει.
+  onSong(now) {
+    if (this.bstate !== 'tired' || Math.hypot(player.x - this.x, player.y - this.y) > BOSS.songReach) return;
+    this.set('lulled', BOSS.lull, now);
+  }
 
   isFrozen() {
     return this.asleep >= 3;
@@ -146,7 +139,6 @@ class CerberusBoss extends Cerberus {
 
   headSleeps(now) {
     this.asleep++;
-    this.cake = null;
     if (this.asleep >= 3) {
       this.bstate = 'asleep';
       this.fight = false;
@@ -233,24 +225,11 @@ class CerberusBoss extends Cerberus {
     } else if (s === 'stunned' || s === 'rise') {
       if (now >= this.bUntil) this.set('windup', BOSS.windup[ph], now);
     } else if (s === 'tired') {
-      // Μια μελόπιτα κοντά του (πεταμένη, στο έδαφος): σέρνεται ως εκεί και την τρώει.
-      const cake = Jars.items.find((it) => it.kind === 'cake' && it.brokenAt >= 0 && !it.eaten &&
-        Math.hypot(it.x - this.x, it.y - this.y) < BOSS.eatReach);
-      if (cake) {
-        cake.eaten = true;
-        this.cake = cake;
-        this.set('eating', BOSS.eat, now);
-      } else if (now >= this.bUntil) {
+      if (now >= this.bUntil) {
         this.set('windup', BOSS.windup[ph], now);
         CERB_PITCH.forEach((f, i) => Sound.bark(this.x, this.y, f, i * 0.2));
       }
-    } else if (s === 'eating') {
-      const c = this.cake;
-      if (c) {
-        const d = Math.hypot(c.x - this.x, c.y - this.y);
-        if (d > this.r) { this.x += ((c.x - this.x) / d) * Math.min(d, 60 * dt); this.y += ((c.y - this.y) / d) * Math.min(d, 60 * dt); }
-        else c.brokenAt = now - 1e3;   // φαγώθηκε (σβήνει)
-      }
+    } else if (s === 'lulled') {
       if (now >= this.bUntil) this.headSleeps(now);
     }
   }

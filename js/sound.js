@@ -969,6 +969,23 @@ const Sound = {
     n.stop(t + 0.7);
   },
 
+  // Ο δαυλός ανάβει: ένα σύντομο "φουφ" (θόρυβος που ανοίγει και κλείνει) — δεν είναι κύμα, οι σκιές δεν το ακούνε.
+  ignite() {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const n = this.noiseSource();
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.8;
+    bp.frequency.setValueAtTime(300, t);
+    bp.frequency.exponentialRampToValueAtTime(1400, t + 0.25);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.35, 0.05, 0.45);
+    n.connect(bp); bp.connect(g); g.connect(this.sfx);
+    n.start(t);
+    n.stop(t + 0.6);
+  },
+
   // Easter egg A: η σκιά χτυπάει στον τοίχο — ένα κούφιο "μπονκ".
   // Ακούγεται μόνο αν είσαι κοντά (αλλιώς θα αντηχούσε σε όλο τον χάρτη).
   bonk(x, y) {

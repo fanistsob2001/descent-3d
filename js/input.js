@@ -57,6 +57,9 @@ const Input = {
   onRelease: null,      // callback(heldSeconds)
   onCancel: null,       // callback() όταν η φόρτιση ακυρώνεται με σύρσιμο (ή X στο PC)
   onPrimary: null,      // callback() στο αριστερό κλικ· true = το χειρίστηκε (π.χ. πέταξε αντικείμενο), όχι κύμα
+  onSecondary: null,    // callback() στο δεξί κλικ· true = το χειρίστηκε (π.χ. η καρδιά στην κρυψώνα)
+  onTouchSide: null,    // callback(-1 | 1) σε άγγιγμα αριστερά / δεξιά· true = το χειρίστηκε (κρυψώνα)
+  canCharge: null,      // callback(): false = η λύρα δεν μπορεί να παίξει ακόμα (cooldown)
   chargeX: 0,           // πού ακούμπησε το δάχτυλο που φορτίζει
   chargeY: 0,
   chargeDrag: 0,        // 0..1: πόσο κοντά είναι το σύρσιμο στην ακύρωση
@@ -160,11 +163,14 @@ const Input = {
         } else if (e.button === 0) {
           // Αν κρατάς κάτι που πετιέται, το κλικ το πετάει (main.js)· αλλιώς είναι κύμα.
           if (!(this.onPrimary && this.onPrimary())) this.startCharge('mouse');
+        } else if (e.button === 2 && this.onSecondary && this.onSecondary()) {
+          // (χειρίστηκε από το main)
         } else if (e.button === 2 && this.chargeSource === 'mouse') {
           this.dragCancel();   // δεξί κλικ ενώ φορτίζεις = ακύρωση (σαν το X)
         }
         return;
       }
+      if (this.onTouchSide && this.onTouchSide(e.clientX < window.innerWidth / 2 ? -1 : 1)) return;
       if (e.clientX < window.innerWidth / 2) {
         if (this.joy.id !== null) return;
         this.joy.id = e.pointerId;
@@ -214,6 +220,7 @@ const Input = {
 
   startCharge(source) {
     if (this.charging) return;
+    if (this.canCharge && !this.canCharge()) return;
     this.chargeDrag = 0;
     this.charging = true;
     this.chargeSource = source;
@@ -282,15 +289,16 @@ const Input = {
       this.turn = Math.max(-1, Math.min(1, this.turn));
     }
     if (kx || ky) {
-      // Με Shift: αργό, αθόρυβο περπάτημα.
-      const sneak = k.ShiftLeft || k.ShiftRight;
-      const l = Math.hypot(kx, ky) / (sneak ? RUN_THRESHOLD : 1);
+      // Χωρίς Shift: περπάτημα, αθόρυβο. Με Shift: τρέξιμο (θόρυβος, και κουράζει — stamina στο main).
+      const run = k.ShiftLeft || k.ShiftRight;
+      const l = Math.hypot(kx, ky) / (run ? 1 : RUN_THRESHOLD);
       mx = kx / l;
       my = ky / l;
     }
 
     this.moveX = mx;
     this.moveY = my;
-    this.running = Math.hypot(mx, my) > RUN_THRESHOLD + 1e-3;
+    this.wantRun = Math.hypot(mx, my) > RUN_THRESHOLD + 1e-3;
+    this.running = this.wantRun;   // (το main το σβήνει αν τελείωσε η stamina)
   },
 };

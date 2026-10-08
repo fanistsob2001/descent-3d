@@ -43,8 +43,8 @@ const CHAPTERS = [
         keys: 'Move with WASD. Look around with the mouse.', until: 'move' },
       { touch: 'Hold the lyre button to make a sound. Hold longer for a bigger wave.',
         keys: 'Click (or press Space) to make a sound. Hold it longer for a bigger wave.', until: 'call' },
-      { touch: 'Push the stick only a little to walk silently. Running makes noise.',
-        keys: 'Hold Shift to walk silently. Running makes noise.', until: 'sneak', time: 14 },
+      { touch: 'Push the stick all the way to run. Running is loud, and it tires you.',
+        keys: 'Hold Shift to run. Running is loud, and it tires you.', until: 'run', time: 14 },
     ],
     // MAP I
     map: [

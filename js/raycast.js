@@ -51,7 +51,7 @@ const RC_REAL_H = {
   // σπηλιές και Κάτω Κόσμος
   stalagmite: 15, stalactite: 13, rocks: 4, bones: 2.5, skull: 3, reeds: 20, roots: 26, statue: 30, skullpile: 7, chain: 48,
   // αντικείμενα
-  chest: 8, niche: 26, bars: 44, boulder: 44, tablet: 6, lekythos: 5, cake: 2.5, bell: 3, tripod: 14, obol: 3,
+  chest: 8, niche: 26, bars: 44, boulder: 44, tablet: 6, lekythos: 5, bell: 3, tripod: 14, obol: 3,
   stringCoil: 3.5, shard: 1.5,
 };
 const CERB_BOSS_H = 34;              // ο Κέρβερος: ένα τεράστιο σκυλί (~2.5 μ.)
@@ -748,6 +748,35 @@ const Raycast = {
         se[ss[k]] = Math.max(se[ss[k]], ss[k + 1] * f);
       }
     });
+    // Ο δαυλός (js/inventory.js): φως γύρω από τον παίκτη, με οπτική επαφή — κελιά και πλευρές τοίχων.
+    const ts = typeof Torch !== 'undefined' && typeof player !== 'undefined' && state === 'play' ? Torch.strength(now) : 0;
+    if (ts > 0.01) {
+      const R = TORCH_R, px = player.x, py = player.y, ptx = Math.floor(px / TILE), pty = Math.floor(py / TILE), r = Math.ceil(R) + 1;
+      const front = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+      for (let ty = pty - r; ty <= pty + r; ty++) {
+        for (let tx = ptx - r; tx <= ptx + r; tx++) {
+          if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) continue;
+          const c = ty * cols + tx;
+          if (!L.opaque[c]) {
+            const d = Math.hypot((tx + 0.5) * TILE - px, (ty + 0.5) * TILE - py) / TILE;
+            if (d < R && L.lineOfSight(px, py, (tx + 0.5) * TILE, (ty + 0.5) * TILE)) cl[c] = Math.max(cl[c], ts * Math.pow(1 - d / R, 1.1));
+            continue;
+          }
+          for (let side = 0; side < 4; side++) {
+            const base = this.segBase[c * 4 + side];
+            if (base < 0) continue;
+            const fx = (tx + 0.5 + front[side][0] * 0.55) * TILE, fy = (ty + 0.5 + front[side][1] * 0.55) * TILE;
+            const d = Math.hypot(fx - px, fy - py) / TILE;
+            if (d >= R || !L.lineOfSight(px, py, fx, fy)) continue;
+            const v = ts * Math.pow(1 - d / R, 1.1);
+            for (let k = 0; k < this.segPer; k++) {
+              if (se[base + k] === 0) this._segTouched.push(base + k);
+              se[base + k] = Math.max(se[base + k], v);
+            }
+          }
+        }
+      }
+    }
     // Το φως της ημέρας μπροστά στην έξοδο.
     const exA = this.exitA;
     if (exA > 0.01) {

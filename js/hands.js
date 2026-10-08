@@ -198,6 +198,14 @@ const Hands = {
     pc.filter = bright < 0.99 ? 'brightness(' + bright.toFixed(2) + ')' : 'none';
     pc.drawImage(hd.c, x0, y0, hd.w * k, hd.h * k);
     // Το αντικείμενο στην παλάμη (ξαναεμφανίζεται λίγο μετά το πέταγμα).
+    // Ο δαυλός που καίει: η φλόγα πάνω από το χέρι (προσθετικό φως).
+    if (o.flame) {
+      const fh = 30 * k, fw = (fh * o.flame.width) / o.flame.height;
+      pc.filter = 'none';
+      pc.globalCompositeOperation = 'lighter';
+      pc.drawImage(o.flame, Math.round(x0 + hd.palmX * k - fw / 2), Math.round(y0 + hd.palmY * k - fh - 8 * k), Math.round(fw), Math.round(fh));
+      pc.globalCompositeOperation = 'source-over';
+    }
     if (icon && !(o.thrown > 0 && o.thrown < 0.7)) {
       // ~14 pixels της ζωγραφιάς του χεριού το πιο μεγάλο του μέγεθος.
       const s = (14 * k) / Math.max(icon.width, icon.height);
@@ -250,7 +258,8 @@ const Hands = {
     let col = [255, 246, 210];
     const red = o.warn ? 1 : o.warnNear * 0.7;
     col = col.map((v, i) => v + ([255, 50, 34][i] - v) * red);
-    const sb = Math.min(1, 0.35 + bright * 0.3 + c * 0.6 + o.pluck * 0.6 + (o.warn ? 0.3 * pulse : 0)) * (1 - o.cancel * 0.6);
+    // Στο cooldown (μόλις έπαιξε) οι χορδές είναι σβηστές και ξαναφωτίζουν σιγά σιγά.
+    const sb = Math.min(1, 0.35 + bright * 0.3 + c * 0.6 + o.pluck * 0.6 + (o.warn ? 0.3 * pulse : 0)) * (1 - o.cancel * 0.6) * (1 - (o.cool || 0) * 0.6);
     const n = Math.min(3, o.strings);
     if (n > 0) {
       // Λάμψη γύρω από τις χορδές (προσθετική).

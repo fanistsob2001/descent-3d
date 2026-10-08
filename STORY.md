@@ -331,9 +331,9 @@ VIII "Cross the River of Fire", X "Pass the Gate of Hades".
   - "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer."
   - "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed."
   - "Phaedra. Love was the only monster I ever met, and it wore my own face."
-- The recipes, at the shrine of the River of Wailing (III), the first chapter after Charon: "A potter's tablet, left at the shrine of Hermes. Clay and wine make a libation jar: break it, and the dead run to the sound. Honey and poppy make a cake that puts beasts to sleep. Bronze and thread make a bell that rings when you are already gone. Pine resin and wax let the lyre sing once more. Bring what you find in the chests to a shrine, and make what you need there."
+- The recipes, at the shrine of the River of Wailing (III), the first chapter after Charon: "A potter's tablet, left at the shrine of Hermes. Clay and wine make a libation jar: break it, and the dead run to the sound. Oil and linen make a torch: the dead are blind to its light, and it shows you the way without a sound. Bronze and thread make a bell that rings when you are already gone. Pine resin and wax let the lyre sing once more. Bring what you find in the chests to a shrine, and make what you need there."
   Until you read it, the shrine says: You do not know how to make anything yet.
-- Before the arena of Cerberus (X): "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet. Music does not reach him here. Three heads, three cakes. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate"
+- Before the arena of Cerberus (X): "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he listen: play your lyre to him, close. Three heads, three songs. — A keeper of the gate"
 
 ### Prologue (playable, chapter 0)
 
@@ -390,12 +390,11 @@ In the pause menu during the prologue: Skip prologue
 An arena before the gate, with pillars and braziers (lit, so you can see him). Since 8/10 the fight works like
 Tiny Tiger in Crash Bandicoot: Cerberus cannot see, but he smells you. He turns to you, growls and paws the
 ground (the warning), then charges in a straight line to where you stood. Step aside: he slams into the stone
-and staggers. After three charges he lies down, panting — the only moment he can be put to sleep: throw a honey
-cake near him (he eats it, even one that was already on the ground). Only the honey cake works — the Melody
-does not (the user asked for a single way). One head
+and staggers. After three charges he lies down, panting — the only moment he can be put to sleep: as in the myth, play the lyre to him from close (a wave with the lyre
+in your hands, or the Melody). There is no food in the game (the user asked for a single way, the myth's). One head
 sleeps; he rises angrier and faster. Three heads, three phases; a health bar at the top of the screen shows how
 many heads are still awake. If you hide behind a pillar, he walks around it instead of charging. When all
-three sleep, the gate opens. The chests of this chapter hold honey cakes, and they fill again after a while.
+three sleep, the gate opens.
 Interface text: the health bar is titled "Cerberus"; when he lies down: The hound lies down, panting.
 
 ### Chases
@@ -407,7 +406,7 @@ Interface text: the health bar is titled "Cerberus"; when he lies down: The houn
 ### Chests, map pieces, hiding places
 
 - **Chests** (wooden chests, clay jars, sarcophagi): opening one creaks — a small sound that shades can hear.
-  Inside: materials, pebbles, or the chapter's map piece (in the Gate of Hades: honey cakes). Libation jars are not
+  Inside: materials, pebbles, or the chapter's map piece. Libation jars are not
   found any more: you make them.
 - **Map pieces**: one per chapter, not hard to find (in a side room or chest close to the main path).
   Without it the map shows only what you have seen; with it, the whole chapter.
@@ -421,7 +420,7 @@ Interface text: the health bar is titled "Cerberus"; when he lies down: The houn
 | Libation jar | clay + wine | Thrown: a loud sound far from you (as now) |
 |  |  | (The recipes are learned from the potter's tablet in chapter III.) |
 | Pebbles | (found, no crafting) | Thrown: a small sound, to distract one shade |
-| Honey cake | honey + poppy | Thrown: Cerberus goes to eat it (and shades are drawn to the smell) |
+| Torch | olive oil + linen | Lit: half a minute of light around you, without a sound (the dead are blind). Replaced the honey cake: no food in the game. |
 | Bronze bell | bronze + thread | Placed: rings after a few seconds, far from where you are |
 | Lyre resin | pine resin + wax | One more use of the Melody |
 
@@ -429,7 +428,8 @@ Interface text: the health bar is titled "Cerberus"; when he lies down: The houn
 
 Interface text, not voiced.
 - Materials: Clay · Wine · Honey · Poppy seeds · Bronze · Thread · Pine resin · Beeswax
-- Items: Libation jar · Pebbles · Honey cake · Bronze bell · Lyre resin
+- Items: Libation jar · Pebbles · Torch · Bronze bell · Lyre resin
+- Materials (8/10): Honey and Poppy seeds became Olive oil and Linen.
 - Opening a chest: Inside: (list of what you found).
 - The map piece: A map of this place, scratched on a shard.
 - The shrine: title "Shrine of Hermes", line "Shades never cross this threshold.", buttons "Rest", "Craft", "Leave";
@@ -441,7 +441,7 @@ Interface text, not voiced.
   - Lyre: Hold it to play: the wave shows you the world. With three strings, it can play the Melody.
   - Libation jar: Thrown: it shatters with a loud sound, and the shades run to it.
   - Pebbles: Thrown: a small click, to lead one shade away.
-  - Honey cake: Thrown: Cerberus eats it when he is tired, and falls asleep. Shades follow its smell.
+  - Torch: Light it: it burns for half a minute and shows you the world around you, without a sound. The dead are blind to it.
   - Bronze bell: Thrown: it rings loudly a few seconds after it lands, far from you.
   - Lyre resin: One more use of the Melody.
   - Any material: A material. Bring it to a shrine of Hermes.
@@ -471,3 +471,14 @@ chapter). These become side missions.
 - **Good:** you come out into the light; it is the meadow of the prologue. You walk home with her behind you.
   At the door, for the first time: "Turn around". You turn, and you see her.
 - **Bad:** you come out alone. The house is empty. You can walk to her grave and play the lyre. Nothing answers.
+
+
+### Movement, the lyre, hiding (8/10)
+
+- Walking is silent; **Shift = run** (loud steps, and it tires you: a stamina bar; when it runs out you gasp and
+  can only walk until it recovers). No stamina loss in the chases and the prologue.
+- The lyre cannot be spammed: after each wave it needs a moment (longer after a big one) — the strings are dim.
+  Holding the button too long past the full charge cancels the wave (the strings fade out, no sound).
+- Hiding: when a shade that heard you searches right outside your hiding place, you hold your breath with the
+  heartbeat (like the hiding minigame in DOORS): hearts come from left and right; press their side (A / D, left /
+  right click, or tap left / right) as they reach the circle. Every miss costs breath; out of breath, you gasp.

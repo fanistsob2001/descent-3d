@@ -9,25 +9,25 @@
 // Η λύρα είναι κι αυτή αντικείμενο: τη βάζεις στον σάκο για να κρατάς κάτι άλλο (το κύμα με το Space
 // βγαίνει πάντα — είναι η φωνή του Ορφέα).
 
-const MATERIALS = ['clay', 'wine', 'honey', 'poppy', 'bronze', 'thread', 'resin', 'wax'];
+const MATERIALS = ['clay', 'wine', 'oil', 'linen', 'bronze', 'thread', 'resin', 'wax'];
 // Τι φτιάχνεται από τι (δύο υλικά το καθένα).
 const RECIPES = [
   { id: 'jar', needs: ['clay', 'wine'] },
-  { id: 'cake', needs: ['honey', 'poppy'] },
+  { id: 'torch', needs: ['oil', 'linen'] },   // (8/10: αντί για τη μελόπιτα — χωρίς φαγητό στο παιχνίδι)
   { id: 'bell', needs: ['bronze', 'thread'] },
   { id: 'lyreResin', needs: ['resin', 'wax'] },
 ];
-// Τα αντικείμενα που χρησιμοποιούνται από το χέρι (πετιούνται).
-const TOOL_ORDER = ['jar', 'pebble', 'cake', 'bell'];
+// Τα αντικείμενα που χρησιμοποιούνται από το χέρι (πετιούνται — ο δαυλός ανάβει).
+const TOOL_ORDER = ['jar', 'pebble', 'torch', 'bell'];
+const TORCH_TIME = 30;        // δευτ. που καίει ένας δαυλός
+const TORCH_R = 2.8;          // κελιά: ως πού φωτίζει
 const HOTBAR_SLOTS = 6;
 const BAG_SLOTS = 18;
 const STACK_MAX = 64;
 
 const CHEST_REACH = 34;       // τόσο κοντά = "Open"
 const HIDE_REACH = 30;
-const BREATH_TIME = 6;        // δευτ. που κρατάς την ανάσα σου όταν μια σκιά είναι κοντά
 const BREATH_NEAR = 240;      // τόσο κοντά = η σκιά σε "ψάχνει" (η ανάσα αδειάζει)
-const CHEST_REFILL = 30;      // δευτ.: στο κεφάλαιο του boss τα κιβώτια ξαναγεμίζουν με μελόπιτες
 // Οι πινακίδες με οδηγίες (STORY.tablets): οι συνταγές (III, μετά τον Χάροντα) και ο Κέρβερος (X).
 const TABLET_RECIPES = 1;
 const TABLET_BOSS = 5;
@@ -44,15 +44,17 @@ const Inventory = {
     const inv = saved.inv || {};
     this.slots = new Array(HOTBAR_SLOTS + BAG_SLOTS).fill(null);
     if (Array.isArray(inv.slots)) {
+      // (παλιά save: μέλι / παπαρούνα / μελόπιτα έγιναν λάδι / λινάρι / δαυλός)
+      const OLD = { honey: 'oil', poppy: 'linen', cake: 'torch' };
       inv.slots.forEach((s, i) => {
-        if (i < this.slots.length && s && typeof s.id === 'string' && Number.isInteger(s.n) && s.n > 0) this.slots[i] = { id: s.id, n: s.n };
+        if (i < this.slots.length && s && typeof s.id === 'string' && Number.isInteger(s.n) && s.n > 0) this.slots[i] = { id: OLD[s.id] || s.id, n: s.n };
       });
     } else {
       // Παλιό save (πριν τις θέσεις): η λύρα, τα αντικείμενα στη μπάρα, τα υλικά στον σάκο.
       this.slots[0] = { id: 'lyre', n: 1 };
       this.add('jar', saved.jars | 0);
       this.add('pebble', inv.pebbles | 0);
-      this.add('cake', inv.cakes | 0);
+      this.add('torch', inv.cakes | 0);
       this.add('bell', inv.bells | 0);
       for (const m of MATERIALS) this.add(m, (inv.mats && inv.mats[m]) | 0);
     }
@@ -61,7 +63,7 @@ const Inventory = {
     this.opened = new Set(Array.isArray(inv.opened) ? inv.opened : []);
     this.maps = new Set(Array.isArray(inv.maps) ? inv.maps : []);
     this.tablets = new Set(Array.isArray(inv.tablets) ? inv.tablets : []);
-    this.made = new Set(Array.isArray(inv.made) ? inv.made : []);
+    this.made = new Set((Array.isArray(inv.made) ? inv.made : []).map((id) => (id === 'cake' ? 'torch' : id)));
   },
 
   saveData() {
@@ -162,7 +164,7 @@ const Inventory = {
   // Ο καμβάς του εικονιδίου (και για το χέρι που το κρατάει, js/hands.js).
   iconCanvas(id) {
     if (this._cv[id]) return this._cv[id];
-    const spr = { lyre: 'lyre', jar: 'lekythos', pebble: 'rocks', cake: 'cake', bell: 'bell' }[id];
+    const spr = { lyre: 'lyre', jar: 'lekythos', pebble: 'rocks', bell: 'bell' }[id];
     const cv = spr ? Sprites.getHD(spr, 0).c : this.drawMaterial(id);
     this._cv[id] = cv;
     return cv;
@@ -182,10 +184,13 @@ const Inventory = {
       ell(8, 10, 6, 4, O); ell(8, 10, 5, 3, '#a2532a'); ell(7, 9, 3, 2, '#ce6c38'); px(6, 8, '#ec9c62', 2, 1);
     } else if (id === 'wine') {   // ασκί με κρασί
       ell(8, 10, 5, 5, O); ell(8, 10, 4, 4, '#6e1f22'); ell(7, 9, 2, 2, '#a3333a'); px(7, 2, O, 3, 4); px(8, 3, '#8a5a30', 1, 3);
-    } else if (id === 'honey') {  // πήλινο βαζάκι με μέλι
-      ell(8, 10, 5, 5, O); ell(8, 10, 4, 4, '#ce6c38'); px(5, 4, O, 7, 2); px(6, 5, '#e8b040', 5, 2); px(7, 7, '#ffd772', 2, 1);
-    } else if (id === 'poppy') {  // παπαρούνα
-      px(8, 9, '#4d6a2a', 1, 6); ell(8, 6, 4, 3, O); ell(8, 6, 3, 2, '#c8302a'); px(8, 6, '#2a1210'); px(6, 5, '#f05a40');
+    } else if (id === 'oil') {    // λυχνάρι / βαζάκι με λάδι
+      ell(8, 10, 5, 5, O); ell(8, 10, 4, 4, '#ce6c38'); px(5, 4, O, 7, 2); px(6, 5, '#b8a040', 5, 2); px(7, 7, '#e8d070', 2, 1);
+    } else if (id === 'linen') {  // διπλωμένο λινό πανί
+      px(3, 5, O, 11, 8); px(4, 6, '#e6dcc4', 9, 6); px(4, 8, '#bfb294', 9, 1); px(4, 10, '#bfb294', 9, 1);
+    } else if (id === 'torch') {  // δαυλός: ξύλο, τυλιγμένο πανί, φλόγα
+      px(7, 7, O, 3, 9); px(8, 8, '#8a5a30', 1, 7); px(6, 5, O, 5, 4); px(7, 6, '#d8c49a', 3, 2);
+      ell(8, 3, 2, 3, '#e8762a'); px(8, 2, '#ffd772', 1, 2);
     } else if (id === 'bronze') { // ράβδος χαλκού
       px(2, 8, O, 13, 5); px(3, 9, '#9a6a2a', 11, 3); px(3, 9, '#e0a050', 11, 1); px(4, 11, '#6a4418', 10, 1);
     } else if (id === 'thread') { // κουβάρι κλωστή
@@ -217,17 +222,6 @@ const Chests = {
     }));
   },
 
-  // Στο κεφάλαιο του Κέρβερου (όσο είναι ξύπνιος) τα άδεια κιβώτια ξαναγεμίζουν, ώστε να μην κολλήσεις.
-  update(now, bossAlive) {
-    if (!bossAlive || !Level.boss) return;
-    for (const c of this.list) {
-      if (c.opened && c.region === Level.boss.region && now - c.openedAt > CHEST_REFILL) {
-        c.opened = false;
-        Inventory.opened.delete(c.id);
-      }
-    }
-  },
-
   near(p) {
     let best = null, bd = CHEST_REACH;
     for (const c of this.list) {
@@ -239,8 +233,7 @@ const Chests = {
   },
 
   // Ανοίγει: τρίζει (οι σκιές το ακούνε), και δίνει δύο υλικά (ένα ζευγάρι συνταγής, με τη σειρά), μερικές
-  // φορές χαλίκια, και — στο σημαδεμένο κιβώτιο κάθε κεφαλαίου — τον χάρτη. Στο κεφάλαιο του Κέρβερου:
-  // μελόπιτες. Επιστρέφει το κείμενο.
+  // φορές χαλίκια, και — στο σημαδεμένο κιβώτιο κάθε κεφαλαίου — τον χάρτη. Επιστρέφει το κείμενο.
   open(c, now) {
     c.opened = true;
     c.openedAt = now;
@@ -250,14 +243,9 @@ const Chests = {
     Echoes.emit(c.x, c.y, 170, 0.42, 'step');
     Sound.creak(c.x, c.y);
     const got = [];
-    if (Level.boss && c.region === Level.boss.region) {
-      Inventory.add('cake', 2);
-      got.push(STORY.tools.cake + ' ×2');
-    } else {
-      const a = MATERIALS[(c.id * 2) % MATERIALS.length], b = MATERIALS[(c.id * 2 + 1) % MATERIALS.length];
-      for (const m of [a, b]) { Inventory.add(m, 1); got.push(STORY.materials[m]); }
-      if (c.id % 3 === 0 || c.map) { Inventory.add('pebble', 3); got.push(STORY.tools.pebble); }
-    }
+    const a = MATERIALS[(c.id * 2) % MATERIALS.length], b = MATERIALS[(c.id * 2 + 1) % MATERIALS.length];
+    for (const m of [a, b]) { Inventory.add(m, 1); got.push(STORY.materials[m]); }
+    if (c.id % 3 === 0 || c.map) { Inventory.add('pebble', 3); got.push(STORY.tools.pebble); }
     let text = STORY.chestInside(got.join(', '));
     if (c.map && !Inventory.maps.has(c.region)) { Inventory.maps.add(c.region); text = STORY.mapPiece + ' ' + text; }
     return text;
@@ -307,18 +295,152 @@ const Hides = {
 
   exit() {
     this.active = null;
+    HeartGame.reset();
     Sound.breath(false);
   },
 
-  // Κάθε καρέ όσο είσαι κρυμμένος: η ανάσα αδειάζει όσο μια σκιά είναι κοντά και ξαναγεμίζει όταν φύγει.
+  // Κάθε καρέ: όσο είσαι κρυμμένος και ένα τέρας ψάχνει κοντά (σε άκουσε / σε κυνηγάει — όχι αν απλώς
+  // περνάει), κρατάς την ανάσα σου με το παιχνίδι της καρδιάς (HeartGame)· όταν φύγει, ξαναγεμίζει.
   // Επιστρέφει true αν τελείωσε η ανάσα (λαχάνιασμα).
-  update(dt, mons) {
+  update(dt, mons, now) {
     if (!this.active) {
       this.breath = Math.min(1, this.breath + dt / 3);
       return false;
     }
-    const near = mons.some((m) => !m.isFrozen() && Math.hypot(m.x - player.x, m.y - player.y) < BREATH_NEAR);
-    this.breath = near ? this.breath - dt / BREATH_TIME : Math.min(1, this.breath + dt / 3);
+    const near = mons.some((m) => !m.isFrozen() && Math.hypot(m.x - player.x, m.y - player.y) < BREATH_NEAR &&
+      (m.state === 'hunt' || m.state === 'search' || m.huntPlayer || m.chase));
+    HeartGame.update(dt, now, near);
+    if (!near) this.breath = Math.min(1, this.breath + dt / 3);
     return this.breath <= 0;
+  },
+};
+
+// Ο δαυλός (λάδι + λινάρι): ανάβει και καίει TORCH_TIME δευτ. Φωτίζει γύρω σου χωρίς ήχο (Raycast.prepareLight)
+// — οι νεκροί είναι τυφλοί, δεν τον βλέπουν.
+const Torch = {
+  until: 0,
+  litAt: -1e6,
+
+  reset() {
+    this.until = 0;
+  },
+
+  light(now) {
+    this.litAt = now;
+    this.until = now + TORCH_TIME;
+    Sound.ignite();
+  },
+
+  // 0..1: πόσο φως δίνει τώρα (τρεμοπαίζει, και σβήνει τα τελευταία 3 δευτ.).
+  strength(now) {
+    if (now >= this.until) return 0;
+    const fade = Math.min(1, (this.until - now) / 3);
+    return fade * (0.86 + 0.08 * Math.sin(now * 11) + 0.06 * Math.sin(now * 4.3));
+  },
+};
+
+// Το "παιχνίδι της καρδιάς" στην κρυψώνα (σαν το DOORS του Roblox): όσο ένα τέρας ψάχνει έξω από την κρυψώνα,
+// καρδιές έρχονται από αριστερά και δεξιά προς τη μέση· πατάς την πλευρά τους (αριστερό / δεξί κλικ, A / D,
+// ← / →, ή άγγιγμα στο αριστερό / δεξί μισό) τη στιγμή που φτάνουν στον κύκλο. Κάθε λάθος σου κόβει την ανάσα·
+// όταν τελειώσει, λαχανιάζεις και το τέρας σε ακούει.
+const HEART_TRAVEL = 1.1;     // δευτ. από την άκρη ως τη μέση
+const HEART_WINDOW = 0.2;     // πόσο νωρίς / αργά μετράει το πάτημα
+const HEART_MISS = 0.3;       // πόση ανάσα χάνεις σε κάθε λάθος
+
+const HeartGame = {
+  active: false,
+  beats: [],          // { side: -1 | 1, at: πότε φτάνει στη μέση, done }
+  nextAt: 0,
+  flash: { t: -1e6, ok: true },
+
+  reset() {
+    this.active = false;
+    this.beats = [];
+  },
+
+  // Κάθε καρέ όσο είσαι κρυμμένος. near = ένα τέρας ψάχνει κοντά.
+  update(dt, now, near) {
+    if (!near) {
+      if (this.active) { this.active = false; this.beats = []; }
+      return;
+    }
+    if (!this.active) { this.active = true; this.nextAt = now + 0.6; this.beats = []; }
+    if (now >= this.nextAt) {
+      this.beats.push({ side: Math.random() < 0.5 ? -1 : 1, at: now + HEART_TRAVEL, done: false });
+      this.nextAt = now + 0.75 + Math.random() * 0.55;
+    }
+    for (const b of this.beats) {
+      if (!b.done && now > b.at + HEART_WINDOW) { b.done = true; this.miss(now); }
+    }
+    this.beats = this.beats.filter((b) => !b.done || now - b.at < 0.4);
+  },
+
+  miss(now) {
+    Hides.breath -= HEART_MISS;
+    this.flash = { t: now, ok: false };
+    Sound.heartbeat(1);
+    if (typeof vibrate === 'function') vibrate(80);
+  },
+
+  // Πάτημα: side = -1 (αριστερά) ή 1 (δεξιά). true αν το χειρίστηκε.
+  press(side, now) {
+    if (!this.active) return false;
+    const b = this.beats.find((x) => !x.done && Math.abs(x.at - now) <= HEART_WINDOW);
+    if (b && b.side === side) {
+      b.done = true;
+      b.hit = true;
+      Hides.breath = Math.min(1, Hides.breath + 0.04);
+      this.flash = { t: now, ok: true };
+      Sound.heartbeat(0.35);
+    } else {
+      if (b) b.done = true;
+      this.miss(now);
+    }
+    return true;
+  },
+
+  // Σε πλήρη ανάλυση (CSS px), πάνω από τον κόσμο.
+  draw(ctx, W, H, now) {
+    if (!this.active) return;
+    const cx = W / 2, cy = H * 0.6, span = Math.min(260, W * 0.36);
+    const fl = Math.max(0, 1 - (now - this.flash.t) / 0.35);
+    ctx.save();
+    // Οι δύο "διάδρομοι" και ο κύκλος στη μέση.
+    ctx.strokeStyle = 'rgba(206,108,56,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - span, cy); ctx.lineTo(cx - 26, cy);
+    ctx.moveTo(cx + 26, cy); ctx.lineTo(cx + span, cy);
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = fl > 0 ? (this.flash.ok ? `rgba(255,236,190,${0.5 + fl * 0.5})` : `rgba(255,60,40,${0.5 + fl * 0.5})`) : 'rgba(236,156,98,0.8)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22 + fl * 6, 0, Math.PI * 2);
+    ctx.stroke();
+    const heart = (x, y, s, col) => {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x, y + s * 0.9);
+      ctx.bezierCurveTo(x - s * 1.4, y - s * 0.1, x - s * 0.7, y - s * 1.1, x, y - s * 0.35);
+      ctx.bezierCurveTo(x + s * 0.7, y - s * 1.1, x + s * 1.4, y - s * 0.1, x, y + s * 0.9);
+      ctx.fill();
+    };
+    for (const b of this.beats) {
+      const k = 1 - (b.at - now) / HEART_TRAVEL;     // 0 στην άκρη, 1 στη μέση
+      if (b.done) {
+        if (b.hit) heart(cx, cy, 14 + (now - b.at) * 40, `rgba(255,236,190,${Math.max(0, 0.8 - (now - b.at) * 2)})`);
+        continue;
+      }
+      const x = cx + b.side * span * (1 - Math.min(1, k));
+      heart(x, cy, 12 + (k > 0.9 ? 3 : 0), 'rgba(220,60,44,0.95)');
+    }
+    // Ποιο κουμπί για ποια πλευρά (οδηγία χειρισμού, όχι κείμενο της ιστορίας).
+    ctx.fillStyle = 'rgba(231,207,174,0.75)';
+    ctx.font = '12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const touch = typeof IS_TOUCH !== 'undefined' && IS_TOUCH;
+    ctx.fillText(touch ? 'Tap left' : 'A / Left click', cx - span * 0.6, cy + 30);
+    ctx.fillText(touch ? 'Tap right' : 'D / Right click', cx + span * 0.6, cy + 30);
+    ctx.restore();
   },
 };

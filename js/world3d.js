@@ -188,12 +188,12 @@ const World3D = {
         const p = R.project(it.x, it.y);
         if (!p || p.depth < 0.7) continue;
         const z = 2 + 12 * Math.min(1, Math.hypot(it.vx, it.vy) / JAR_SPEED);
-        const look = { jar: ['lekythos', 1], pebble: ['rocks', 0.5], cake: ['cake', 1], bell: ['bell', 1] }[it.kind || 'jar'];
+        const look = { jar: ['lekythos', 1], pebble: ['rocks', 0.5], bell: ['bell', 1] }[it.kind || 'jar'];
         R.sprite(S(look[0]), { x: it.x, y: it.y, z, size: look[1] });
         continue;
       }
-      // Η μελόπιτα / το κουδούνι μένουν στο έδαφος (το κουδούνι λάμπει όταν χτυπάει).
-      if (it.kind === 'cake' || it.kind === 'bell') {
+      // Το κουδούνι μένει στο έδαφος (λάμπει όταν χτυπάει).
+      if (it.kind === 'bell') {
         const ring = it.rangAt ? Math.max(0, 1 - (now - it.rangAt) / 1.5) : 0;
         R.sprite(S(it.kind), { x: it.x, y: it.y, z: ring * 3 * Math.sin(now * 40), scale: 0.5, alpha: Math.min(1, 0.35 + Raycast.cellLight[Math.floor(it.y / TILE) * Level.cols + Math.floor(it.x / TILE)] + ring),
           glow: ring ? { r: 30, color: '255,200,120', a: ring * 0.6 } : undefined });
@@ -415,13 +415,13 @@ const World3D = {
       const s = m.bstate, k = Math.floor(now * 6) % 3;
       const loud = s === 'windup' || s === 'charge' || s === 'rise';
       const barking = [0, 1, 2].map((i) => loud && i >= m.asleep && i === k);
-      const down = s === 'tired' || s === 'eating' || s === 'asleep';
+      const down = s === 'tired' || s === 'lulled' || s === 'asleep';
       const breath = down ? (Math.sin(now * (s === 'tired' ? 7 : 1.4)) > 0 ? 1 : 0) : Math.sin(now * 1.6) > 0 ? 1 : 0;
       const shake = s === 'windup' ? (Math.random() - 0.5) * 2 : 0;
       R.sprite(Sprites.cerberusHD(barking, breath), { x: x + shake, y, z: down ? -3 : 0, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H,
         glow: { r: 46, color: s === 'windup' || s === 'charge' ? '255,60,40' : POT.red, a: (s === 'windup' ? 0.5 + 0.3 * Math.sin(now * 20) : 0.35) * a },
         after: (pc, b) => {
-          if (s !== 'stunned' && s !== 'tired') return;
+          if (s !== 'stunned' && s !== 'tired' && s !== 'lulled') return;
           // Αστεράκια / ιδρώτας: μικρές φωτεινές κουκκίδες που γυρίζουν πάνω από τα κεφάλια.
           pc.globalCompositeOperation = 'lighter';
           pc.fillStyle = 'rgba(255,236,180,0.85)';

@@ -967,3 +967,8 @@ body.subs-large #level-intro #intro-line { font-size: 1.6rem; }
 #shrine .side-missions li { grid-template-columns: 24px 1fr auto; align-items: center; }
 .side-missions li.missing .name, .side-missions li.missing .mat-icon { opacity: 0.38; }
 #inventory h3 { margin-top: 0.4rem; }
+/* Stamina (τρέξιμο): λεπτή μπάρα πάνω από τη μπάρα αντικειμένων· κόκκινη όταν άδειασε. */
+#stamina { position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 66px); transform: translateX(-50%); z-index: 3; width: 180px; height: 4px; background: rgba(0,0,0,0.55); border: 1px solid rgba(236,218,186,0.35); pointer-events: none; }
+#stamina.hidden { display: none; }
+#stamina div { height: 100%; background: #ecdab9; }
+#stamina.out div { background: #ff6a5a; }

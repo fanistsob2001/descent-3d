@@ -2,7 +2,7 @@
 
 // Μηνύματα στην οθόνη, το ένα μετά το άλλο (ουρά).
 //   touch / keys: κείμενο για κινητό / υπολογιστή (αν λείπει το keys, χρησιμοποιείται το touch)
-//   until: 'move' | 'call' | 'sneak' | 'jar' | 'melody' — προχωράει όταν το κάνει ο παίκτης
+//   until: 'move' | 'call' | 'run' | 'jar' | 'melody' — προχωράει όταν το κάνει ο παίκτης
 //   time:  δευτ. — προχωράει μόνο του μετά από τόσο χρόνο (ή μέγιστος χρόνος για το until)
 //   title: { numeral, name, line } — αντί για κείμενο, δείχνει τον τίτλο κεφαλαίου
 //          στη μέση της οθόνης (μέσω του onTitle)
@@ -49,7 +49,7 @@ const Hints = {
     this.el.classList.remove('visible');
   },
 
-  // Ο παίκτης έκανε κάτι ('move', 'call', 'sneak', 'jar', 'melody'). dt για τις συνεχείς ενέργειες.
+  // Ο παίκτης έκανε κάτι ('move', 'call', 'run', 'jar', 'melody'). dt για τις συνεχείς ενέργειες.
   notify(event, dt = 0) {
     if (!this.showing) return;
     const h = this.list[this.idx];

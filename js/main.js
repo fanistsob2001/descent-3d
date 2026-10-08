@@ -2,8 +2,20 @@
 
 // ---- Ρυθμίσεις παίκτη / ήχων ----
 const PLAYER_RADIUS = 7;
-const RUN_SPEED = 115;             // γρήγορο περπάτημα, μονάδες κόσμου / δευτ.
-const SNEAK_SPEED = 50;            // αργό, αθόρυβο περπάτημα
+const RUN_SPEED = 115;             // τρέξιμο (Shift), μονάδες κόσμου / δευτ. — κάνει θόρυβο και κουράζει
+const WALK_SPEED = 72;             // περπάτημα (χωρίς Shift), αθόρυβο
+// Stamina (8/10): το τρέξιμο την αδειάζει σε STAMINA_RUN δευτ.· ξαναγεμίζει σε STAMINA_REST δευτ., λίγο αφού
+// σταματήσεις. Αν αδειάσει, δεν τρέχεις ώσπου να ξαναγεμίσει ως STAMINA_AGAIN. Στις καταδιώξεις και στον πρόλογο
+// δεν αδειάζει (αδρεναλίνη).
+const STAMINA_RUN = 6;
+const STAMINA_REST = 4;
+const STAMINA_DELAY = 0.8;
+const STAMINA_AGAIN = 0.3;
+// Η λύρα (8/10): μετά από κάθε κύμα περιμένεις LYRE_COOLDOWN + μέγεθος × LYRE_COOLDOWN_BIG δευτ. (χωρίς spam)·
+// αν κρατάς το κουμπί LYRE_OVERHOLD δευτ. πέρα από τη μέγιστη φόρτιση, ακυρώνεται μόνο του (δεν παίζει).
+const LYRE_COOLDOWN = 0.45;
+const LYRE_COOLDOWN_BIG = 1.1;
+const LYRE_OVERHOLD = 1.2;
 const STEP_LENGTH = 32;            // απόσταση ανάμεσα σε δύο βήματα
 
 // Πόσο γυρίζει το βλέμμα (ακτίνια): ανά CSS px συρσίματος, ανά px ποντικιού, ανά δευτ. με τα βελάκια.
@@ -108,6 +120,7 @@ function updatePlayer(dt) {
   let a = player.angle + Input.lookDX * LOOK_TOUCH + Input.mouseDX * sens + Input.turn * TURN_SPEED * dt;
   player.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, player.pitch - Input.mouseDY * sens * (Settings.invert ? -1 : 1)));
   Input.lookDX = Input.mouseDX = Input.mouseDY = 0;
+  updateStamina(dt);
   if ((Prologue.active && Prologue.lock) || Crossing.active || Hides.active || Throne.locked()) { player.walkSpeed *= 0.9; return; }
   if (a > Math.PI) a -= Math.PI * 2;
   if (a <= -Math.PI) a += Math.PI * 2;
@@ -125,7 +138,7 @@ function updatePlayer(dt) {
 
   const speed = Input.running
     ? RUN_SPEED
-    : SNEAK_SPEED * Math.min(1, amount / RUN_THRESHOLD);
+    : WALK_SPEED * Math.min(1, amount / RUN_THRESHOLD);
   const ux = (player.fx * -my - player.fy * mx) / amount;
   const uy = (player.fy * -my + player.fx * mx) / amount;
   if (Math.abs(ux) > 0.15) player.dir = ux < 0 ? -1 : 1;
@@ -138,12 +151,10 @@ function updatePlayer(dt) {
   player.walkPhase += Math.hypot(player.x - ox, player.y - oy) * 0.11;
 
   Hints.notify('move', dt);
-  if (!Input.running) {
-    Hints.notify('sneak', dt);
-    return;
-  }
+  if (!Input.running) return;
+  Hints.notify('run', dt);
 
-  // Βήματα: μόνο το γρήγορο περπάτημα κάνει θόρυβο.
+  // Βήματα: μόνο το τρέξιμο κάνει θόρυβο.
   player.stepDist += Math.hypot(player.x - ox, player.y - oy);
   if (player.stepDist >= STEP_LENGTH) {
     player.stepDist -= STEP_LENGTH;
@@ -158,6 +169,27 @@ function updatePlayer(dt) {
   }
 }
 
+// Stamina: το τρέξιμο (Shift / joystick έξω) την αδειάζει· όταν αδειάσει περπατάς ώσπου να ξαναγεμίσει λίγο.
+let stamina = 1, staminaOut = false, lastRunAt = -1e6;
+function updateStamina(dt) {
+  const moving = Math.hypot(Input.moveX, Input.moveY) > 0.01;
+  const free = Prologue.active || Chases.active();   // αδρεναλίνη
+  if (staminaOut && stamina >= STAMINA_AGAIN) staminaOut = false;
+  Input.running = Input.wantRun && !staminaOut;
+  if (Input.running && moving) {
+    lastRunAt = gameTime;
+    if (!free) stamina -= dt / STAMINA_RUN;
+    if (stamina <= 0) { stamina = 0; staminaOut = true; Input.running = false; Sound.gasp(); }
+  } else if (gameTime - lastRunAt > STAMINA_DELAY) {
+    stamina = Math.min(1, stamina + dt / STAMINA_REST);
+  }
+  const el = $('stamina');
+  const show = state === 'play' && !Prologue.active && stamina < 0.999;
+  el.classList.toggle('hidden', !show);
+  el.classList.toggle('out', staminaOut);
+  if (show) el.firstChild.style.width = (stamina * 100).toFixed(1) + '%';
+}
+
 // Κύμα που ακυρώθηκε με σύρσιμο: απαλός ήχος "ξεφουσκώματος" και το δαχτυλίδι μαζεύεται.
 const cancelFx = { t: -1e6, r: 0 };
 function cancelCall(amount) {
@@ -168,10 +200,14 @@ function cancelCall(amount) {
 }
 
 let lastCallAt = -1e6;   // πότε έβγαλε ο παίκτης το τελευταίο κύμα (για το "παίζει λύρα")
+let callReadyAt = 0;     // πότε μπορεί να ξαναπαίξει η λύρα (cooldown)
 function emitCall(held) {
   if (state !== 'play') return;
   lastCallAt = gameTime;
   const c = Math.min(1, held / MAX_CHARGE);
+  callReadyAt = gameTime + LYRE_COOLDOWN + c * LYRE_COOLDOWN_BIG;
+  // Ο Κέρβερος (X): ξαπλωμένος, ακούει τη λύρα σου από κοντά και αποκοιμιέται (όπως στον μύθο).
+  if (Prologue.active || Inventory.held() === 'lyre') for (const m of monsters) if (m.boss) m.onSong(gameTime);
   Echoes.emit(player.x, player.y,
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
@@ -268,7 +304,15 @@ let lastThrowAt = -1e6;
 function throwHeld() {
   if (state !== 'play') return false;
   const k = Inventory.held();
-  if (!Inventory.isTool(k) || !Inventory.take(k, 1)) return false;
+  if (!Inventory.isTool(k)) return false;
+  if (k === 'torch') {
+    // Ο δαυλός δεν πετιέται: ανάβει (αν δεν καίει ήδη ένας).
+    if (Torch.strength(gameTime) > 0.5 || !Inventory.take(k, 1)) return false;
+    Torch.light(gameTime);
+    updateHud();
+    return true;
+  }
+  if (!Inventory.take(k, 1)) return false;
   Jars.launch(player.x, player.y, player.fx, player.fy, k);
   Sound.jarThrow();
   lastThrowAt = gameTime;
@@ -342,7 +386,8 @@ function interact() {
 // Αριστερό κλικ (Input.onPrimary): αν κρατάς κάτι που πετιέται, το πετάς· αλλιώς (λύρα, υλικό, τίποτα)
 // το κλικ είναι κύμα όπως πάντα.
 function primaryUse() {
-  if (state !== 'play' || Prologue.active || Crossing.active || Hides.active) return false;
+  if (state === 'play' && Hides.active) return HeartGame.press(-1, gameTime) || true;   // στην κρυψώνα: όχι κύμα
+  if (state !== 'play' || Prologue.active || Crossing.active) return false;
   if (!Inventory.isTool(Inventory.held())) return false;
   throwHeld();
   return true;
@@ -796,11 +841,17 @@ function draw3D(pc, W, H) {
   if (state === 'play' || state === 'paused') {
     drawTurnWarning(pc, W, H);
     // Στο χέρι: η λύρα, ή ό,τι άλλο κρατάς από τη μπάρα (όχι στον πρόλογο: εκεί πάντα η λύρα).
-    const held = Prologue.active ? 'lyre' : Inventory.held();
+    // (ένας αναμμένος δαυλός μένει στο χέρι και όταν η θέση του άδειασε· με τη λύρα στο χέρι δεν φαίνεται)
+    let held = Prologue.active ? 'lyre' : Inventory.held();
+    const lit = !Prologue.active && Torch.strength(gameTime) > 0.01;
+    if (!held && lit) held = 'torch';
     if (held === 'lyre') { if (!(Prologue.active && Prologue.noLyre)) drawHands3D(pc, W, H); }
     else if (held) {
       const cell = Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE);
+      const burning = held === 'torch' && lit;
+      if (burning) World3D.drawFlame(gameTime);
       Hands.drawHeld(pc, W, H, gameTime, Inventory.iconCanvas(held), {
+        flame: burning ? World3D.flame.c : null,
         light: Math.min(1, Raycast.cellLight ? Raycast.cellLight[cell] || 0 : 0),
         walkPhase: player.walkPhase, walkSpeed: player.walkSpeed, thrown: (gameTime - lastThrowAt) / 0.45,
       });
@@ -820,6 +871,7 @@ function draw3D(pc, W, H) {
   // Από πάνω, σε πλήρη ανάλυση: τα λόγια των ψυχών, το joystick και το κουμπί της λύρας.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   World3D.overlay(ctx, gameTime, Pixel.px);
+  if (state === 'play' && Hides.active) HeartGame.draw(ctx, cssW, cssH, gameTime);
   if (state === 'play') {
     drawJoystick();
     if (IS_TOUCH) drawLyreButton();
@@ -842,7 +894,10 @@ function drawHands3D(pc, W, H) {
     charge: c,
     charging: Input.charging,
     pluck: Math.max(0, 1 - (gameTime - lastCallAt) / HANDS_PLUCK),
-    cancel: Math.max(Input.chargeDrag * 0.8, ct >= 0 && ct < 1 ? 1 - ct : 0),
+    // (το κράτημα πέρα από τη μέγιστη φόρτιση σβήνει σιγά σιγά τις χορδές: σε λίγο ακυρώνεται)
+    cancel: Math.max(Input.chargeDrag * 0.8, ct >= 0 && ct < 1 ? 1 - ct : 0,
+      Input.charging ? Math.max(0, Math.min(1, (gameTime - Input.chargeStart - MAX_CHARGE) / LYRE_OVERHOLD)) : 0),
+    cool: Math.max(0, Math.min(1, (callReadyAt - gameTime) / LYRE_COOLDOWN_BIG)),
     warn: rule && Input.charging && c >= LOOK_BACK_CHARGE,
     warnNear: near,
     light: Math.min(1, Raycast.cellLight ? Raycast.cellLight[cell] || 0 : 0),
@@ -1341,10 +1396,11 @@ function frame(t) {
     if (chasing !== wasChasing) { Sound.breath(chasing, 2.6); wasChasing = chasing; }
     Throne.update(dt, gameTime, here);
     const boss = monsters.find((m) => m.boss);
-    Chests.update(gameTime, !!(boss && boss.asleep < 3));
     updateBossBar(boss);
     killer = safeHere || Hides.active ? null : monsters.find((m) => m.touches(player)) || (Boulder.touches(player) ? Boulder : null);
-    if (Hides.update(dt, monsters)) {
+    // Η λύρα: αν κρατάς το κουμπί πολύ πέρα από τη μέγιστη φόρτιση, ακυρώνεται μόνο της (δεν παίζει).
+    if (Input.charging && gameTime - Input.chargeStart > MAX_CHARGE + LYRE_OVERHOLD) Input.dragCancel();
+    if (Hides.update(dt, monsters, gameTime)) {
       // Τελείωσε η ανάσα: λαχανιάζεις δυνατά και βγαίνεις από την κρυψώνα.
       Hides.exit();
       Sound.gasp();
@@ -1428,7 +1484,7 @@ function updateWaterSound() {
   const cb = Eggs.cerberus;
   const playing = state === 'play' || state === 'dead';
   // (και το boss: λαχάνιασμα όσο είναι κουρασμένο, ροχαλητό όταν κοιμηθεί)
-  const bz = playing ? monsters.find((m) => m.boss && ['tired', 'eating', 'asleep'].includes(m.bstate)) : null;
+  const bz = playing ? monsters.find((m) => m.boss && ['tired', 'lulled', 'asleep'].includes(m.bstate)) : null;
   if (bz) {
     const d = Math.hypot(bz.x - player.x, bz.y - player.y);
     Sound.updateSnore(bz.x, bz.y, d < 300 ? d : -1, Level.lineOfSight(player.x, player.y, bz.x, bz.y));
@@ -1562,7 +1618,7 @@ function updateHud() {
 let bossBarKey = '';
 function updateBossBar(boss) {
   const on = !!(boss && boss.fight && boss.asleep < 3 && state === 'play');
-  const key = on ? 'on' + boss.asleep + (boss.bstate === 'tired' || boss.bstate === 'eating' ? 't' : '') : 'off';
+  const key = on ? 'on' + boss.asleep + (boss.bstate === 'tired' || boss.bstate === 'lulled' ? 't' : '') : 'off';
   if (key === bossBarKey) return;
   bossBarKey = key;
   const el = $('boss-bar');
@@ -1737,6 +1793,9 @@ function spawn(saved) {
   Missions.reset(saved);
   Chests.reset();
   Hides.reset();
+  HeartGame.reset();
+  Torch.reset();
+  stamina = 1; staminaOut = false; callReadyAt = 0;
   Chases.reset();
   Throne.reset(chapter >= CHAPTERS.length - 1);
   // Ο Κέρβερος στην Πύλη του Άδη (αν δεν τον έχεις ήδη αποκοιμίσει).
@@ -1967,6 +2026,10 @@ function init() {
   Input.onRelease = emitCall;
   Input.onCancel = cancelCall;
   Input.onPrimary = primaryUse;
+  // Στην κρυψώνα: δεξί κλικ / άγγιγμα δεξιά = η δεξιά καρδιά.
+  Input.onSecondary = () => state === 'play' && Hides.active && HeartGame.press(1, gameTime);
+  Input.onTouchSide = (side) => state === 'play' && Hides.active && HeartGame.press(side, gameTime);
+  Input.canCharge = () => state !== 'play' || gameTime >= callReadyAt;
   Input.canLook = () => state === 'play';
   Input.init(canvas);
 
@@ -2036,6 +2099,8 @@ function init() {
       else if (state === 'play' && !Prologue.active && !Crossing.active) openInventory();
     } else if (state === 'inventory' && /^Digit[1-6]$/.test(e.code)) {
       invSwapHotbar(Number(e.code.slice(5)) - 1);
+    } else if (state === 'play' && Hides.active && HeartGame.active && !e.repeat && ['KeyA', 'ArrowLeft', 'KeyD', 'ArrowRight'].includes(e.code)) {
+      HeartGame.press(e.code === 'KeyA' || e.code === 'ArrowLeft' ? -1 : 1, gameTime);
     } else if (e.code === 'KeyE' && !e.repeat) {
       interact();
     } else if (/^Digit[1-6]$/.test(e.code) && state === 'play') {
