@@ -753,7 +753,7 @@ const Prologue = {
         x.drawImage(src, 0, 0);
         return c;
       };
-      m[q] = { ...fr, c: mk(fr.c), f: mk(fr.f) };
+      m[q] = { ...fr, c: mk(fr.c), f: mk(fr.f), dim: q };   // (dim: και για τα 3D μοντέλα)
     }
     return m[q];
   },
@@ -777,7 +777,7 @@ const Prologue = {
       const k2 = Math.sin(g.t * 0.3);
       g.x = g.hx + k2 * 14;
       const right = -Math.sin(player.angle) * Math.cos(g.t * 0.3) + Math.cos(player.angle) * 0;
-      if (near(g)) R.sprite(D(S('goat', Math.sin(g.t * 1.1) > 0.6 ? 1 : 0)), { x: g.x, y: g.y, scale: 0.42, fog: false, flip: right < 0 });
+      if (near(g)) R.sprite(D(S('goat', Math.sin(g.t * 1.1) > 0.6 ? 1 : 0)), { x: g.x, y: g.y, scale: 0.42, fog: false, flip: right < 0, ent: g });
     }
     for (const f of this.flowers) if (!f.taken && near(f)) R.sprite(D(S('asphodel', 0)), { x: f.x, y: f.y, scale: 1.1, fog: false, glow: { r: 10, color: '255,246,228', a: 0.25 } });
     // Η Ευρυδίκη.
@@ -790,7 +790,7 @@ const Prologue = {
         const fx = e.moving ? e.dirX : player.x - e.x, fy = e.moving ? e.dirY : player.y - e.y;
         const right = -Math.sin(player.angle) * fx + Math.cos(player.angle) * fy;
         const frame = e.moving ? 1 + (Math.floor(e.dist / 14) % 2) : 0;
-        R.sprite(D(S('euryAlive', frame)), { x: e.x, y: e.y, scale: 0.39, flip: right < 0, fog: false });
+        R.sprite(D(S('euryAlive', frame)), { x: e.x, y: e.y, scale: 0.39, flip: right < 0, fog: false, ent: e });
       }
     }
     // Το φίδι.

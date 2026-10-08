@@ -2145,6 +2145,7 @@ function init() {
   CutArt.init();      // οι ζωγραφιές των cutscenes (μετά τις μορφές)
   Raycast.buildTextures();   // μετά τα sprites: οι ζωφόροι των τοίχων φτιάχνονται από αυτά
   World3D.init();
+  Models.init();      // τα 3D μοντέλα των χαρακτήρων (js/models.js)
   GL3D.init();
   updateToggleLabels();   // (το κουμπί "Graphics" φαίνεται μόνο αν υπάρχει WebGL)
   Hands.init();

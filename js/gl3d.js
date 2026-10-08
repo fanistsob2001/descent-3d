@@ -715,6 +715,50 @@ void main() {
     for (const n of ['aPos', 'aUV']) this.sloc[n] = gl.getAttribLocation(p, n);
     for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uTex', 'uCut']) this.sloc[n] = gl.getUniformLocation(p, n);
     this.svbo = gl.createBuffer();
+    // Τα 3D μοντέλα: θέση, κάθετο διάνυσμα, χρώμα (+ "λάμπει μόνο του"). Φως από την πλευρά της κάμερας και
+    // λίγο από πάνω (σαν τις μορφές), και στις δύο όψεις των τριγώνων.
+    const mvs = `
+attribute vec3 aPos;
+attribute vec3 aNorm;
+attribute vec4 aCol;
+uniform vec3 uEye;
+uniform vec2 uDir;
+uniform vec4 uProj;
+uniform vec2 uPitch;
+varying vec3 vN;
+varying vec4 vCol;
+void main() {
+  vec2 d = aPos.xy - uEye.xy;
+  float xc = dot(d, vec2(-uDir.y, uDir.x));
+  float zc0 = dot(d, uDir), yc0 = aPos.z - uEye.z;
+  float zc = zc0 * uPitch.x + yc0 * uPitch.y;
+  float yc = yc0 * uPitch.x - zc0 * uPitch.y;
+  float n = 0.02, f = 60.0;
+  gl_Position = vec4(uProj.x * xc, uProj.y * yc + uProj.z * zc, zc * (f + n) / (f - n) - 2.0 * f * n / (f - n), zc);
+  vN = aNorm; vCol = aCol;
+}`;
+    const mfs = `
+precision mediump float;
+varying vec3 vN;
+varying vec4 vCol;
+uniform vec3 uLight;
+uniform float uAlpha, uGhost;
+void main() {
+  float l = 0.38 + 0.75 * abs(dot(normalize(vN), uLight));
+  vec3 c = (vCol.a > 0.5 || uGhost > 0.5) ? vCol.rgb : vCol.rgb * l;
+  gl_FragColor = vec4(c * uAlpha, uAlpha);
+}`;
+    const mp = gl.createProgram();
+    gl.attachShader(mp, sh(gl.VERTEX_SHADER, mvs));
+    gl.attachShader(mp, sh(gl.FRAGMENT_SHADER, mfs));
+    gl.linkProgram(mp);
+    if (!gl.getProgramParameter(mp, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(mp));
+    this.mprog = mp;
+    this.mloc = {};
+    for (const n of ['aPos', 'aNorm', 'aCol']) this.mloc[n] = gl.getAttribLocation(mp, n);
+    for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uLight', 'uAlpha', 'uGhost']) this.mloc[n] = gl.getUniformLocation(mp, n);
+    this.mvbo = gl.createBuffer();
+    this.track = new WeakMap();    // ανά χαρακτήρα: προς τα πού πηγαίνει και πόσο γρήγορα (για το γύρισμα και το βάδισμα)
     this.stex = new WeakMap();     // καμβάς → υφή WebGL
     this.lathes = {};              // όνομα sprite → πλέγμα τορνευτού σώματος
   },
@@ -780,6 +824,79 @@ void main() {
     return res;
   },
 
+  // Τα 3D μοντέλα: προς τα πού κοιτάζουν (από την κίνησή τους, ή προς την κάμερα, ή o.yaw), η στάση τους
+  // (βάδισμα, γαβγίσματα, ξαπλωμένος, κάθεται / γέρνει), και ζωγράφισμα. solid = αδιαφανή (γράφουν βάθος).
+  drawModels(list, solid) {
+    if (!list.length) return;
+    const gl = this.gl, R = Raycast, W = R.W, H = R.H, U = this.mloc;
+    gl.useProgram(this.mprog);
+    gl.uniform3f(U.uEye, R.posX, R.posY, RC_EYE);
+    gl.uniform2f(U.uDir, R.dirX, R.dirY);
+    gl.uniform4f(U.uProj, (2 * R.focal) / W, (2 * R.focal) / H, 1 - (2 * R.horizon) / H, 0);
+    gl.uniform2f(U.uPitch, R.pc, R.ps);
+    const rx = -R.dirY, ry = R.dirX;
+    const L = [-R.dirX * 0.6 - rx * 0.35, -R.dirY * 0.6 - ry * 0.35, 0.7], ll = Math.hypot(...L);
+    gl.uniform3f(U.uLight, L[0] / ll, L[1] / ll, L[2] / ll);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.mvbo);
+    gl.enableVertexAttribArray(U.aPos);
+    gl.enableVertexAttribArray(U.aNorm);
+    gl.enableVertexAttribArray(U.aCol);
+    gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 40, 0);
+    gl.vertexAttribPointer(U.aNorm, 3, gl.FLOAT, false, 40, 12);
+    gl.vertexAttribPointer(U.aCol, 4, gl.FLOAT, false, 40, 24);
+    gl.depthMask(solid);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    const now = typeof gameTime !== 'undefined' ? gameTime : performance.now() / 1000;
+    if (!solid) list.sort((a, b) => b.depth - a.depth);
+    for (const m of list) {
+      const o = m.o, ent = o.ent;
+      // Προς τα πού κοιτάζει: η κίνησή του (ομαλά), αλλιώς o.yaw, αλλιώς προς την κάμερα.
+      let yaw = o.yaw, walk = 0, tr = null;
+      const toCam = Math.atan2(R.posY - m.y, R.posX - m.x);
+      if (ent) {
+        tr = this.track.get(ent);
+        if (!tr) { tr = { x: ent.x, y: ent.y, yaw: toCam, speed: 0, phase: 0, f: this.frameNo }; this.track.set(ent, tr); }
+        if (tr.f !== this.frameNo) {
+          const dx = ent.x - tr.x, dy = ent.y - tr.y, d = Math.hypot(dx, dy);
+          tr.speed += (Math.min(1, d / 2) - tr.speed) * 0.2;
+          if (d > 0.15) {
+            let da = Math.atan2(dy, dx) - tr.yaw;
+            da = Math.atan2(Math.sin(da), Math.cos(da));
+            tr.yaw += da * 0.25;
+          } else if (tr.speed < 0.05 && !ent.boss && ent.kind === undefined) {
+            // (μορφές που στέκονται, π.χ. η Ευρυδίκη: γυρίζουν σιγά σιγά προς εσένα)
+            let da = toCam - tr.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); tr.yaw += da * 0.05;
+          }
+          tr.phase += d * 0.16;
+          tr.x = ent.x; tr.y = ent.y; tr.f = this.frameNo;
+        }
+        if (ent.boss) tr.yaw = ent.facing !== undefined && ['windup', 'charge', 'prowl'].includes(ent.bstate) ? ent.facing : tr.yaw;
+        yaw = tr.yaw;
+        walk = tr.speed;
+      }
+      if (yaw === undefined) yaw = m.name === 'boat3d' ? toCam + Math.PI / 2 : toCam;
+      if (m.name === 'euryLying') yaw = 0.6;
+      const pose = Models.pose(m.name, {
+        t: now + (m.x * 7.1 + m.y * 3.3) % 10, walk: m.name === 'cerberus' && ent && ent.bstate === 'charge' ? 1 : walk,
+        phase: tr ? tr.phase : now * 4, frame: Math.max(0, (Sprites.hdFrames[m.frame.name] || []).indexOf(m.frame)),
+        bark: m.frame.bark ? m.frame.bark.map(Number) : null,
+        lie: ent && ['tired', 'lulled', 'asleep'].includes(ent.bstate), asleep: ent && ent.asleep >= 3, sleepHeads: ent ? ent.asleep : 0,
+      });
+      // (το "frame" των sprites: η Περσεφόνη που γέρνει, ο Χάροντας που ζητάει τον οβολό, το φίδι που σφυρίζει)
+      if (m.name === 'persephone3d' && typeof Throne !== 'undefined' && Throne.lean) pose.body = [0, 0.32];
+      if (m.name === 'charon3d' && typeof Charon !== 'undefined' && !Charon.paid) pose.armL = [-1.2, 0];
+      const out = [];
+      Models.emit(m.name, { x: m.x, y: m.y, z: m.z }, yaw, m.h, pose, out, m.frame.dim || 1);
+      gl.uniform1f(U.uAlpha, m.alpha);
+      gl.uniform1f(U.uGhost, MODEL_GHOST.has(m.name) ? 1 : 0);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(out), gl.STREAM_DRAW);
+      gl.drawArrays(gl.TRIANGLES, 0, out.length / 10);
+    }
+    gl.disableVertexAttribArray(U.aNorm);
+    gl.disableVertexAttribArray(U.aCol);
+    gl.depthMask(true);
+  },
+
   // Αντί για το Raycast.flushSprites όταν ζωγραφίζει το WebGL.
   flushSprites(pc) {
     const gl = this.gl, R = Raycast, list = R.sprites;
@@ -787,7 +904,7 @@ void main() {
     if (!this.sprog) this.initSprites();
     const W = R.W, H = R.H;
     const rx = -R.dirY, ry = R.dirX;           // το "δεξιά" της κάμερας (κελιά)
-    const opaque = [], blend = [];
+    const opaque = [], blend = [], models = [];
     const boxes = [];
     for (const it of list) {
       const { frame, o, p } = it;
@@ -803,6 +920,12 @@ void main() {
       const hpx = pt && pb ? Math.max(1, pb.sy - pt.sy) : hu * k, wpx = (hu * k * fw) / fh;
       boxes.push({ o, p, box: { left: Math.round(sx - wpx / 2), top: Math.round(bottom - hpx), w: wpx, h: hpx, k, sx, depth: p.depth, alpha } });
       if (!frame) continue;
+      const mname = frame.name && MODEL_OF[frame.name];
+      if (mname && Settings.models !== 'off') {
+        boxes[boxes.length - 1].box.model = true;
+        models.push({ name: mname, o, frame, x: o.x / TILE, y: o.y / TILE, z: (o.z || 0) / TILE, h: hu / TILE, alpha, depth: p.depth });
+        continue;
+      }
       const cv = o.flip ? frame.f : frame.c;
       const e = { cv, flip: false, o, x: o.x / TILE, y: o.y / TILE, z: (o.z || 0) / TILE, h: hu / TILE, w: (hu / TILE) * (fw / fh), alpha, depth: p.depth - (o.bias || 0) };
       // Τορνευτό αντικείμενο: αληθινό 3D σώμα (μόνο για τα στρογγυλά αντικείμενα, όχι μορφές / λάμψεις).
@@ -854,12 +977,22 @@ void main() {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.uniform1f(U.uCut, 0.5);
     for (const e of opaque) draw(e);
+    // Τα 3D μοντέλα (αδιαφανή με βάθος· τα φαντάσματα / όσα σβήνουν, διάφανα, μαζί με τα υπόλοιπα διάφανα).
+    const ghosts = this.drawModels(models.filter((m) => m.alpha >= 0.995 && !MODEL_GHOST.has(m.name)), true);
+    gl.useProgram(this.sprog);
+    gl.enableVertexAttribArray(U.aPos);
+    gl.enableVertexAttribArray(U.aUV);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.svbo);
+    gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 28, 0);
+    gl.vertexAttribPointer(U.aUV, 4, gl.FLOAT, false, 28, 12);
+    void ghosts;
     gl.depthMask(false);
     gl.uniform1f(U.uCut, 0.02);
     for (const e of blend) {
       gl.blendFunc(gl.ONE, e.o.add ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
       draw(e);
     }
+    this.drawModels(models.filter((m) => m.alpha < 0.995 || MODEL_GHOST.has(m.name)), false);
     gl.depthMask(true);
     gl.disable(gl.BLEND);
 

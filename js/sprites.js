@@ -805,7 +805,7 @@ const Sprites = {
     if (!this._cerb[key]) {
       const fr = this.build(cerberusGrid(barking, breath), POT.terra);
       const c = this.hdify(fr.c);
-      this._cerb[key] = { c, f: c, w: c.width, h: c.height, hd: 2 };
+      this._cerb[key] = { c, f: c, w: c.width, h: c.height, hd: 2, name: 'cerberus', bark: barking.slice() };   // (name: το 3D μοντέλο στο WebGL)
     }
     return this._cerb[key];
   },

@@ -268,7 +268,7 @@ const World3D = {
       }
       if (a > 0.01) {
         R.sprite(S('eurydice3d', e.moving ? Math.floor(e.walked / 12) : 0), {
-          x: e.x, y: e.y, z: rise, alpha: a, fog: false, scale: 0.39,
+          x: e.x, y: e.y, z: rise, alpha: a, fog: false, scale: 0.39, ent: e,
           glow: { r: 30, color: POT.cream, a: a * 0.3 },
         });
       }
@@ -336,10 +336,10 @@ const World3D = {
         R.sprite(S('snake3d', hiss), { x: d.x, y: d.y, alpha: a, flip: true, bias: 0.01, scale: 0.36 });
       } else if (d.kind === 'hades') {
         // Οι δύο θρόνοι δίπλα δίπλα (σε διπλανά κελιά, και λίγο πιο κοντά ο ένας στον άλλο: ~2 μ.).
-        R.sprite(S('hades3d'), { x: d.x, y: d.y + THRONE_NEAR, alpha: a, scale: 0.44 });
-        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 18, alpha: a, h: 10 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
+        R.sprite(S('hades3d'), { x: d.x, y: d.y + THRONE_NEAR, alpha: a, scale: 0.44, yaw: Math.PI });
+        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 18, alpha: a, h: 10, yaw: Math.PI });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
       } else {
-        R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y - THRONE_NEAR, alpha: a, scale: 0.44 });
+        R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y - THRONE_NEAR, alpha: a, yaw: Math.PI, scale: 0.44 });
       }
     }
 
@@ -419,8 +419,8 @@ const World3D = {
       const down = s === 'tired' || s === 'lulled' || s === 'asleep';
       const breath = down ? (Math.sin(now * (s === 'tired' ? 7 : 1.4)) > 0 ? 1 : 0) : Math.sin(now * 1.6) > 0 ? 1 : 0;
       const shake = s === 'windup' ? (Math.random() - 0.5) * 2 : 0;
-      R.sprite(Sprites.cerberusHD(barking, breath), { x: x + shake, y, z: down ? -3 : 0, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H,
-        glow: { r: 46, color: s === 'windup' || s === 'charge' ? '255,60,40' : POT.red, a: (s === 'windup' ? 0.5 + 0.3 * Math.sin(now * 20) : 0.35) * a },
+      R.sprite(Sprites.cerberusHD(barking, breath), { x: x + shake, y, z: down ? -3 : 0, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
+        glow: { r: 46, color: s === 'windup' || s === 'charge' ? '255,60,40' : POT.red, a: (s === 'windup' ? 0.3 + 0.2 * Math.sin(now * 20) : 0.18) * a },
         after: (pc, b) => {
           if (s !== 'stunned' && s !== 'tired' && s !== 'lulled') return;
           // Αστεράκια / ιδρώτας: μικρές φωτεινές κουκκίδες που γυρίζουν πάνω από τα κεφάλια.
@@ -440,7 +440,7 @@ const World3D = {
       const hunting = m.state === 'hunt' && !m.isFrozen();
       const k = Math.floor(now * 3) % 3;
       const barking = [0, 1, 2].map((i) => hunting && i >= m.asleep && i === k);
-      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H,
+      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H, ent: m,
         glow: { r: 40, color: POT.red, a: a * 0.45 } });
       return;
     }
@@ -453,10 +453,11 @@ const World3D = {
     // Θέση των ματιών σε pixels του (HD) καρέ.
     const [eyeX, eyeY, eyeColor] = erinys ? [fr.w / 2, 18, '255,210,90'] : [45, 15, '255,250,235'];
     R.sprite(fr, {
-      x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : erinys ? 0.48 : 1,
+      x, y, z: hover, alpha: a, flip, fog: false, scale: ghoul ? 0.5 : erinys ? 0.48 : 1, ent: m,
       glow: { r: 30, color: POT.red, a: a * 0.5 },
       after: (pc, b) => {
         const s = b.h / fr.h;   // art px ανά pixel του sprite
+        if (b.model) { if (icon && m.revealState !== 'wander') Sprites.blit(pc, m.revealState === 'hunt' ? 'iconHear' : 'iconSearch', 0, b.sx, b.top - 2, { alpha: a * (0.65 + 0.35 * Math.sin(now * 10)), scale: Math.max(1, Math.min(3, Math.round(s * 0.6))) }); return; }
         const ex = b.left + (flip ? fr.w - eyeX : eyeX) * s, ey = b.top + eyeY * s;
         if (!R.visible(ex, b.depth)) return;
         pc.globalCompositeOperation = 'lighter';
