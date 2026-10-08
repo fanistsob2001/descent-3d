@@ -210,6 +210,7 @@ const Scare = {
   prepare(kind = 'shade') {
     if (!this.kinds) this.build();
     this.kind = this.kinds[kind] ? kind : 'shade';
+    this.kindName = this.kind;
     this.seed = Math.random() * 100;
     // Δύο ή τρία χέρια: x = θέση στο πλάτος της οθόνης, flip = δεξί χέρι.
     const n = Math.random() < 0.5 ? 2 : 3;
@@ -261,6 +262,38 @@ const Scare = {
     halo.addColorStop(1, Pottery.rgba(K.halo, 0));
     ctx.fillStyle = halo;
     ctx.fillRect(0, 0, w, h);
+
+    // Με τη μηχανή WebGL: το ίδιο το 3D μοντέλο του τέρατος ορμάει (με φτερά / κεφάλια / χέρια του).
+    if (typeof GL3D !== 'undefined' && GL3D.use() && Settings.models !== 'off') {
+      const r = GL3D.renderScare(this.kindName, t, grow, (Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+      if (r) {
+        const glitchG = (t > 0.19 && t < 0.235) || (t > 0.5 && Math.random() < 0.5);
+        if (glitchG) {
+          const bands = 7;
+          for (let b = 0; b < bands; b++) {
+            const by = (h / bands) * b, bh = h / bands;
+            ctx.drawImage(r.canvas, 0, by, w, bh, Math.round((Math.random() - 0.5) * w * 0.12), by, w, bh);
+          }
+        } else ctx.drawImage(r.canvas, 0, 0);
+        const fl = t > 0.42 ? (t - 0.42) / (SCARE_TIME - 0.42) : 0;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const [px, py] of r.eyes) {
+          const R = Math.max(2, w * 0.012 * (1 + grow * 2) * (1 + fl * 2)) * (0.9 + 0.2 * Math.random());
+          const g = ctx.createRadialGradient(px, py, 0, px, py, R);
+          g.addColorStop(0, `rgba(${K.eyeColor},${(0.55 + 0.45 * fl).toFixed(3)})`);
+          g.addColorStop(1, `rgba(${K.eyeColor},0)`);
+          ctx.fillStyle = g;
+          ctx.fillRect(px - R, py - R, R * 2, R * 2);
+        }
+        ctx.restore();
+        ctx.fillStyle = Pottery.rgba(POT.light, 0.12);
+        for (let i = 0; i < 10; i++) ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * w * 0.4, 1);
+        Pottery.meander(ctx, 0, 0, w, 7, POT.terra, 0.6, 1);
+        Pottery.meander(ctx, 0, h - 7, w, 7, POT.terra, 0.6, 1);
+        return;
+      }
+    }
 
     // Φτερά που ανοίγουν πίσω από το πρόσωπο και χτυπάνε.
     if (K.wing) {

@@ -742,9 +742,11 @@ precision mediump float;
 varying vec3 vN;
 varying vec4 vCol;
 uniform vec3 uLight;
-uniform float uAlpha, uGhost;
+uniform float uAlpha, uGhost, uAmb;
 void main() {
-  float l = 0.38 + 0.75 * abs(dot(normalize(vN), uLight));
+  // Ομαλή σκίαση: κύριο φως από την πλευρά της κάμερας / πάνω, λίγο φως και από πίσω (ώστε να μη γίνεται μαύρο).
+  float d = dot(normalize(vN), uLight);
+  float l = uAmb + 0.82 * max(d, 0.0) + 0.14 * max(-d, 0.0);
   vec3 c = (vCol.a > 0.5 || uGhost > 0.5) ? vCol.rgb : vCol.rgb * l;
   gl_FragColor = vec4(c * uAlpha, uAlpha);
 }`;
@@ -756,8 +758,9 @@ void main() {
     this.mprog = mp;
     this.mloc = {};
     for (const n of ['aPos', 'aNorm', 'aCol']) this.mloc[n] = gl.getAttribLocation(mp, n);
-    for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uLight', 'uAlpha', 'uGhost']) this.mloc[n] = gl.getUniformLocation(mp, n);
+    for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uLight', 'uAlpha', 'uGhost', 'uAmb']) this.mloc[n] = gl.getUniformLocation(mp, n);
     this.mvbo = gl.createBuffer();
+    this.mcache = new Map();      // τα ακίνητα σκηνικά: τρίγωνα στον κόσμο, μία φορά
     this.track = new WeakMap();    // ανά χαρακτήρα: προς τα πού πηγαίνει και πόσο γρήγορα (για το γύρισμα και το βάδισμα)
     this.stex = new WeakMap();     // καμβάς → υφή WebGL
     this.lathes = {};              // όνομα sprite → πλέγμα τορνευτού σώματος
@@ -837,6 +840,9 @@ void main() {
     const rx = -R.dirY, ry = R.dirX;
     const L = [-R.dirX * 0.6 - rx * 0.35, -R.dirY * 0.6 - ry * 0.35, 0.7], ll = Math.hypot(...L);
     gl.uniform3f(U.uLight, L[0] / ll, L[1] / ll, L[2] / ll);
+    // Στο ύπαιθρο (μέρα) περισσότερο φως από παντού.
+    const outd = typeof Level !== 'undefined' && RC_OUTDOOR[Level.regionAt(Math.floor(R.posX), Math.floor(R.posY))];
+    gl.uniform1f(U.uAmb, outd ? 0.3 + 0.35 * outd.light : 0.3);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.mvbo);
     gl.enableVertexAttribArray(U.aPos);
     gl.enableVertexAttribArray(U.aNorm);
@@ -874,11 +880,32 @@ void main() {
         yaw = tr.yaw;
         walk = tr.speed;
       }
+      const stat = MODEL_STATIC.has(m.name);
+      if (yaw === undefined && stat) yaw = MHASH(m.x * 3.1, m.y * 1.7) * Math.PI * 2;
+      if (m.name === 'obol' || m.name === 'stringCoil') yaw = now * 2.2;
       if (yaw === undefined) yaw = m.name === 'boat3d' ? toCam + Math.PI / 2 : toCam;
       if (m.name === 'euryLying') yaw = 0.6;
+      const frameIdx = Math.max(0, (Sprites.hdFrames[m.frame.name] || []).indexOf(m.frame));
+      // Τα ακίνητα σκηνικά: τα τρίγωνά τους φτιάχνονται μία φορά (cache) — δεν κινούνται.
+      if (stat) {
+        const key = m.name + '|' + frameIdx + '|' + m.x.toFixed(2) + '|' + m.y.toFixed(2) + '|' + m.z.toFixed(2) + '|' + m.h.toFixed(3) + '|' + (m.frame.dim || 1) + '|' + yaw.toFixed(2);
+        let arr = this.mcache.get(key);
+        if (!arr) {
+          const out = [];
+          Models.emit(m.name, { x: m.x, y: m.y, z: m.z }, yaw, m.h, Models.pose(m.name, { t: 0, walk: 0, phase: 0, frame: frameIdx }), out, m.frame.dim || 1);
+          arr = new Float32Array(out);
+          if (this.mcache.size > 3000) this.mcache.clear();
+          this.mcache.set(key, arr);
+        }
+        gl.uniform1f(U.uAlpha, m.alpha);
+        gl.uniform1f(U.uGhost, 0);
+        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STREAM_DRAW);
+        gl.drawArrays(gl.TRIANGLES, 0, arr.length / 10);
+        continue;
+      }
       const pose = Models.pose(m.name, {
         t: now + (m.x * 7.1 + m.y * 3.3) % 10, walk: m.name === 'cerberus' && ent && ent.bstate === 'charge' ? 1 : walk,
-        phase: tr ? tr.phase : now * 4, frame: Math.max(0, (Sprites.hdFrames[m.frame.name] || []).indexOf(m.frame)),
+        phase: tr ? tr.phase : now * 4, frame: frameIdx, scare: m.scare || 0,
         bark: m.frame.bark ? m.frame.bark.map(Number) : null,
         lie: ent && ['tired', 'lulled', 'asleep'].includes(ent.bstate), asleep: ent && ent.asleep >= 3, sleepHeads: ent ? ent.asleep : 0,
       });
@@ -895,6 +922,42 @@ void main() {
     gl.disableVertexAttribArray(U.aNorm);
     gl.disableVertexAttribArray(U.aCol);
     gl.depthMask(true);
+  },
+
+  // ---- Το jump scare με το 3D μοντέλο του τέρατος (js/scare.js το καλεί όταν ζωγραφίζει το WebGL) ----
+  // Το τέρας ορμάει από το βάθος ως ακριβώς μπροστά στα μάτια σου, ανοίγει το στόμα / τα σαγόνια, απλώνει τα χέρια
+  // (ή χτυπάει τα φτερά). Ζωγραφίζεται στον καμβά του WebGL (διάφανο φόντο)· επιστρέφει πού πέφτουν τα μάτια του.
+  renderScare(kind, t, lunge, shakeX, shakeY) {
+    if (!this.ok) return null;
+    const gl = this.gl, R = Raycast, W = R.W, H = R.H;
+    if (this.W !== W || this.H !== H) this.resize(W, H);
+    if (!this.sprog) this.initSprites();
+    const name = { shade: 'ghoul', erinys: 'erinys3d', cerberus: 'cerberus' }[kind] || 'ghoul';
+    const spec = { ghoul: [0.72, 0.84, 0.25], erinys3d: [0.78, 0.93, 0.05], cerberus: [0.9, 0.88, 1.0] }[name];   // ύψος (κελιά), ύψος προσώπου, μπροστά
+    const save = {};
+    for (const k of ['posX', 'posY', 'dirX', 'dirY', 'planeX', 'planeY', 'horizon', 'pc', 'ps']) save[k] = R[k];
+    const plane = (W / 2) / R.focal;
+    Object.assign(R, { posX: 0, posY: 0, dirX: 1, dirY: 0, planeX: 0, planeY: plane, horizon: H / 2, pc: 1, ps: 0 });
+    const h = spec[0], face = spec[1] * h;
+    const d = 2.8 - 2.62 * lunge + spec[2] * h;                // η μουσούδα του σκύλου είναι πιο μπροστά από το κεφάλι
+    const m = { name, x: d + shakeX * 0.004, y: shakeY * 0.004, z: RC_EYE - face, h, alpha: 1, depth: d, o: { yaw: Math.PI }, frame: { name: '' },
+      scare: t < 0.13 ? 0.2 : t < 0.22 ? 0.6 : 1 };
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    this.frameNo = (this.frameNo || 0) + 1;
+    this.drawModels([m], true);
+    gl.disable(gl.BLEND);
+    // Τα μάτια (για τη λάμψη τους): από το μοντέλο, χωρίς τη στάση.
+    const eyes = [].map(([ex, ey, ez]) => {
+      const wx = m.x - ey * h, wy = m.y - ex * h;              // yaw = π: μπροστά = −x, δεξιά = −y
+      const p = R.project(wx * TILE, wy * TILE, (m.z + ez * h) * TILE);
+      return p ? [p.sx, p.sy] : null;
+    }).filter(Boolean);
+    Object.assign(R, save);
+    return { canvas: this.canvas, eyes };
   },
 
   // Αντί για το Raycast.flushSprites όταν ζωγραφίζει το WebGL.

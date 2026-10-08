@@ -218,7 +218,7 @@ const World3D = {
     if (!Level.barsOpen) {
       for (const b of Level.bars) {
         const a = Math.max(0.25, Math.min(1, (Raycast.cellLight[b.ty * Level.cols + b.tx] || 0) * 1.5));
-        R.sprite(S('bars'), { x: b.x, y: b.y - TILE * 0.45, alpha: a, scale: 0.55 });
+        R.sprite(S('bars'), { x: b.x, y: b.y - TILE * 0.45, alpha: a, scale: 0.55, yaw: Math.PI / 2 });
       }
     }
 
@@ -233,7 +233,7 @@ const World3D = {
     for (const h of Hides.list) {
       const age = now - h.revealTime;
       const a = Math.max(age < 3 ? Math.min(1, 0.3 + h.revealStrength) * (1 - age / 3) : 0, Math.min(1, cellLit(h.x, h.y) * 1.4));
-      if (a > 0.02 && Hides.active !== h) R.sprite(S('niche'), { x: h.x + h.wx * TILE * 0.38, y: h.y + h.wy * TILE * 0.38, alpha: a, scale: 0.75 });
+      if (a > 0.02 && Hides.active !== h) R.sprite(S('niche'), { x: h.x + h.wx * TILE * 0.38, y: h.y + h.wy * TILE * 0.38, alpha: a, yaw: Math.atan2(-h.wy, -h.wx), scale: 0.75 });
     }
 
     // ---- Σκιές και Ερινύες ----
