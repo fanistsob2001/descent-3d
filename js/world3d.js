@@ -15,6 +15,7 @@ const OBOL = [
   '.yYYYy.',
   '..yyy..',
 ];
+const THRONE_NEAR = 8;   // μονάδες: πόσο πλησιάζουν οι δύο θρόνοι από το κέντρο του κελιού τους
 const STRING_COIL = [
   '..111..',
   '.1...1.',
@@ -332,10 +333,11 @@ const World3D = {
         R.sprite(S('grass'), { x: d.x, y: d.y - 2, alpha: a * 0.8 });
         R.sprite(S('snake3d', hiss), { x: d.x, y: d.y, alpha: a, flip: true, bias: 0.01, scale: 0.36 });
       } else if (d.kind === 'hades') {
-        R.sprite(S('hades3d'), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
-        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 26, alpha: a, h: 10 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
+        // Οι δύο θρόνοι δίπλα δίπλα (σε διπλανά κελιά, και λίγο πιο κοντά ο ένας στον άλλο: ~2 μ.).
+        R.sprite(S('hades3d'), { x: d.x, y: d.y + THRONE_NEAR, alpha: a, scale: 0.44 });
+        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 18, alpha: a, h: 10 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
       } else {
-        R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
+        R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y - THRONE_NEAR, alpha: a, scale: 0.44 });
       }
     }
 

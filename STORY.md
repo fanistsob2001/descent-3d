@@ -333,7 +333,7 @@ VIII "Cross the River of Fire", X "Pass the Gate of Hades".
   - "Phaedra. Love was the only monster I ever met, and it wore my own face."
 - The recipes, at the shrine of the River of Wailing (III), the first chapter after Charon: "A potter's tablet, left at the shrine of Hermes. Clay and wine make a libation jar: break it, and the dead run to the sound. Honey and poppy make a cake that puts beasts to sleep. Bronze and thread make a bell that rings when you are already gone. Pine resin and wax let the lyre sing once more. Bring what you find in the chests to a shrine, and make what you need there."
   Until you read it, the shrine says: You do not know how to make anything yet.
-- Before the arena of Cerberus (X): "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet, or play to him from close. Three heads, three sleeps. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate"
+- Before the arena of Cerberus (X): "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet. Music does not reach him here. Three heads, three cakes. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate"
 
 ### Prologue (playable, chapter 0)
 
@@ -391,7 +391,8 @@ An arena before the gate, with pillars and braziers (lit, so you can see him). S
 Tiny Tiger in Crash Bandicoot: Cerberus cannot see, but he smells you. He turns to you, growls and paws the
 ground (the warning), then charges in a straight line to where you stood. Step aside: he slams into the stone
 and staggers. After three charges he lies down, panting — the only moment he can be put to sleep: throw a honey
-cake near him (he eats it, even one that was already on the ground) or play the Melody close to him. One head
+cake near him (he eats it, even one that was already on the ground). Only the honey cake works — the Melody
+does not (the user asked for a single way). One head
 sleeps; he rises angrier and faster. Three heads, three phases; a health bar at the top of the screen shows how
 many heads are still awake. If you hide behind a pillar, he walks around it instead of charging. When all
 three sleep, the gate opens. The chests of this chapter hold honey cakes, and they fill again after a while.

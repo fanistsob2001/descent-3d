@@ -155,7 +155,7 @@ const STORY = {
     "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer.",
     "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed.",
     "Phaedra. Love was the only monster I ever met, and it wore my own face.",
-    "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet, or play to him from close. Three heads, three sleeps. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate",
+    "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet. Music does not reach him here. Three heads, three cakes. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate",
   ],
   // Τι κάνει κάθε αντικείμενο (στο Inventory και στο ιερό, όταν πας να το φτιάξεις).
   toolInfo: {
