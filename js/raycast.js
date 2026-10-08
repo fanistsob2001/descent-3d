@@ -82,6 +82,7 @@ const Raycast = {
   fov: RC_FOV,        // οριζόντιο οπτικό πεδίο (το main βάζει RC_FOV_PC στο PC)
   focal: 0,           // art pixels ανά μονάδα (σε απόσταση 1 κελιού = 1 κελί)
   horizon: 0,
+  pc: 1, ps: 0,       // cos, sin της κλίσης του βλέμματος (μόνο η μηχανή WebGL· ο raycaster: 1, 0)
   // Η κάμερα του τελευταίου καρέ (για τα sprites): θέση σε κελιά, κατεύθυνση, επίπεδο.
   posX: 0, posY: 0, dirX: 1, dirY: 0, planeX: 0, planeY: 0,
 
@@ -826,19 +827,21 @@ const Raycast = {
       const sx = rdx < 0 ? -1 : 1, sy = rdy < 0 ? -1 : 1;
       let sdx = (rdx < 0 ? posX - tx : tx + 1 - posX) * ddx;
       let sdy = (rdy < 0 ? posY - ty : ty + 1 - posY) * ddy;
-      let dist = RC_MAX;
+      let dist = RC_MAX, wh = 1;
       while (true) {
         let d;
         if (sdx < sdy) { d = sdx; sdx += ddx; tx += sx; } else { d = sdy; sdy += ddy; ty += sy; }
         if (d >= RC_MAX) break;
-        if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) { dist = d; break; }
+        if (tx < 0 || ty < 0 || tx >= cols || ty >= rows) { dist = d; wh = 3; break; }
         const ci = ty * cols + tx;
-        if (L.opaque[ci] === 1 && gateAt[ci] < 0 && this.wallH[ci] >= RC_EYE) { dist = d; break; }
+        if (L.opaque[ci] === 1 && gateAt[ci] < 0 && this.wallH[ci] >= RC_EYE) { dist = d; wh = this.wallH[ci]; break; }
       }
       this.zbuf[x] = dist;
-      const lineH = this.focal / dist;
-      this.wallTop[x] = hz - lineH * (1 - RC_EYE);
-      this.wallBot[x] = hz + lineH * RC_EYE;
+      // (με την κλίση του βλέμματος: η βάση και η κορυφή του τοίχου σε αυτή τη στήλη)
+      const yb = -RC_EYE, yt = wh - RC_EYE;
+      const db = Math.max(0.05, dist * this.pc + yb * this.ps), dt = Math.max(0.05, dist * this.pc + yt * this.ps);
+      this.wallBot[x] = hz - (this.focal * (yb * this.pc - dist * this.ps)) / db;
+      this.wallTop[x] = hz - (this.focal * (yt * this.pc - dist * this.ps)) / dt;
     }
   },
 
@@ -857,7 +860,7 @@ const Raycast = {
     const plane = (W / 2) / this.focal;
     const planeX = -dirY * plane, planeY = dirX * plane;
     const hz = H * 0.5 + bob;
-    Object.assign(this, { posX, posY, dirX, dirY, planeX, planeY, horizon: hz });
+    Object.assign(this, { posX, posY, dirX, dirY, planeX, planeY, horizon: hz, pc: 1, ps: 0 });
 
     this.prepareLight(now);
     const cl = this.cellLight, se = this.segExtra, exA = this.exitA, red = this.redCell, rs = this._redSrc;
@@ -1314,12 +1317,16 @@ const Raycast = {
 
   // Προβολή ενός σημείου του κόσμου (x, y σε μονάδες) στην οθόνη: { sx, depth } ή null
   // αν είναι πίσω από την κάμερα. depth σε κελιά (για σύγκριση με το zbuf).
-  project(x, y) {
+  // zu = ύψος του σημείου σε μονάδες (προεπιλογή: στο ύψος των ματιών)· sy = πού πέφτει κάθετα στην οθόνη. Με
+  // τη μηχανή WebGL η κάμερα γέρνει πάνω-κάτω (pc, ps = cos, sin της κλίσης)· ο raycaster μετατοπίζει τον ορίζοντα.
+  project(x, y, zu) {
     const rx = x / TILE - this.posX, ry = y / TILE - this.posY;
     const inv = 1 / (this.planeX * this.dirY - this.dirX * this.planeY);
     const tX = inv * (this.dirY * rx - this.dirX * ry);
     const tY = inv * (-this.planeY * rx + this.planeX * ry);
-    if (tY <= 0.05) return null;
-    return { sx: (this.W / 2) * (1 + tX / tY), depth: tY };
+    const y0 = zu === undefined ? 0 : zu / TILE - RC_EYE;
+    const d = tY * this.pc + y0 * this.ps, yc = y0 * this.pc - tY * this.ps;
+    if (d <= 0.05) return null;
+    return { sx: (this.W / 2) * (1 + tX / d), sy: this.horizon - (this.focal * yc) / d, depth: d };
   },
 };

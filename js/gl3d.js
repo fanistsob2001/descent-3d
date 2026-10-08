@@ -30,6 +30,7 @@ attribute vec2 aC;        // το κελί μπροστά από τον τοίχ
 uniform vec3 uEye;        // θέση (κελιά), ύψος ματιών
 uniform vec2 uDir;        // κατεύθυνση βλέμματος
 uniform vec4 uProj;       // 2·focal/W, 2·focal/H, 1 − 2·horizon/H, (κενό)
+uniform vec2 uPitch;      // cos, sin της κλίσης του βλέμματος
 varying vec3 vPos;
 varying vec4 vA;
 varying vec4 vB;
@@ -38,8 +39,10 @@ varying float vDepth;
 void main() {
   vec2 d = aPos.xy - uEye.xy;
   float xc = dot(d, vec2(-uDir.y, uDir.x));
-  float zc = dot(d, uDir);
-  float yc = aPos.z - uEye.z;
+  // Η κάμερα γέρνει πάνω-κάτω (uPitch = cos, sin): αληθινή προοπτική, όχι μετατόπιση του ορίζοντα.
+  float zc0 = dot(d, uDir), yc0 = aPos.z - uEye.z;
+  float zc = zc0 * uPitch.x + yc0 * uPitch.y;
+  float yc = yc0 * uPitch.x - zc0 * uPitch.y;
   float n = 0.02, f = 60.0;
   gl_Position = vec4(uProj.x * xc, uProj.y * yc + uProj.z * zc, zc * (f + n) / (f - n) - 2.0 * f * n / (f - n), zc);
   vPos = aPos; vA = aA; vB = aB; vC = aC; vDepth = zc;
@@ -62,6 +65,11 @@ uniform vec4 uWaves[${GL_MAX_WAVES}];     // x, y (μονάδες), r, έντα�
 uniform float uWaveRays[${GL_MAX_WAVES}];  // πόσες ακτίνες (0 = κανένα κύμα)
 uniform vec3 uRed[${GL_MAX_RED}];         // x, y (κελιά), ένταση
 uniform float uRing;
+uniform float uReflect;       // 1 = δεύτερο πέρασμα: μόνο οι αντανακλάσεις στο νερό
+uniform sampler2D uScene;     // ο κόσμος όπως ζωγραφίστηκε (αντίγραφο της οθόνης)
+uniform sampler2D uCols;      // ανά στήλη: πού είναι η βάση / η κορυφή του πρώτου τοίχου (Raycast.castZ)
+uniform vec2 uScreen;         // W, H
+float colY(vec2 hl) { return (hl.x * 255.0 * 256.0 + hl.y * 255.0) / 16.0 - 1024.0; }
 
 float bit(float m, float k) { return mod(floor(m / pow(2.0, k)), 2.0); }
 
@@ -103,6 +111,24 @@ vec2 rings(vec2 p, float floorK) {
 }
 
 void main() {
+  if (uReflect > 0.5) {
+    // Μόνο νερό (όχι λάβα): ο τοίχος από πάνω, καθρεφτισμένος γύρω από τη βάση του.
+    if (vA.x > 1.5 || vA.x < 0.5 || vB.y < 0.5) discard;
+    vec4 inf = texture2D(uInfo, (floor(vPos.xy) + 0.5) / uWorld);
+    if (mod(inf.g * 255.0, 2.0) > 0.5) discard;
+    float col = floor(gl_FragCoord.x);
+    float y = uScreen.y - gl_FragCoord.y;
+    vec4 cw = texture2D(uCols, vec2((col + 0.5) / uScreen.x, 0.5));
+    float wb = colY(cw.rg), wt = colY(cw.ba);
+    if (wb >= uScreen.y || y <= wb) discard;
+    float my = floor(2.0 * wb - y + 0.5);
+    if (my < 0.0 || my < wt) discard;
+    float mx = clamp(col + floor(sin(vPos.y * 14.0 + uTime * 2.2) * 1.2 + 0.5), 0.0, uScreen.x - 1.0);
+    vec3 c = texture2D(uScene, vec2((mx + 0.5) / uScreen.x, 1.0 - (my + 0.5) / uScreen.y)).rgb;
+    float k = 0.45 * max(0.0, 1.0 - (y - wb) / (wb - wt + 1.0));
+    gl_FragColor = vec4(c * k, 0.0);
+    return;
+  }
   float kind = vA.x;
   float fog = max(uFogMin, 1.0 - vDepth * uTile / uFogDist);
   vec2 wp = vPos.xy * uTile;
@@ -270,12 +296,12 @@ const GL3D = {
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
       this.prog = p;
       for (const n of ['aPos', 'aA', 'aB', 'aC']) this.loc[n] = gl.getAttribLocation(p, n);
-      for (const n of ['uEye', 'uDir', 'uProj', 'uWallAtlas', 'uFloorAtlas', 'uCell', 'uSeg', 'uRays', 'uInfo', 'uWorld', 'uSegSize',
+      for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uWallAtlas', 'uFloorAtlas', 'uCell', 'uSeg', 'uRays', 'uInfo', 'uWorld', 'uSegSize',
         'uSegPer', 'uWallAtlasSize', 'uFloorAtlasSize', 'uTime', 'uFogDist', 'uFogMin', 'uFocal', 'uExitA', 'uTile', 'uWaves',
-        'uWaveRays', 'uRed', 'uRing']) this.loc[n] = gl.getUniformLocation(p, n);
+        'uWaveRays', 'uRed', 'uRing', 'uReflect', 'uScene', 'uCols', 'uScreen']) this.loc[n] = gl.getUniformLocation(p, n);
       this.vbo = gl.createBuffer();
       this.tex = {};
-      for (const n of ['wall', 'floor', 'cell', 'seg', 'rays', 'info']) {
+      for (const n of ['wall', 'floor', 'cell', 'seg', 'rays', 'info', 'scene', 'cols']) {
         const t = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, t);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -337,7 +363,7 @@ const GL3D = {
   build() {
     const gl = this.gl, L = Level, R = Raycast, cols = L.cols, rows = L.rows;
     if (this.atlasesFor !== R.walls) this.buildAtlases();
-    const v = [];
+    const v = [], waterV = [];
     // Μία κορυφή: θέση (3), aA (4), aB (4), aC (2) = 13 floats.
     const vert = (x, y, z, a0, a1, a2, a3, b0, b1, b2, b3, c0, c1) => v.push(x, y, z, a0, a1, a2, a3, b0, b1, b2, b3, c0, c1);
     const quad = (p, A, B, C) => {
@@ -425,6 +451,8 @@ const GL3D = {
           const water = t === T_WATER || R.gateAt[c] >= 0 ? 1 : 0;
           const fi = this.floorIdx.get(R.cellFloor[c]) || 0;
           quad([[tx, ty, 0, 0], [tx, ty + 1, 0, 0], [tx + 1, ty + 1, 0, 0], [tx + 1, ty, 0, 0]], [1, fi, fi, -1], [0, water, 0, 0], [tx, ty]);
+          // (τα νερά και σε δική τους λίστα, για το πέρασμα των αντανακλάσεων)
+          if (water && !R.lava[c]) waterV.push(...v.slice(v.length - 6 * 13));
         }
         if (R.ceilOn[c]) {
           const ci = this.floorIdx.get(R.cellCeil[c]) || 0;
@@ -432,6 +460,11 @@ const GL3D = {
         }
       }
     }
+    if (!this.wvbo) this.wvbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.wvbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(waterV), gl.STATIC_DRAW);
+    this.waterCount = waterV.length / 13;
+    this.hasWater = this.waterCount > 0;
     const data = new Float32Array(v);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
@@ -483,8 +516,9 @@ const GL3D = {
     const posX = px / TILE, posY = py / TILE;
     const dirX = Math.cos(angle), dirY = Math.sin(angle);
     const plane = (W / 2) / R.focal;
-    const hz = H * 0.5 + bob;
-    Object.assign(R, { posX, posY, dirX, dirY, planeX: -dirY * plane, planeY: dirX * plane, horizon: hz });
+    const pitch = Math.atan(bob / R.focal);
+    const hz = H * 0.5;
+    Object.assign(R, { posX, posY, dirX, dirY, planeX: -dirY * plane, planeY: dirX * plane, horizon: hz, pc: Math.cos(pitch), ps: Math.sin(pitch) });
     R.prepareLight(now);
     R.castZ();
 
@@ -536,6 +570,7 @@ const GL3D = {
     const U = this.loc;
     gl.uniform3f(U.uEye, posX, posY, RC_EYE);
     gl.uniform2f(U.uDir, dirX, dirY);
+    gl.uniform2f(U.uPitch, R.pc, R.ps);
     gl.uniform4f(U.uProj, (2 * R.focal) / W, (2 * R.focal) / H, 1 - (2 * hz) / H, 0);
     gl.uniform2f(U.uWorld, cols, L.rows);
     gl.uniform2f(U.uSegSize, this.segSize[0], this.segSize[1]);
@@ -565,11 +600,41 @@ const GL3D = {
       gl.vertexAttribPointer(U[name], size, gl.FLOAT, false, stride, off * 4);
     };
     attr('aPos', 3, 0); attr('aA', 4, 3); attr('aB', 4, 7); attr('aC', 2, 11);
+    gl.uniform1f(U.uReflect, 0);
     gl.drawArrays(gl.TRIANGLES, 0, this.count);
+
+    // Οι αντανακλάσεις στο νερό: αντίγραφο της οθόνης, και ξανά τα νερά με προσθετικό φως (χωρίς εγγραφή βάθους).
+    if (this.hasWater) {
+      const cols = this.colData && this.colData.length === W * 4 ? this.colData : (this.colData = new Uint8Array(W * 4));
+      for (let x = 0; x < W; x++) {
+        const enc = (y) => Math.max(0, Math.min(65535, Math.round((y + 1024) * 16)));
+        const b = enc(R.zbuf[x] < RC_MAX ? R.wallBot[x] : 1e4), t = enc(R.wallTop[x]);
+        cols[x * 4] = b >> 8; cols[x * 4 + 1] = b & 255; cols[x * 4 + 2] = t >> 8; cols[x * 4 + 3] = t & 255;
+      }
+      gl.activeTexture(gl.TEXTURE7);
+      gl.bindTexture(gl.TEXTURE_2D, this.tex.cols);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, W, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, cols);
+      gl.uniform1i(U.uCols, 7);
+      gl.activeTexture(gl.TEXTURE6);
+      gl.bindTexture(gl.TEXTURE_2D, this.tex.scene);
+      gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, W, H, 0);
+      gl.uniform1i(U.uScene, 6);
+      gl.uniform2f(U.uScreen, W, H);
+      gl.uniform1f(U.uReflect, 1);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.depthMask(false);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.wvbo);
+      attr('aPos', 3, 0); attr('aA', 4, 3); attr('aB', 4, 7); attr('aC', 2, 11);
+      gl.drawArrays(gl.TRIANGLES, 0, this.waterCount);
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
+      gl.uniform1f(U.uReflect, 0);
+    }
 
     // Οι μορφές (Raycast.sprite) μπαίνουν από πάνω στο ίδιο WebGL (με το βάθος του κόσμου) στο flushSprites,
     // και μετά όλα μαζί στον μικρό καμβά (composite).
-    this.pending = { outdoor: RC_OUTDOOR[L.regionAt(Math.floor(px / TILE), Math.floor(py / TILE))], hz, angle };
+    this.pending = { outdoor: RC_OUTDOOR[L.regionAt(Math.floor(px / TILE), Math.floor(py / TILE))], hz: hz + bob, angle };
   },
 
   // Στον μικρό καμβά: ο ουρανός (ύπαιθρο) ή σκοτάδι, και από πάνω ο κόσμος (και οι μορφές) του WebGL.
@@ -610,12 +675,15 @@ attribute vec4 aUV;       // u, v, άλφα, φωτεινότητα (lathe: σκ
 uniform vec3 uEye;
 uniform vec2 uDir;
 uniform vec4 uProj;
+uniform vec2 uPitch;
 varying vec4 vUV;
 void main() {
   vec2 d = aPos.xy - uEye.xy;
   float xc = dot(d, vec2(-uDir.y, uDir.x));
-  float zc = dot(d, uDir);
-  float yc = aPos.z - uEye.z;
+  // Η κάμερα γέρνει πάνω-κάτω (uPitch = cos, sin): αληθινή προοπτική, όχι μετατόπιση του ορίζοντα.
+  float zc0 = dot(d, uDir), yc0 = aPos.z - uEye.z;
+  float zc = zc0 * uPitch.x + yc0 * uPitch.y;
+  float yc = yc0 * uPitch.x - zc0 * uPitch.y;
   float n = 0.02, f = 60.0;
   gl_Position = vec4(uProj.x * xc, uProj.y * yc + uProj.z * zc, zc * (f + n) / (f - n) - 2.0 * f * n / (f - n), zc);
   vUV = aUV;
@@ -645,7 +713,7 @@ void main() {
     this.sprog = p;
     this.sloc = {};
     for (const n of ['aPos', 'aUV']) this.sloc[n] = gl.getAttribLocation(p, n);
-    for (const n of ['uEye', 'uDir', 'uProj', 'uTex', 'uCut']) this.sloc[n] = gl.getUniformLocation(p, n);
+    for (const n of ['uEye', 'uDir', 'uProj', 'uPitch', 'uTex', 'uCut']) this.sloc[n] = gl.getUniformLocation(p, n);
     this.svbo = gl.createBuffer();
     this.stex = new WeakMap();     // καμβάς → υφή WebGL
     this.lathes = {};              // όνομα sprite → πλέγμα τορνευτού σώματος
@@ -730,9 +798,10 @@ void main() {
       const fh = frame ? frame.h : 1, fw = frame ? frame.w : 1;
       const real = !o.h && frame && frame.name && RC_REAL_H[frame.name];
       const hu = o.h || (real ? real * (o.size || 1) : (fh / ((frame && frame.hd) || 1)) * RC_SPX * (o.scale || 1));   // ύψος σε μονάδες
-      const hpx = hu * k, wpx = (hpx * fw) / fh;
-      const bottom = R.horizon + (R.focal * (RC_EYE - (o.z || 0) / TILE)) / p.depth;
-      boxes.push({ o, p, box: { left: Math.round(p.sx - wpx / 2), top: Math.round(bottom - hpx), w: wpx, h: hpx, k, sx: p.sx, depth: p.depth, alpha } });
+      const pb = R.project(o.x, o.y, o.z || 0), pt = R.project(o.x, o.y, (o.z || 0) + hu);
+      const sx = pb ? pb.sx : p.sx, bottom = pb ? pb.sy : R.horizon;
+      const hpx = pt && pb ? Math.max(1, pb.sy - pt.sy) : hu * k, wpx = (hu * k * fw) / fh;
+      boxes.push({ o, p, box: { left: Math.round(sx - wpx / 2), top: Math.round(bottom - hpx), w: wpx, h: hpx, k, sx, depth: p.depth, alpha } });
       if (!frame) continue;
       const cv = o.flip ? frame.f : frame.c;
       const e = { cv, flip: false, o, x: o.x / TILE, y: o.y / TILE, z: (o.z || 0) / TILE, h: hu / TILE, w: (hu / TILE) * (fw / fh), alpha, depth: p.depth - (o.bias || 0) };
@@ -746,6 +815,7 @@ void main() {
     const U = this.sloc;
     gl.uniform3f(U.uEye, R.posX, R.posY, RC_EYE);
     gl.uniform2f(U.uDir, R.dirX, R.dirY);
+    gl.uniform2f(U.uPitch, R.pc, R.ps);
     gl.uniform4f(U.uProj, (2 * R.focal) / W, (2 * R.focal) / H, 1 - (2 * R.horizon) / H, 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(U.uTex, 0);
@@ -802,16 +872,16 @@ void main() {
     for (const { o, p, box } of boxes) {
       if (o.glow) {
         const g = o.glow, k = box.k, fog = o.fog === false ? 1 : Math.max(R.fogMin + 0.05, 1 - (p.depth * TILE) / R.fogDist);
-        const cy = box.top + box.h * (g.cy === undefined ? 0.5 : g.cy);
-        if (R.visible(p.sx, p.depth - 0.3)) {
+        const cy = box.top + box.h * (g.cy === undefined ? 0.5 : g.cy), gx = box.sx;
+        if (R.visible(gx, p.depth - 0.3)) {
           const Rr = Math.max(1, g.r * k);
-          const gr = pc.createRadialGradient(p.sx, cy, 0, p.sx, cy, Rr);
+          const gr = pc.createRadialGradient(gx, cy, 0, gx, cy, Rr);
           gr.addColorStop(0, 'rgba(' + g.color + ',' + (g.a * fog).toFixed(3) + ')');
           gr.addColorStop(1, 'rgba(' + g.color + ',0)');
           pc.globalAlpha = 1;
           pc.globalCompositeOperation = 'lighter';
           pc.fillStyle = gr;
-          pc.fillRect(p.sx - Rr, cy - Rr, Rr * 2, Rr * 2);
+          pc.fillRect(gx - Rr, cy - Rr, Rr * 2, Rr * 2);
         }
       }
       if (o.after) {

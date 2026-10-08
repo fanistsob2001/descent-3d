@@ -370,15 +370,14 @@ const World3D = {
     this.lights.length = 0;
     for (const a of Altars.list) {
       if (!a.lit) continue;
-      const p = R.project(a.x, a.y);
+      const p = R.project(a.x, a.y, 34);
       if (!p || p.depth > 9 || !R.visible(p.sx, p.depth - 0.2)) continue;
-      const y = R.horizon + (R.focal * (RC_EYE - 34 / TILE)) / p.depth;
-      this.lights.push({ x: p.sx, y, a: Math.min(1, 1.4 / p.depth) });
+      this.lights.push({ x: p.sx, y: p.sy, a: Math.min(1, 1.4 / p.depth) });
     }
     if (R.exitA > 0.2 && R.exitDir) {
       const [ix, iy] = R.exitDir;
-      const p = R.project(Level.exit.x - ix * TILE * 0.45, Level.exit.y - iy * TILE * 0.45);
-      if (p && R.visible(p.sx, p.depth - 0.3)) this.lights.push({ x: p.sx, y: R.horizon, a: R.exitA * 0.9 });
+      const p = R.project(Level.exit.x - ix * TILE * 0.45, Level.exit.y - iy * TILE * 0.45, RC_EYE * TILE);
+      if (p && R.visible(p.sx, p.depth - 0.3)) this.lights.push({ x: p.sx, y: p.sy, a: R.exitA * 0.9 });
     }
 
     if (typeof Prologue !== 'undefined' && Prologue.active) Prologue.sprites(R, now);
@@ -612,9 +611,9 @@ const World3D = {
     for (const d of this.drips) {
       const a = Math.min(1, cl[d.c] * 2);
       if (a < 0.05) continue;
-      const p = R.project(d.x, d.y);
+      const p = R.project(d.x, d.y, d.z);
       if (!p || !R.visible(p.sx, p.depth)) continue;
-      const y = R.horizon + (R.focal * (RC_EYE - d.z / TILE)) / p.depth;
+      const y = p.sy;
       pc.fillStyle = 'rgba(236,218,186,' + (a * 0.9).toFixed(3) + ')';
       pc.fillRect(Math.round(p.sx), Math.round(y), 1, p.depth < 2 ? 3 : 2);
     }
@@ -630,9 +629,9 @@ const World3D = {
       let pen = false;
       for (let k = 0; k <= 14; k++) {
         const ang = (k / 14) * Math.PI * 2;
-        const p = R.project(r.x + Math.cos(ang) * rad, r.y + Math.sin(ang) * rad);
+        const p = R.project(r.x + Math.cos(ang) * rad, r.y + Math.sin(ang) * rad, 0);
         if (!p) { pen = false; continue; }
-        const y = R.horizon + (R.focal * RC_EYE) / p.depth;
+        const y = p.sy;
         if (!pen) { pc.moveTo(p.sx, y); pen = true; } else pc.lineTo(p.sx, y);
       }
       pc.stroke();
@@ -685,9 +684,9 @@ const World3D = {
     pc.setTransform(1, 0, 0, 1, 0, 0);
     pc.globalCompositeOperation = 'lighter';
     for (const s of this.sparks) {
-      const p = R.project(s.x, s.y);
+      const p = R.project(s.x, s.y, s.z);
       if (!p || p.depth > 14 || !R.visible(p.sx, p.depth)) continue;
-      const y = R.horizon + (R.focal * (RC_EYE - s.z / TILE)) / p.depth;
+      const y = p.sy;
       const t = 1 - s.age / s.life;
       const size = p.depth < 1.2 ? 2 : 1;
       // Από λευκοκίτρινο (καυτό) σε πηλό καθώς σβήνει.
@@ -707,12 +706,12 @@ const World3D = {
     pc.globalCompositeOperation = 'lighter';
     for (const m of Fx.motes) {
       if (m.z === undefined) m.z = 4 + Math.random() * 32;
-      const p = R.project(m.x, m.y);
+      const z = m.z + Math.sin(now * 0.7 + m.ph) * 2;
+      const p = R.project(m.x, m.y, z);
       if (!p || p.depth > 10 || !R.visible(p.sx, p.depth)) continue;
       const l = Fx.light(m.x, m.y);
       if (l < 0.03) continue;
-      const z = m.z + Math.sin(now * 0.7 + m.ph) * 2;
-      const y = R.horizon + (R.focal * (RC_EYE - z / TILE)) / p.depth;
+      const y = p.sy;
       const s = p.depth < 1.5 ? 2 : 1;
       const tw = 0.6 + 0.4 * Math.sin(now * 3 + m.ph * 4);
       pc.fillStyle = `rgba(${POT.light},${Math.min(0.85, l * 0.9 * tw).toFixed(3)})`;
