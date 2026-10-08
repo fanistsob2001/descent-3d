@@ -10,20 +10,10 @@ const JAR_WAVE = { radius: 460, strength: 1 };
 const JAR_SHARDS_TIME = 1.2;     // πόσο φαίνονται τα θραύσματα
 
 const Jars = {
-  items: [],      // αγγεία στον αέρα ή σπασμένα
-  left: 0,        // πόσα κρατάει ο παίκτης
+  items: [],      // αγγεία στον αέρα ή σπασμένα (πόσα κρατάει ο παίκτης: Inventory)
 
-  reset(count) {
+  reset() {
     this.items = [];
-    this.left = count;
-  },
-
-  // Πέταγμα από (x, y) προς την κατεύθυνση (dx, dy) (μοναδιαίο διάνυσμα).
-  throw(x, y, dx, dy) {
-    if (this.left <= 0) return false;
-    this.left--;
-    this.launch(x, y, dx, dy, 'jar');
-    return true;
   },
 
   // Οτιδήποτε πετιέται (js/inventory.js): 'jar' σπάει με δυνατό ήχο, 'pebble' ένα μικρό "τικ",
@@ -80,7 +70,7 @@ const Jars = {
           Echoes.emit(it.x, it.y, 480, 0.95, 'jar');
           Sound.bell(it.x, it.y);
         }
-        const life = it.kind === 'cake' ? 12 : it.kind === 'bell' ? (it.rangAt ? it.rangAt - it.brokenAt + 2 : 99) : it.kind === 'pebble' ? 0.5 : JAR_SHARDS_TIME;
+        const life = it.kind === 'cake' ? 40 : it.kind === 'bell' ? (it.rangAt ? it.rangAt - it.brokenAt + 2 : 99) : it.kind === 'pebble' ? 0.5 : JAR_SHARDS_TIME;
         if (now - it.brokenAt > life) this.items.splice(i, 1);
         continue;
       }

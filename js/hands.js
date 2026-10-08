@@ -17,6 +17,7 @@ const Hands = {
   art: [],      // [ήρεμο, χτύπημα]: { c: καμβάς, s: σιλουέτα (μαύρη, για το σκοτάδι) }
 
   init() {
+    this.hold = this.buildHold();
     this.art = [false, true].map((pluck) => this.build(pluck));
     // Διπλή ανάλυση με σκίαση (όπως οι μορφές): λείες γραμμές, όγκος στα χέρια.
     this.artHD = this.art.map((a) => ({ c: Sprites.hdify(a.c), s: Sprites.hdify(a.s) }));
@@ -127,6 +128,84 @@ const Hands = {
       return cv;
     };
     return { c: make(false), s: make(true) };
+  },
+
+  // Το δεξί χέρι μόνο του (όταν κρατάς κάτι άλλο από τη λύρα): πήχης από κάτω δεξιά, με λευκό μανίκι,
+  // και μια γροθιά με την παλάμη προς τα πάνω (εκεί κάθεται το αντικείμενο). 44×40 art pixels.
+  buildHold() {
+    const W = 44, H = 40;
+    const px = new Array(W * H).fill(null);
+    const C = (k) => SPR_PAL[k];
+    const set = (x, y, col) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = col;
+    };
+    // Ο πήχης: από την κάτω δεξιά γωνία ως την παλάμη.
+    const x0 = 40, y0 = 42, x1 = 18, y1 = 20, t = 9;
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 2);
+    const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny);
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, cx = x0 + (x1 - x0) * f, cy = y0 + (y1 - y0) * f;
+      for (let k = -t / 2; k <= t / 2; k += 0.5) {
+        const sleeve = f < 0.45, shade = k > t / 2 - 2;
+        set(cx + (nx / nl) * k, cy + (ny / nl) * k, sleeve ? C(shade ? 'W' : 'w') : C(shade ? 'S' : 's'));
+      }
+    }
+    // Η παλάμη (ανοιχτή, προς τα πάνω) και τα δάχτυλα που κλείνουν γύρω από το αντικείμενο.
+    for (let y = 14; y <= 22; y++) {
+      for (let x = 8; x <= 24; x++) {
+        const e = ((x - 16) / 8.5) ** 2 + ((y - 19) / 4.2) ** 2;
+        if (e > 1) continue;
+        set(x, y, C(y > 20 ? 'S' : 's'));
+      }
+    }
+    for (const fx of [9, 12, 15]) for (let y = 13; y <= 16; y++) set(fx, y, C(y === 13 ? 's' : 'S'));   // δάχτυλα
+    for (let x = 21; x <= 24; x++) set(x, 15, C('s'));   // ο αντίχειρας
+    const out = px.slice();
+    const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && px[y * W + x] !== null;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (px[y * W + x] === null && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) out[y * W + x] = '26,12,6';
+    }
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const c = cv.getContext('2d');
+    const img = c.createImageData(W, H);
+    out.forEach((v, i) => {
+      if (v === null) return;
+      const [r, g, b] = v.split(',').map(Number);
+      img.data.set([r, g, b, 255], i * 4);
+    });
+    c.putImageData(img, 0, 0);
+    return { c: Sprites.hdify(cv), w: W, h: H, palmX: 16, palmY: 15 };
+  },
+
+  // Το χέρι με αυτό που κρατάς (εικονίδιο από το Inventory). o: { light, walkPhase, walkSpeed, thrown (0..1:
+  // πόσο πρόσφατα το πέταξες — το χέρι τινάζεται μπροστά και το αντικείμενο λείπει για λίγο) }.
+  drawHeld(pc, W, H, now, icon, o) {
+    const kh = Math.max(1, Math.round(Math.min(H, W * 0.75) / 216));
+    const k = 2 * kh;
+    const idle = 1 - Math.min(1, o.walkSpeed * 2);
+    const sway = Math.sin(o.walkPhase) * o.walkSpeed * 2.5 + Math.sin(now * 0.9) * 0.6 * idle;
+    const bob = (1 - Math.cos(o.walkPhase * 2)) * o.walkSpeed * 1.5 + (0.5 + 0.5 * Math.sin(now * 1.6)) * 1.1 * idle;
+    const th = o.thrown > 0 ? Math.sin(Math.min(1, o.thrown) * Math.PI) : 0;
+    const hd = this.hold;
+    const x0 = Math.round(W * 0.62 + (sway - th * 6) * k);
+    const y0 = Math.round(H - hd.h * k + (bob + 4 - th * 8) * k);
+    const bright = Math.min(1, 0.35 + o.light * 0.65);
+    pc.save();
+    pc.setTransform(1, 0, 0, 1, 0, 0);
+    pc.imageSmoothingEnabled = false;
+    pc.filter = bright < 0.99 ? 'brightness(' + bright.toFixed(2) + ')' : 'none';
+    pc.drawImage(hd.c, x0, y0, hd.w * k, hd.h * k);
+    // Το αντικείμενο στην παλάμη (ξαναεμφανίζεται λίγο μετά το πέταγμα).
+    if (icon && !(o.thrown > 0 && o.thrown < 0.7)) {
+      // ~14 pixels της ζωγραφιάς του χεριού το πιο μεγάλο του μέγεθος.
+      const s = (14 * k) / Math.max(icon.width, icon.height);
+      const iw = icon.width * s, ih = icon.height * s;
+      pc.drawImage(icon, Math.round(x0 + hd.palmX * k - iw / 2), Math.round(y0 + hd.palmY * k - ih + k), Math.round(iw), Math.round(ih));
+    }
+    pc.filter = 'none';
+    pc.restore();
   },
 
   // o: { strings (0..3), charge (0..1), charging, pluck (0..1: πόσο πρόσφατο ήταν το κύμα),

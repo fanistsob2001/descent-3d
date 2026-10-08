@@ -941,6 +941,34 @@ const Sound = {
     this.pluck(notes[i % notes.length], this.ctx.currentTime, 0.22);
   },
 
+  // Ο Κέρβερος πέφτει πάνω στην πέτρα: βαρύς γδούπος (χαμηλός τόνος που πέφτει + θόρυβος από πέτρες).
+  thud(x, y) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const out = this.spatial(x, y, 0.9, 900);
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(95, t);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.35);
+    const g = ac.createGain();
+    this.envelope(g.gain, t, 0.9, 0.004, 0.5);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.6);
+    const n = this.noiseSource();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(900, t);
+    lp.frequency.exponentialRampToValueAtTime(160, t + 0.5);
+    const ng = ac.createGain();
+    this.envelope(ng.gain, t, 0.55, 0.003, 0.45);
+    n.connect(lp); lp.connect(ng); ng.connect(out);
+    if (this.echoSend) ng.connect(this.echoSend);
+    n.start(t);
+    n.stop(t + 0.7);
+  },
+
   // Easter egg A: η σκιά χτυπάει στον τοίχο — ένα κούφιο "μπονκ".
   // Ακούγεται μόνο αν είσαι κοντά (αλλιώς θα αντηχούσε σε όλο τον χάρτη).
   bonk(x, y) {

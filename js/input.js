@@ -56,6 +56,7 @@ const Input = {
   chargeSource: null,   // 'key' ή pointerId
   onRelease: null,      // callback(heldSeconds)
   onCancel: null,       // callback() όταν η φόρτιση ακυρώνεται με σύρσιμο (ή X στο PC)
+  onPrimary: null,      // callback() στο αριστερό κλικ· true = το χειρίστηκε (π.χ. πέταξε αντικείμενο), όχι κύμα
   chargeX: 0,           // πού ακούμπησε το δάχτυλο που φορτίζει
   chargeY: 0,
   chargeDrag: 0,        // 0..1: πόσο κοντά είναι το σύρσιμο στην ακύρωση
@@ -157,7 +158,8 @@ const Input = {
           // Το κλικ ζήτησε ήδη να πιαστεί το ποντίκι (window pointerdown πιο πάνω)· δεν είναι κύμα.
           // (Όπου το κλείδωμα δεν γίνεται — lockFailed — το κλικ είναι κύμα, παρακάτω.)
         } else if (e.button === 0) {
-          this.startCharge('mouse');
+          // Αν κρατάς κάτι που πετιέται, το κλικ το πετάει (main.js)· αλλιώς είναι κύμα.
+          if (!(this.onPrimary && this.onPrimary())) this.startCharge('mouse');
         } else if (e.button === 2 && this.chargeSource === 'mouse') {
           this.dragCancel();   // δεξί κλικ ενώ φορτίζεις = ακύρωση (σαν το X)
         }

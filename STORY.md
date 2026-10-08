@@ -242,7 +242,7 @@ Side missions (title: description):
 - Mend the lyre: Find the three strings of your lyre.
 - The ferryman's toll: Find an obol and pay Charon.
 - Voices of the lost: Hear all nine lost souls.
-- Libations: Find every libation jar.
+- The potter's hands: Make each of the four offerings at a shrine. (Before 8/10: "Libations: Find every libation jar." — jars are no longer scattered on the map; you make them.)
 - Rekindle the flames: Light every altar.
 - The guardian sleeps: Lull the hound of Hades to sleep. (First-person version; before: secret, "Wake the hound of Hades.")
 - Three thousand years (secret): Find the shade that walks into the wall.
@@ -331,6 +331,9 @@ VIII "Cross the River of Fire", X "Pass the Gate of Hades".
   - "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer."
   - "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed."
   - "Phaedra. Love was the only monster I ever met, and it wore my own face."
+- The recipes, at the shrine of the River of Wailing (III), the first chapter after Charon: "A potter's tablet, left at the shrine of Hermes. Clay and wine make a libation jar: break it, and the dead run to the sound. Honey and poppy make a cake that puts beasts to sleep. Bronze and thread make a bell that rings when you are already gone. Pine resin and wax let the lyre sing once more. Bring what you find in the chests to a shrine, and make what you need there."
+  Until you read it, the shrine says: You do not know how to make anything yet.
+- Before the arena of Cerberus (X): "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet, or play to him from close. Three heads, three sleeps. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate"
 
 ### Prologue (playable, chapter 0)
 
@@ -384,11 +387,15 @@ In the pause menu during the prologue: Skip prologue
 
 ### Boss: Cerberus (chapter X)
 
-An arena before the gate, with pillars and braziers. Cerberus is awake and hunts by sound, much faster than a
-shade. In the myth Orpheus put him to sleep with music: each head must be lulled with the Melody, played close
-to him without being heard first. Throw a honey cake (crafted) or a libation jar to make him go to it, sneak
-close, play. Three heads, three phases; each phase he is angrier and faster. When all three sleep, the gate
-opens.
+An arena before the gate, with pillars and braziers (lit, so you can see him). Since 8/10 the fight works like
+Tiny Tiger in Crash Bandicoot: Cerberus cannot see, but he smells you. He turns to you, growls and paws the
+ground (the warning), then charges in a straight line to where you stood. Step aside: he slams into the stone
+and staggers. After three charges he lies down, panting — the only moment he can be put to sleep: throw a honey
+cake near him (he eats it, even one that was already on the ground) or play the Melody close to him. One head
+sleeps; he rises angrier and faster. Three heads, three phases; a health bar at the top of the screen shows how
+many heads are still awake. If you hide behind a pillar, he walks around it instead of charging. When all
+three sleep, the gate opens. The chests of this chapter hold honey cakes, and they fill again after a while.
+Interface text: the health bar is titled "Cerberus"; when he lies down: The hound lies down, panting.
 
 ### Chases
 
@@ -399,7 +406,8 @@ opens.
 ### Chests, map pieces, hiding places
 
 - **Chests** (wooden chests, clay jars, sarcophagi): opening one creaks — a small sound that shades can hear.
-  Inside: materials, obols, libation jars, clay tablets with stories, or the chapter's map piece.
+  Inside: materials, pebbles, or the chapter's map piece (in the Gate of Hades: honey cakes). Libation jars are not
+  found any more: you make them.
 - **Map pieces**: one per chapter, not hard to find (in a side room or chest close to the main path).
   Without it the map shows only what you have seen; with it, the whole chapter.
 - **Hiding places** (alcoves, open sarcophagi, reeds): inside you hold your breath for a few seconds and the
@@ -410,6 +418,7 @@ opens.
 | Item | Made from | Use |
 |---|---|---|
 | Libation jar | clay + wine | Thrown: a loud sound far from you (as now) |
+|  |  | (The recipes are learned from the potter's tablet in chapter III.) |
 | Pebbles | (found, no crafting) | Thrown: a small sound, to distract one shade |
 | Honey cake | honey + poppy | Thrown: Cerberus goes to eat it (and shades are drawn to the smell) |
 | Bronze bell | bronze + thread | Placed: rings after a few seconds, far from where you are |
@@ -427,6 +436,16 @@ Interface text, not voiced.
 - Using lyre resin: The lyre can play once more.
 - Hiding: You hold your breath. · When the breath runs out: You gasp for air!
 - Prompts: Open · Shrine · Hide · Come out
+- What each item does (shown in the Inventory and next to each recipe at the shrine):
+  - Lyre: Hold it to play: the wave shows you the world. With three strings, it can play the Melody.
+  - Libation jar: Thrown: it shatters with a loud sound, and the shades run to it.
+  - Pebbles: Thrown: a small click, to lead one shade away.
+  - Honey cake: Thrown: Cerberus eats it when he is tired, and falls asleep. Shades follow its smell.
+  - Bronze bell: Thrown: it rings loudly a few seconds after it lands, far from you.
+  - Lyre resin: One more use of the Melody.
+  - Any material: A material. Bring it to a shrine of Hermes.
+- The Inventory (like Minecraft): sections "Bag" and "In hand" (the bar of six at the bottom of the screen); the lyre
+  is one of the things you can hold — put it in the bag to hold something else. Maps · Tablets.
 
 ### Texts of the set pieces (interface / narration, not voiced)
 

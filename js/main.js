@@ -27,8 +27,8 @@ const DEATH_DELAY = 1.7;
 
 // Οδηγίες χειρισμού (όχι κείμενα της ιστορίας): πώς πετάς αγγείο / παίζεις τη Μελωδία.
 const JAR_HINTS = [
-  { touch: 'Tap the jar button at the top right to throw it where you are looking.',
-    keys: 'Press E to throw the jar where you are looking.', until: 'jar', time: 10 },
+  { touch: 'Tap the item button to throw what you hold where you are looking.',
+    keys: 'Left click or E throws what you hold. Tab opens your bag.', until: 'jar', time: 10 },
 ];
 const MELODY_HINTS = [
   { touch: 'Tap the lyre button to play.', keys: 'Press Q to play the lyre.', until: 'melody', time: 10 },
@@ -47,7 +47,6 @@ const screens = {
   controls: $('controls'), inventory: $('inventory'),
 };
 const hudEl = $('hud');
-const jarBtn = $('btn-jar');
 const melodyBtn = $('btn-melody');
 
 // ---- Κατάσταση ----
@@ -177,7 +176,7 @@ function emitCall(held) {
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
     'call');
-  Sound.voice(c, strings >= 3);
+  Sound.voice(c, strings >= 3 && (Prologue.active || Inventory.held() === 'lyre'));   // η λύρα ακούγεται μόνο αν την κρατάς
   Hints.notify('call');
   Prologue.onCall(c);
   Throne.onCall(gameTime);
@@ -264,13 +263,18 @@ function lookBack() {
   Notice.el.classList.add('whisper');
 }
 
-function throwJar() {
-  if (state !== 'play') return;
-  if (Jars.throw(player.x, player.y, player.fx, player.fy)) {
-    Sound.jarThrow();
-    Hints.notify('jar');
-    updateHud();
-  }
+// Πετάει ένα από αυτά που κρατάς (αγγείο, χαλίκι, μελόπιτα, κουδούνι) προς το βλέμμα.
+let lastThrowAt = -1e6;
+function throwHeld() {
+  if (state !== 'play') return false;
+  const k = Inventory.held();
+  if (!Inventory.isTool(k) || !Inventory.take(k, 1)) return false;
+  Jars.launch(player.x, player.y, player.fx, player.fy, k);
+  Sound.jarThrow();
+  lastThrowAt = gameTime;
+  if (k === 'jar') Hints.notify('jar');
+  updateHud();
+  return true;
 }
 
 function playMelody() {
@@ -283,11 +287,7 @@ function playMelody() {
 
 // Ο παίκτης μάζεψε ένα αντικείμενο.
 function pickUp(it) {
-  if (it.kind === 'jar') {
-    Jars.left++;
-    Sound.jarPickup();   // χωρίς κείμενο (ο χρήστης δεν το θέλει κάθε φορά): μόνο ο ήχος και ο μετρητής
-    jarsFound = true;
-  } else if (it.kind === 'tablet') {
+  if (it.kind === 'tablet') {
     // Πήλινη πινακίδα: τη διαβάζεις (χωρίς φωνή — γραμμένο κείμενο).
     Sound.jarPickup();
     Notice.show(STORY.tablets[it.n] || '', gameTime, 15, null, 'tablet');
@@ -315,13 +315,10 @@ function shrineHere() {
   return Altars.list.findIndex((a) => Math.hypot(a.x - player.x, a.y - player.y) < TILE * 1.3);
 }
 
-// E: ό,τι είναι δίπλα σου (κρυψώνα, ιερό, κιβώτιο) — αλλιώς χρησιμοποιείς το αντικείμενο που κρατάς.
+// E: ό,τι είναι δίπλα σου (κρυψώνα, ιερό, κιβώτιο) — αλλιώς πετάς αυτό που κρατάς.
 function interact() {
   if (state === 'play' && Prologue.active) { Prologue.interact(); return; }
-  if (state !== 'play' || Prologue.active || Crossing.active) {
-    if (state === 'play' && !Prologue.active && !Crossing.active) throwJar();
-    return;
-  }
+  if (state !== 'play' || Crossing.active) return;
   if (Hides.active) { Hides.exit(); updateInteract(); return; }
   const sh = shrineHere();
   if (sh >= 0) { openShrine(sh); return; }
@@ -339,24 +336,16 @@ function interact() {
     updateInteract();
     return;
   }
-  useItem();
+  throwHeld();
 }
 
-// Πετάει / αφήνει το αντικείμενο που κρατάς.
-function useItem() {
-  const t = Inventory.sel;
-  if (Inventory.count(t) <= 0) { Inventory.cycle(1); if (Inventory.count(Inventory.sel) <= 0) return; }
-  const k = Inventory.sel;
-  if (k === 'jar') throwJar();
-  else {
-    if (k === 'pebble') Inventory.pebbles--;
-    else if (k === 'cake') Inventory.cakes--;
-    else if (k === 'bell') Inventory.bells--;
-    Jars.launch(player.x, player.y, player.fx, player.fy, k);
-    Sound.jarThrow();
-  }
-  if (Inventory.count(Inventory.sel) <= 0) Inventory.cycle(1);
-  updateHud();
+// Αριστερό κλικ (Input.onPrimary): αν κρατάς κάτι που πετιέται, το πετάς· αλλιώς (λύρα, υλικό, τίποτα)
+// το κλικ είναι κύμα όπως πάντα.
+function primaryUse() {
+  if (state !== 'play' || Prologue.active || Crossing.active || Hides.active) return false;
+  if (!Inventory.isTool(Inventory.held())) return false;
+  throwHeld();
+  return true;
 }
 
 // Η προτροπή στη μέση της οθόνης ("E — Open") και η ανάσα στην κρυψώνα.
@@ -367,14 +356,14 @@ function updateInteract() {
     // (μόνο το "Turn around" του τέλους)
   } else if (state === 'play' && !Crossing.active) {
     const P = STORY.prompts;
-    if (Throne.prompt()) t = (IS_TOUCH ? '' : 'Space \u2014 ') + Throne.prompt();
+    if (Throne.prompt()) t = (IS_TOUCH ? '' : 'Space — ') + Throne.prompt();
     else if (Hides.active) t = P.leave;
     else if (shrineHere() >= 0) t = P.shrine;
     else if (Chests.near(player)) t = P.open;
     else if (Hides.near(player)) t = P.hide;
   }
   if (Prologue.active && Prologue.prompt()) t = Prologue.prompt();
-  const full = t ? (IS_TOUCH || t.includes('\u2014') ? t : 'E \u2014 ' + t) : '';
+  const full = t ? (IS_TOUCH || t.includes('—') ? t : 'E — ' + t) : '';
   if (full !== promptText) {
     promptText = full;
     $('prompt').textContent = full;
@@ -385,55 +374,66 @@ function updateInteract() {
   if (Hides.active) br.firstChild.style.width = Math.max(0, Hides.breath * 100).toFixed(0) + '%';
 }
 
-// Το εικονίδιο κάθε αντικειμένου (από τα sprites, μία φορά).
-const TOOL_ICON = { jar: 'lekythos', pebble: 'rocks', cake: 'cake', bell: 'bell' };
-const _icons = {};
-function toolIcon(t) {
-  if (!_icons[t]) _icons[t] = Sprites.getHD(TOOL_ICON[t], 0).c.toDataURL();
-  return _icons[t];
+// Το όνομα και η εξήγηση κάθε αντικειμένου / υλικού.
+function itemName(id) {
+  return id === 'lyre' ? 'Lyre' : STORY.tools[id] || STORY.materials[id] || id;
+}
+function itemInfo(id) {
+  return STORY.toolInfo[id] || (Inventory.isMaterial(id) ? STORY.materialInfo : '');
 }
 
-// Η μπάρα κάτω στη μέση: τα 4 αντικείμενα, με το επιλεγμένο τονισμένο (όπως στο Minecraft).
-let hotbarKey = '';
-function updateItemSlot() {
-  const el = $('hotbar');
-  const any = TOOL_ORDER.some((t) => Inventory.count(t) > 0);
-  el.classList.toggle('hidden', !any || Prologue.active || state !== 'play');
-  if (!any) return;
-  if (Inventory.count(Inventory.sel) <= 0) Inventory.sel = TOOL_ORDER.find((x) => Inventory.count(x) > 0);
-  const key = TOOL_ORDER.map((t) => Inventory.count(t)).join() + Inventory.sel;
-  if (key === hotbarKey) return;
-  hotbarKey = key;
-  el.textContent = '';
-  for (const t of TOOL_ORDER) el.appendChild(toolSlot(t, false));
-}
-
-function toolSlot(t, big) {
-  const n = Inventory.count(t);
+// Μία θέση (slot) σε HTML: εικονίδιο + πλήθος. i = ο δείκτης της στο Inventory.slots.
+function slotEl(i, cls) {
+  const s = Inventory.slots[i];
   const d = document.createElement('div');
-  d.className = 'slot' + (t === Inventory.sel ? ' sel' : '') + (n ? '' : ' empty');
-  const img = document.createElement('img');
-  img.src = toolIcon(t);
-  img.alt = STORY.tools[t];
-  const c = document.createElement('span');
-  c.className = 'n';
-  c.textContent = n ? String(n) : '';
-  d.append(img, c);
-  if (big) {
-    const s = document.createElement('small');
-    s.textContent = STORY.tools[t];
-    d.appendChild(s);
-    d.addEventListener('click', (e) => { e.preventDefault(); if (n) { Inventory.sel = t; hotbarKey = ''; fillInventory(); } });
+  d.className = 'slot' + (cls ? ' ' + cls : '') + (s ? '' : ' empty');
+  d.dataset.i = String(i);
+  if (s) {
+    const img = document.createElement('img');
+    img.src = Inventory.icon(s.id);
+    img.alt = itemName(s.id);
+    img.draggable = false;
+    const c = document.createElement('span');
+    c.className = 'n';
+    c.textContent = s.n > 1 ? String(s.n) : s.id === 'lyre' && strings >= 3 ? String(Melody.uses) : '';
+    if (s.id === 'lyre') c.classList.add('melody');
+    d.append(img, c);
   }
   return d;
 }
 
-// ---- Inventory (Tab / I, ή από την παύση) ----
+// Η μπάρα κάτω στη μέση: οι 6 πρώτες θέσεις, με αυτή που κρατάς τονισμένη (όπως στο Minecraft).
+let hotbarKey = '';
+function updateItemSlot() {
+  const el = $('hotbar');
+  el.classList.toggle('hidden', Prologue.active || state !== 'play');
+  const key = Inventory.slots.slice(0, HOTBAR_SLOTS).map((s) => (s ? s.id + s.n : '-')).join() + Inventory.sel + strings + Melody.uses;
+  if (key === hotbarKey) return;
+  hotbarKey = key;
+  el.textContent = '';
+  for (let i = 0; i < HOTBAR_SLOTS; i++) el.appendChild(slotEl(i, i === Inventory.sel ? 'sel' : ''));
+  // Το όνομα αυτού που κρατάς, για λίγο πάνω από τη μπάρα.
+  const h = Inventory.held();
+  const name = $('held-name');
+  name.textContent = h ? itemName(h) : '';
+  name.classList.remove('show');
+  void name.offsetWidth;
+  if (h) name.classList.add('show');
+}
+
+// ---- Inventory (Tab / I, ή από την παύση), σαν του Minecraft ----
+// Κλικ σε θέση = σηκώνεις τη στοίβα (ακολουθεί τον κέρσορα)· κλικ σε άλλη = την αφήνεις / ενώνεις / αλλάζεις.
+// Δεξί κλικ = μισή στοίβα (ή αφήνεις μία). Shift + κλικ = πάει από τον σάκο στη μπάρα και αντίστροφα.
+// 1-6 πάνω από μια θέση = την ανταλλάσσεις με αυτή τη θέση της μπάρας.
 let invFrom = 'play';
+let cursorStack = null;     // { id, n }: ό,τι κρατάει ο κέρσορας
+let cursorFrom = -1;
+let invHover = -1;
 function openInventory() {
   invFrom = state === 'paused' ? 'paused' : 'play';
   setState('inventory');
   stopInput();
+  cursorStack = null;
   fillInventory();
   $('inv-read').textContent = '';
   showScreen('inventory');
@@ -441,22 +441,107 @@ function openInventory() {
 
 function closeInventory() {
   if (state !== 'inventory') return;
+  // Ό,τι κρατάει ο κέρσορας γυρίζει πίσω.
+  if (cursorStack) {
+    if (cursorFrom >= 0 && !Inventory.slots[cursorFrom]) Inventory.slots[cursorFrom] = cursorStack;
+    else Inventory.add(cursorStack.id, cursorStack.n);
+    cursorStack = null;
+  }
+  $('inv-cursor').classList.add('hidden');
+  hotbarKey = '';
   if (invFrom === 'paused') { setState('paused'); showScreen('pause'); return; }
   setState('play');
   showScreen(null);
   updateHud();
 }
 
+function invClick(i, right, shift) {
+  const S = Inventory.slots;
+  const s = S[i];
+  Sound.unlock();
+  if (shift && s && !cursorStack) {
+    // Γρήγορη μετακίνηση: σάκος ⇄ μπάρα (στην πρώτη θέση που χωράει).
+    const range = i < HOTBAR_SLOTS ? [HOTBAR_SLOTS, S.length] : [0, HOTBAR_SLOTS];
+    for (let j = range[0]; j < range[1] && S[i]; j++) {
+      if (S[j] && S[j].id === s.id && s.id !== 'lyre') { S[j].n += s.n; S[i] = null; }
+    }
+    for (let j = range[0]; j < range[1] && S[i]; j++) if (!S[j]) { S[j] = s; S[i] = null; }
+  } else if (!cursorStack) {
+    if (!s) return;
+    if (right && s.n > 1) {
+      const k = Math.ceil(s.n / 2);
+      cursorStack = { id: s.id, n: k };
+      s.n -= k;
+    } else {
+      cursorStack = s;
+      S[i] = null;
+    }
+    cursorFrom = i;
+  } else if (!s) {
+    if (right && cursorStack.n > 1) { S[i] = { id: cursorStack.id, n: 1 }; cursorStack.n--; }
+    else { S[i] = cursorStack; cursorStack = null; }
+  } else if (s.id === cursorStack.id && s.id !== 'lyre') {
+    if (right) { s.n++; cursorStack.n--; if (!cursorStack.n) cursorStack = null; }
+    else { s.n += cursorStack.n; cursorStack = null; }
+  } else {
+    S[i] = cursorStack;
+    cursorStack = s;
+    cursorFrom = i;
+  }
+  if (Sound.ctx) Sound.pluck(cursorStack ? 392 : 330, Sound.ctx.currentTime, 0.06);   // απαλό "τσακ"
+  fillInventory();
+}
+
+function invSwapHotbar(k) {
+  if (invHover < 0 || k >= HOTBAR_SLOTS || invHover === k) return;
+  const S = Inventory.slots;
+  [S[invHover], S[k]] = [S[k], S[invHover]];
+  fillInventory();
+}
+
+function showItemInfo(i) {
+  const s = i >= 0 ? Inventory.slots[i] : null;
+  const box = $('inv-info');
+  if (!s) { box.textContent = ''; return; }
+  box.textContent = '';
+  const b = document.createElement('b');
+  b.textContent = itemName(s.id);
+  const p = document.createElement('span');
+  p.textContent = itemInfo(s.id);
+  box.append(b, p);
+}
+
 function fillInventory() {
-  const tools = $('inv-tools');
-  tools.textContent = '';
-  for (const t of TOOL_ORDER) tools.appendChild(toolSlot(t, true));
+  const bag = $('inv-bag'), hot = $('inv-hot');
+  bag.textContent = '';
+  hot.textContent = '';
+  for (let i = HOTBAR_SLOTS; i < HOTBAR_SLOTS + BAG_SLOTS; i++) bag.appendChild(slotEl(i));
+  for (let i = 0; i < HOTBAR_SLOTS; i++) hot.appendChild(slotEl(i, i === Inventory.sel ? 'sel' : ''));
+  for (const d of document.querySelectorAll('#inventory .slot')) {
+    const i = Number(d.dataset.i);
+    d.addEventListener('pointerdown', (e) => { e.preventDefault(); invClick(i, e.button === 2, e.shiftKey); });
+    d.addEventListener('pointerenter', () => { invHover = i; showItemInfo(i); });
+    d.addEventListener('pointerleave', () => { if (invHover === i) { invHover = -1; showItemInfo(-1); } });
+  }
+  showItemInfo(invHover);
+  // Ο κέρσορας με τη στοίβα που κρατάει.
+  const cur = $('inv-cursor');
+  cur.classList.toggle('hidden', !cursorStack);
+  cur.textContent = '';
+  if (cursorStack) {
+    const img = document.createElement('img');
+    img.src = Inventory.icon(cursorStack.id);
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = cursorStack.n > 1 ? String(cursorStack.n) : '';
+    cur.append(img, n);
+  }
   const list = (id, items) => {
     const ul = $(id);
     ul.textContent = '';
-    for (const [name, prog, done, onClick] of items) {
+    for (const [name, prog, missing, onClick] of items) {
       const li = document.createElement('li');
-      if (done) li.classList.add('done');
+      if (missing) li.classList.add('missing');
       const a = document.createElement('span'); a.className = 'name'; a.textContent = name;
       const b = document.createElement('span'); b.className = 'prog'; b.textContent = prog;
       li.append(a, b);
@@ -464,9 +549,8 @@ function fillInventory() {
       ul.appendChild(li);
     }
   };
-  list('inv-mats', MATERIALS.map((m) => [STORY.materials[m], String(Inventory.mats[m] || 0), !Inventory.mats[m]]));
-  list('inv-maps', CHAPTERS.map((c, i) => [c.numeral + '. ' + c.name, Inventory.maps.has(i) ? '\u2713' : '', !Inventory.maps.has(i)]));
-  list('inv-tablets', [...Inventory.tablets].sort((a, b) => a - b).map((n) => [STORY.tablets[n].split('.')[0].slice(0, 32) + '\u2026', '', false,
+  list('inv-maps', CHAPTERS.map((c, i) => [c.numeral + '. ' + c.name, Inventory.maps.has(i) ? '✓' : '', !Inventory.maps.has(i)]));
+  list('inv-tablets', [...Inventory.tablets].sort((a, b) => a - b).map((n) => [STORY.tablets[n].split('.')[0].slice(0, 32) + '…', '', false,
     () => { $('inv-read').textContent = STORY.tablets[n]; }]));
 }
 
@@ -489,24 +573,38 @@ function fillShrine() {
   const ul = $('shrine-mats');
   ul.textContent = '';
   for (const m of MATERIALS) {
+    const n = Inventory.count(m);
     const li = document.createElement('li');
-    if (!Inventory.mats[m]) li.classList.add('done');
-    const n = document.createElement('span'); n.className = 'name'; n.textContent = STORY.materials[m];
-    const c = document.createElement('span'); c.className = 'prog'; c.textContent = String(Inventory.mats[m]);
-    li.append(n, c);
+    if (!n) li.classList.add('missing');
+    const img = document.createElement('img'); img.src = Inventory.icon(m); img.className = 'mat-icon';
+    const t = document.createElement('span'); t.className = 'name'; t.textContent = STORY.materials[m];
+    const c = document.createElement('span'); c.className = 'prog'; c.textContent = String(n);
+    li.append(img, t, c);
     ul.appendChild(li);
   }
   const box = $('shrine-recipes');
   box.textContent = '';
+  if (!Inventory.knowsRecipes()) {
+    const p = document.createElement('p');
+    p.className = 'recipe-info';
+    p.textContent = STORY.noRecipes;
+    box.appendChild(p);
+    return;
+  }
+  // Κάθε συνταγή: τι φτιάχνεις, από τι, και τι κάνει (η εξήγηση).
   for (const r of RECIPES) {
     const b = document.createElement('button');
-    b.className = 'btn';
+    b.className = 'btn recipe';
     b.type = 'button';
     b.disabled = !Inventory.canCraft(r);
-    b.textContent = STORY.shrineCraft + ': ' + STORY.tools[r.id];
+    const have = r.id === 'lyreResin' ? '' : ' (' + Inventory.count(r.id) + ')';
+    b.textContent = STORY.shrineCraft + ': ' + STORY.tools[r.id] + have;
     const sm = document.createElement('small');
-    sm.textContent = r.needs.map((m) => STORY.materials[m]).join(' + ') + (r.id === 'jar' ? ' (' + Jars.left + ')' : r.id === 'lyreResin' ? '' : ' (' + Inventory.count(r.id) + ')');
-    b.appendChild(sm);
+    sm.textContent = r.needs.map((m) => STORY.materials[m]).join(' + ');
+    const info = document.createElement('span');
+    info.className = 'recipe-info';
+    info.textContent = STORY.toolInfo[r.id];
+    b.append(sm, info);
     b.addEventListener('click', (e) => { e.preventDefault(); doAction('craft:' + r.id); });
     box.appendChild(b);
   }
@@ -514,8 +612,11 @@ function fillShrine() {
 
 function craftAt(id) {
   Sound.unlock();
+  const first = Inventory.made.size === 0 && id !== 'lyreResin';
   if (!Inventory.craft(id)) return;
   Sound.stringFound(1);
+  // Το πρώτο αντικείμενο που φτιάχνεις: μία οδηγία για το πώς το πετάς (μετά το ιερό).
+  if (first) Hints.push(JAR_HINTS);
   Notice.show(id === 'lyreResin' ? STORY.resinUsed : STORY.made(STORY.tools[id]), gameTime, 3);
   fillShrine();
   updateHud();
@@ -690,7 +791,16 @@ function draw3D(pc, W, H) {
   ctx = pc;
   if (state === 'play' || state === 'paused') {
     drawTurnWarning(pc, W, H);
-    if (!(Prologue.active && Prologue.noLyre)) drawHands3D(pc, W, H);
+    // Στο χέρι: η λύρα, ή ό,τι άλλο κρατάς από τη μπάρα (όχι στον πρόλογο: εκεί πάντα η λύρα).
+    const held = Prologue.active ? 'lyre' : Inventory.held();
+    if (held === 'lyre') { if (!(Prologue.active && Prologue.noLyre)) drawHands3D(pc, W, H); }
+    else if (held) {
+      const cell = Math.floor(player.y / TILE) * Level.cols + Math.floor(player.x / TILE);
+      Hands.drawHeld(pc, W, H, gameTime, Inventory.iconCanvas(held), {
+        light: Math.min(1, Raycast.cellLight ? Raycast.cellLight[cell] || 0 : 0),
+        walkPhase: player.walkPhase, walkSpeed: player.walkSpeed, thrown: (gameTime - lastThrowAt) / 0.45,
+      });
+    }
     Dread.drawVignette(pc, W, H, gameTime);
   }
   if (Prologue.active) Prologue.drawOverlay(pc, W, H, gameTime);
@@ -1226,6 +1336,9 @@ function frame(t) {
     if (Math.abs(Raycast.fov - (baseFov + fovKick)) > 0.002) Raycast.setFov(baseFov + fovKick);
     if (chasing !== wasChasing) { Sound.breath(chasing, 2.6); wasChasing = chasing; }
     Throne.update(dt, gameTime, here);
+    const boss = monsters.find((m) => m.boss);
+    Chests.update(gameTime, !!(boss && boss.asleep < 3));
+    updateBossBar(boss);
     killer = safeHere || Hides.active ? null : monsters.find((m) => m.touches(player)) || (Boulder.touches(player) ? Boulder : null);
     if (Hides.update(dt, monsters)) {
       // Τελείωσε η ανάσα: λαχανιάζεις δυνατά και βγαίνεις από την κρυψώνα.
@@ -1310,7 +1423,12 @@ function updateWaterSound() {
   // Ο Κέρβερος ροχαλίζει στον ύπνο του (όχι όσο γαβγίζει).
   const cb = Eggs.cerberus;
   const playing = state === 'play' || state === 'dead';
-  if (cb && playing && gameTime - cb.barkStart > CERB_BARK_GAP * 3 + 0.5) {
+  // (και το boss: λαχάνιασμα όσο είναι κουρασμένο, ροχαλητό όταν κοιμηθεί)
+  const bz = playing ? monsters.find((m) => m.boss && ['tired', 'eating', 'asleep'].includes(m.bstate)) : null;
+  if (bz) {
+    const d = Math.hypot(bz.x - player.x, bz.y - player.y);
+    Sound.updateSnore(bz.x, bz.y, d < 300 ? d : -1, Level.lineOfSight(player.x, player.y, bz.x, bz.y));
+  } else if (cb && playing && gameTime - cb.barkStart > CERB_BARK_GAP * 3 + 0.5) {
     const d = Math.hypot(cb.x - player.x, cb.y - player.y);
     Sound.updateSnore(cb.x, cb.y, d < 300 ? d : -1, Level.lineOfSight(player.x, player.y, cb.x, cb.y));
   } else Sound.updateSnore(0, 0, -1, false);
@@ -1412,10 +1530,7 @@ function applySettings() {
 }
 
 function updateHud() {
-  // Το κουμπί του αγγείου εμφανίζεται μόλις βρεις το πρώτο· της λύρας με την 3η χορδή.
-  jarBtn.classList.toggle('hidden', !jarsFound);
-  jarBtn.classList.toggle('empty', Jars.left === 0);
-  $('jar-count').textContent = String(Jars.left);
+  // Το κουμπί της Μελωδίας εμφανίζεται με την 3η χορδή (τα αντικείμενα: στη μπάρα κάτω στη μέση).
   melodyBtn.classList.toggle('hidden', strings < 3 || Prologue.active);
   melodyBtn.classList.toggle('empty', Melody.uses === 0);
   $('melody-count').textContent = String(Melody.uses);
@@ -1432,6 +1547,38 @@ function updateHud() {
   $('level-label').textContent = r >= 0 ? CHAPTERS[r].numeral : '';
   // Οι χορδές φαίνονται από το κεφάλαιο II (εκεί βρίσκεται η πρώτη).
   $('strings-label').textContent = Math.max(r, chapter) >= 1 || strings > 0 ? `Strings: ${strings}/3` : '';
+}
+
+// Η μπάρα ζωής του Κέρβερου (πάνω στη μέση) όσο κρατάει η μάχη: τρία κομμάτια, ένα για κάθε κεφάλι.
+let bossBarKey = '';
+function updateBossBar(boss) {
+  const on = !!(boss && boss.fight && boss.asleep < 3 && state === 'play');
+  const key = on ? 'on' + boss.asleep + (boss.bstate === 'tired' || boss.bstate === 'eating' ? 't' : '') : 'off';
+  if (key === bossBarKey) return;
+  bossBarKey = key;
+  const el = $('boss-bar');
+  el.classList.toggle('hidden', !on);
+  if (!on) return;
+  el.querySelector('span').textContent = STORY.bossName;
+  el.classList.toggle('tired', key.endsWith('t'));
+  el.querySelectorAll('i').forEach((seg, i) => seg.classList.toggle('gone', i >= 3 - boss.asleep));
+}
+
+// Η αρένα της Πύλης φωτίζεται από μαγκάλια (λίγο σταθερό φως), ώστε να βλέπεις τον Κέρβερο να ορμάει.
+function lightArena(boss) {
+  const L = Level;
+  World3D.braziers = [];
+  for (let ty = boss.arenaTop; ty < L.rows; ty++) {
+    for (let tx = 0; tx < L.cols; tx++) {
+      const c = ty * L.cols + tx;
+      if (L.region[c] !== boss.region || L.opaque[c]) continue;
+      Raycast.ambient[c] = Math.max(Raycast.ambient[c], 0.2);
+      // Ένα μαγκάλι στις γωνίες κάθε κολόνας (όπου ένα κελί έχει τοίχο από δύο πλευρές διαγώνια).
+      if (L.isOpaque(tx + 1, ty + 1) && !L.isOpaque(tx + 1, ty) && !L.isOpaque(tx, ty + 1) && ty > boss.arenaTop + 1) {
+        World3D.braziers.push({ x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE });
+      }
+    }
+  }
 }
 
 // Μια γραμμή αφήγησης στη μέση της οθόνης (πρόλογος, αίθουσα του θρόνου, τέλη) — χωρίς φωνή.
@@ -1552,7 +1699,7 @@ function spawn(saved) {
   chapter = saved.chapter;
   strings = saved.strings;
   hasObol = saved.obol;
-  jarsFound = saved.jars > 0 || saved.taken.some((id) => Level.items[id] && Level.items[id].kind === 'jar');
+  jarsFound = false;
   // Ο χάρτης θυμάται ό,τι έχεις δει: μετά από θάνατο κρατάει και όσα είδες μετά τον βωμό.
   Level.mergeSeen(saved.seen);
 
@@ -1571,14 +1718,14 @@ function spawn(saved) {
   Altars.reset(chapter);
   Items.reset(saved.taken);
   Charon.reset(saved.paid);
-  Jars.reset(saved.jars);
+  Jars.reset();
   Melody.reset(saved.melody);
   Notice.clear();
   Souls.reset();
   Eggs.reset();
   World3D.reset();
+  Inventory.reset(saved);   // (πριν τις αποστολές: η πρόοδος της "The potter's hands" βγαίνει από εδώ)
   Missions.reset(saved);
-  Inventory.reset(saved);
   Chests.reset();
   Hides.reset();
   Chases.reset();
@@ -1586,10 +1733,12 @@ function spawn(saved) {
   // Ο Κέρβερος στην Πύλη του Άδη (αν δεν τον έχεις ήδη αποκοιμίσει).
   if (Level.boss && !Missions.secrets.has('cerberus')) {
     Level.setBars(false);
-    const c = new Cerberus(Level.boss.x, Level.boss.y, Level.boss.region);
+    const c = new CerberusBoss(Level.boss.x, Level.boss.y, Level.boss.region);
     c.voice = 'shade';
+    lightArena(c);
     c.onAsleep = () => {
       Level.setBars(true);
+      updateBossBar(null);
       Missions.secrets.add('cerberus');
       Notice.show(STORY.bossAsleep, gameTime, 6);
       Sound.win();
@@ -1673,7 +1822,7 @@ function lightAltar(i, quiet = false) {
   chapter = i;
   if (strings >= 3) Melody.uses = MELODY_USES;
   Save.write({
-    chapter: i, jars: Jars.left, strings, obol: hasObol, paid: Charon.paid,
+    chapter: i, jars: 0, strings, obol: hasObol, paid: Charon.paid,
     melody: Melody.uses, taken: Items.takenIds(), seen: Level.seenString(), ...Missions.saveData(), ...Inventory.saveData(),
   });
   Sound.win();
@@ -1807,21 +1956,40 @@ function init() {
   Input.now = () => gameTime;
   Input.onRelease = emitCall;
   Input.onCancel = cancelCall;
+  Input.onPrimary = primaryUse;
   Input.canLook = () => state === 'play';
   Input.init(canvas);
 
   for (const btn of document.querySelectorAll('[data-action]')) {
     btn.addEventListener('click', (e) => { e.preventDefault(); doAction(btn.dataset.action); });
   }
+  // Παύση / χάρτης / αντικείμενο: κουμπιά μόνο στο κινητό (στο PC: Esc, M, E — ο χρήστης δεν θέλει εικονίδια).
   $('btn-pause').addEventListener('pointerdown', (e) => { e.preventDefault(); pauseGame(); });
   $('btn-map').addEventListener('pointerdown', (e) => { e.preventDefault(); openMap(); });
-  jarBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); interact(); });
-  // Ροδέλα του ποντικιού: αλλάζει το αντικείμενο που κρατάς.
+  $('btn-item').addEventListener('pointerdown', (e) => { e.preventDefault(); interact(); });
+  $('btn-bag').addEventListener('pointerdown', (e) => { e.preventDefault(); openInventory(); });
+  // Ροδέλα του ποντικιού: αλλάζει τη θέση της μπάρας (τι κρατάς).
   window.addEventListener('wheel', (e) => {
     if (state !== 'play') return;
     Inventory.cycle(e.deltaY > 0 ? 1 : -1);
     updateItemSlot();
   }, { passive: true });
+  // Η μπάρα στο κινητό: άγγιγμα σε θέση = αυτό κρατάς.
+  $('hotbar').addEventListener('pointerdown', (e) => {
+    const d = e.target.closest('.slot');
+    if (!d || state !== 'play') return;
+    e.preventDefault();
+    Inventory.sel = Number(d.dataset.i);
+    updateItemSlot();
+  });
+  // Ο κέρσορας του Inventory: η στοίβα που σήκωσες τον ακολουθεί.
+  window.addEventListener('pointermove', (e) => {
+    if (state !== 'inventory') return;
+    const c = $('inv-cursor');
+    c.style.left = e.clientX + 'px';
+    c.style.top = e.clientY + 'px';
+  });
+  $('inventory').addEventListener('contextmenu', (e) => e.preventDefault());
   melodyBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); playMelody(); });
 
   window.addEventListener('keydown', (e) => {
@@ -1856,10 +2024,12 @@ function init() {
       if (e.repeat) return;
       if (state === 'inventory') closeInventory();
       else if (state === 'play' && !Prologue.active && !Crossing.active) openInventory();
+    } else if (state === 'inventory' && /^Digit[1-6]$/.test(e.code)) {
+      invSwapHotbar(Number(e.code.slice(5)) - 1);
     } else if (e.code === 'KeyE' && !e.repeat) {
       interact();
-    } else if (/^Digit[1-4]$/.test(e.code) && state === 'play') {
-      Inventory.sel = TOOL_ORDER[Number(e.code.slice(5)) - 1];
+    } else if (/^Digit[1-6]$/.test(e.code) && state === 'play') {
+      Inventory.sel = Number(e.code.slice(5)) - 1;
       updateItemSlot();
     } else if (e.code === 'KeyQ' && !e.repeat) {
       playMelody();

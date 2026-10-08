@@ -151,15 +151,32 @@ const STORY = {
   // Πήλινες πινακίδες (STORY.md, ενότητα 12), με τη σειρά που βρίσκονται στον χάρτη (L).
   tablets: [
     "I came down alive, like you, with a friend and a foolish plan. Across this river the dead are blind, but they hear everything: a step, a breath, a song. Walk as if you do not exist. If you meet Theseus, tell him I am still waiting. \u2014 Pirithous",
+    "A potter's tablet, left at the shrine of Hermes. Clay and wine make a libation jar: break it, and the dead run to the sound. Honey and poppy make a cake that puts beasts to sleep. Bronze and thread make a bell that rings when you are already gone. Pine resin and wax let the lyre sing once more. Bring what you find in the chests to a shrine, and make what you need there.",
     "Dido. I built a city and burned with it. When he came down here, he spoke to me. I did not answer.",
     "Laodamia. The gods gave him back to me for three hours. Then he left again, and I followed.",
     "Phaedra. Love was the only monster I ever met, and it wore my own face.",
+    "To whoever comes next. The hound is blind; he charges at your scent like a bull. Stand with stone behind you and step aside at the last moment. When he strikes the stone he staggers, and after three charges he lies down, panting. Only then will he eat: throw a honey cake at his feet, or play to him from close. Three heads, three sleeps. The chests by the gate fill again — the dead who keep them are patient. — A keeper of the gate",
   ],
+  // Τι κάνει κάθε αντικείμενο (στο Inventory και στο ιερό, όταν πας να το φτιάξεις).
+  toolInfo: {
+    lyre: "Hold it to play: the wave shows you the world. With three strings, it can play the Melody.",
+    jar: "Thrown: it shatters with a loud sound, and the shades run to it.",
+    pebble: "Thrown: a small click, to lead one shade away.",
+    cake: "Thrown: Cerberus eats it when he is tired, and falls asleep. Shades follow its smell.",
+    bell: "Thrown: it rings loudly a few seconds after it lands, far from you.",
+    lyreResin: "One more use of the Melody.",
+  },
+  materialInfo: "A material. Bring it to a shrine of Hermes.",
+  noRecipes: "You do not know how to make anything yet.",
+  bag: "Bag",
+  hotbar: "In hand",
+  bossName: "Cerberus",
+  bossTired: "The hound lies down, panting.",
   sideMissions: [
     { id: 'strings', title: "Mend the lyre", text: "Find the three strings of your lyre." },
     { id: 'obol', title: "The ferryman's toll", text: "Find an obol and pay Charon." },
     { id: 'souls', title: "Voices of the lost", text: "Hear all nine lost souls." },
-    { id: 'jars', title: "Libations", text: "Find every libation jar." },
+    { id: 'jars', title: "The potter's hands", text: "Make each of the four offerings at a shrine." },
     { id: 'altars', title: "Rekindle the flames", text: "Light every altar." },
     { id: 'cerberus', title: "The guardian sleeps", text: "Lull the hound of Hades to sleep." },
     { id: 'stuck', title: "Three thousand years", text: "Find the shade that walks into the wall.", secret: true },

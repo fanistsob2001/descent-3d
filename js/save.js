@@ -12,7 +12,9 @@
 // (SAVE_V2_CHAPTERS)· τα αντικείμενα και ο χάρτης που είχες δει δεν μεταφέρονται (άλλοι χάρτες).
 // v4: οι χάρτες μεγάλωσαν (×1.5) και οι καταδιώξεις άλλαξαν: το κεφάλαιο μένει, τα αντικείμενα / κιβώτια /
 // χάρτες που είχες δει όχι.
-const SAVE_VERSION = 4;
+// v5: τα αγγεία δεν είναι πια σκόρπια στον χάρτη (τα id των αντικειμένων άλλαξαν) και μπήκε μία νέα πινακίδα
+// (οι συνταγές, n = 1): τα μαζεμένα ξαναβγαίνουν από τις χορδές / τον οβολό / τις πινακίδες· inventory με θέσεις.
+const SAVE_VERSION = 5;
 const SAVE_V1_CHAPTERS = [0, 1, 2, 6, 7];   // v1 → v2
 const SAVE_V2_CHAPTERS = [0, 1, 3, 4, 6, 8, 10, 11];   // v2 → v3
 
@@ -51,6 +53,30 @@ const Save = {
   // Μετατρέπει ένα παλιό save (v1) στη μορφή του v2.
   migrate(d) {
     if (!d || d.v === SAVE_VERSION || !Number.isInteger(d.chapter)) return d;
+    return this.toV5(this.toV4(d));
+  },
+
+  // v4 → v5: οι πινακίδες μετά την πρώτη πάνε μία θέση πιο κάτω· τα αντικείμενα που είχες μαζέψει
+  // βρίσκονται από ό,τι ξέρουμε (οι πρώτες χορδές, ο οβολός, οι πινακίδες που διάβασες).
+  toV5(d) {
+    if (!d) return d;
+    const inv = d.inv && typeof d.inv === 'object' ? { ...d.inv } : {};
+    const tablets = (Array.isArray(inv.tablets) ? inv.tablets : []).map((n) => (n >= 1 ? n + 1 : n));
+    // Η νέα πινακίδα με τις συνταγές είναι στο ιερό του III: όποιος έχει ήδη περάσει από εκεί την ξέρει.
+    if (d.chapter >= 2 && !tablets.includes(1)) tablets.push(1);
+    inv.tablets = tablets;
+    const taken = [];
+    let strings = Math.min(3, d.strings | 0);
+    Level.items.forEach((it, id) => {
+      if (it.kind === 'string' && strings > 0) { strings--; taken.push(id); }
+      if (it.kind === 'obol' && (d.obol || d.paid)) taken.push(id);
+      if (it.kind === 'tablet' && tablets.includes(it.n)) taken.push(id);
+    });
+    return { ...d, v: SAVE_VERSION, inv, taken };
+  },
+
+  toV4(d) {
+    if (d.v === 4) return d;
     if (d.v === 3) {
       const inv = d.inv && typeof d.inv === 'object' ? { ...d.inv, opened: [], maps: [] } : {};
       return { ...d, v: SAVE_VERSION, taken: [], seen: '', inv };

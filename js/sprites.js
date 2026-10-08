@@ -743,7 +743,7 @@ const Sprites = {
         fc.translate(c.width, 0);
         fc.scale(-1, 1);
         fc.drawImage(c, 0, 0);
-        return { c, f, w: c.width, h: c.height, hd: 2 };
+        return { c, f, w: c.width, h: c.height, hd: 2, name };
       });
     }
     return list[((i % list.length) + list.length) % list.length];

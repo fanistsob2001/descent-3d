@@ -15,7 +15,8 @@
 
   <!-- Κατά τη διάρκεια του παιχνιδιού -->
   <div id="hud" class="hidden">
-    <div class="hud-left">
+    <!-- Παύση / χάρτης: μόνο στο κινητό (στο PC Esc / M — ο χρήστης δεν θέλει εικονίδια εκεί). -->
+    <div class="hud-left touch-only">
       <button id="btn-pause" class="hud-btn" type="button" aria-label="Pause">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
       </button>
@@ -32,14 +33,22 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M7 4c-3 3-3 9 0 13h10c3-4 3-10 0-13M7 4c1 2 1 4 0 6M17 4c-1 2-1 4 0 6M6 10h12M9 10v7M12 10v7M15 10v7M8 20h8"/></svg>
         <span id="melody-count" class="count">0</span>
       </button>
-      <button id="btn-jar" class="hud-btn hidden" type="button" aria-label="Throw libation jar">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M9 3h6M10 3v3c-4 2-5 7-3 11l2 3h6l2-3c2-4 1-9-3-11V3M7 10h10"/></svg>
-        <span id="jar-count" class="count">0</span>
-      </button>
     </div>
   </div>
   <div id="mission" class="hidden"></div>
+  <!-- Η μπάρα ζωής του Κέρβερου (μάχη στην Πύλη του Άδη): ένα κομμάτι για κάθε ξύπνιο κεφάλι -->
+  <div id="boss-bar" class="hidden"><span></span><div><i></i><i></i><i></i></div></div>
   <div id="hotbar" class="hidden"></div>
+  <div id="held-name"></div>
+  <!-- Κινητό: πέταγμα / Inventory (στο PC: κλικ ή E, Tab) -->
+  <div id="touch-items" class="touch-only">
+    <button id="btn-bag" class="hud-btn" type="button" aria-label="Inventory">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M8 7V5a4 4 0 0 1 8 0v2M5 7h14l-1 13H6z"/></svg>
+    </button>
+    <button id="btn-item" class="hud-btn" type="button" aria-label="Use">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="line" d="M5 19L19 5M12 5h7v7"/></svg>
+    </button>
+  </div>
   <div id="prompt" class="hidden"></div>
   <div id="breath" class="hidden"><div></div></div>
   <div id="hint"></div>
@@ -84,12 +93,13 @@
     <dl class="controls-list keys-only">
       <dt>W A S D</dt><dd>Move</dd>
       <dt>Mouse</dt><dd>Look around</dd>
-      <dt>Left click / Space</dt><dd>Sing (hold for a bigger wave)</dd>
+      <dt>Space</dt><dd>Sing (hold for a bigger wave)</dd>
+      <dt>Left click</dt><dd>Use what you hold: the lyre sings, the rest is thrown</dd>
       <dt>Right click / X</dt><dd>Cancel the wave while holding</dd>
       <dt>Shift</dt><dd>Walk silently</dd>
       <dt>E</dt><dd>Open, rest, hide, turn &mdash; or throw what you hold</dd>
-      <dt>1 &ndash; 4 / Wheel</dt><dd>Choose what you hold</dd>
-      <dt>Tab / I</dt><dd>Inventory</dd>
+      <dt>1 &ndash; 6 / Wheel</dt><dd>Choose what you hold</dd>
+      <dt>Tab / I</dt><dd>Inventory (click to move things, Shift + click to the bar)</dd>
       <dt>Q</dt><dd>Play the Melody</dd>
       <dt>M</dt><dd>Map</dd>
       <dt>F</dt><dd>Fullscreen</dd>
@@ -99,24 +109,35 @@
       <dt>Left side</dt><dd>Move (a little: walk silently)</dd>
       <dt>Right side</dt><dd>Look around</dd>
       <dt>Lyre button</dt><dd>Sing (hold for a bigger wave, drag away to cancel)</dd>
-      <dt>Item button</dt><dd>Open, rest, hide &mdash; or throw what you hold</dd>
+      <dt>Bar</dt><dd>Choose what you hold</dd>
+      <dt>Arrow button</dt><dd>Open, rest, hide &mdash; or throw what you hold</dd>
+      <dt>Bag button</dt><dd>Inventory</dd>
     </dl>
     <button class="btn primary" type="button" data-action="back">Back</button>
   </div>
 
-  <!-- Inventory: τα αντικείμενα που κρατάς (διαλέγεις με κλικ), υλικά, χάρτες, πινακίδες. Το γεμίζει το js/main.js. -->
+  <!-- Inventory σαν του Minecraft: ο σάκος (18 θέσεις) και η μπάρα (6 θέσεις — αυτό κρατάς). Κλικ = σηκώνεις /
+       αφήνεις, δεξί κλικ = μισά / ένα, Shift + κλικ = σάκος ⇄ μπάρα. Δεξιά: εξήγηση, χάρτες, πινακίδες. js/main.js. -->
   <div id="inventory" class="overlay hidden">
     <div class="panel inventory-panel">
       <div class="panel-head"><h2>Inventory</h2></div>
       <div class="meander"></div>
       <div class="inv-grid">
-        <section><h3>Held</h3><div id="inv-tools" class="inv-tools"></div></section>
-        <section><h3>Materials</h3><ul id="inv-mats" class="side-missions"></ul></section>
-        <section><h3>Maps</h3><ul id="inv-maps" class="side-missions"></ul></section>
-        <section><h3>Tablets</h3><ul id="inv-tablets" class="side-missions"></ul><p id="inv-read" class="inv-read"></p></section>
+        <section class="inv-slots">
+          <h3>Bag</h3>
+          <div id="inv-bag" class="slot-grid"></div>
+          <h3>In hand</h3>
+          <div id="inv-hot" class="slot-grid hot"></div>
+          <p id="inv-info" class="inv-info"></p>
+        </section>
+        <section>
+          <h3>Maps</h3><ul id="inv-maps" class="side-missions"></ul>
+          <h3>Tablets</h3><ul id="inv-tablets" class="side-missions"></ul><p id="inv-read" class="inv-read"></p>
+        </section>
       </div>
       <div class="shrine-actions"><button class="btn primary" type="button" data-action="inventory-close">Back</button></div>
     </div>
+    <div id="inv-cursor" class="slot hidden"></div>
   </div>
 
   <!-- Ιερό του Ερμή (safe room): κατασκευή αντικειμένων και ξεκούραση (save). Το γεμίζει το js/main.js. -->

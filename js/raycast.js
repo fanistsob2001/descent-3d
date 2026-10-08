@@ -28,7 +28,7 @@ const RC_ALTAR_R = 2.4;              // ως πόσα κελιά φτάνει τ
 // αλλού σκοτάδι από πάνω. Οι βράχοι έχουν ακανόνιστη κορυφή.
 const RC_WALL_MAX = { rock: 2.7, blocks: 1.5, palace: 2.2, meadow: 0.8, grave: 0.8, road: 2.4 };   // πόσο ψηλώνουν (πάνω από το 1) στους μεγάλους χώρους
 // Ύψος ανά είδος τοίχου (Level.wallKind): 1 = χαμηλή ξερολιθιά, 2 = τοίχος σπιτιού.
-const RC_KIND_H = [0, 0.72, 1.7];
+const RC_KIND_H = [0, 0.4, 1.25];        // ύψη: ξερολιθιά ~1.2 μ., τοίχος σπιτιού ~3.7 μ. (1 κελί = 3 μ.)
 const RC_HMAX = 4.2;                 // το πιο ψηλό που μπορεί να είναι ένας τοίχος (για να σταματάει η ακτίνα)
 const RC_NARROW = 0.44;              // κάτω από τόσο "άνοιγμα" (ποσοστό ελεύθερων κελιών 5×5) ένα κελί έχει ταβάνι
 const RC_JAG = 0.28;                 // πόσο ακανόνιστη είναι η κορυφή των βράχων (ποσοστό του ύψους)
@@ -36,6 +36,25 @@ const RC_JAG = 0.28;                 // πόσο ακανόνιστη είναι
 // sun: { az, el (ακτίνια), r (ακτίνια), color, glow } (ήλιος ή φεγγάρι), stars: true, hills: [r,g,b].
 const RC_OUTDOOR = {};               // region → { sky: [[θέση 0..1, [r,g,b]], ...], light: 0..1, sun, stars, hills }
 const RC_SPX = 1.9;                  // μονάδες κόσμου ανά pixel ενός sprite (η σκιά = 16 px ≈ 30 μονάδες)
+// Πραγματικά ύψη (σε μονάδες κόσμου) των μορφών, ώστε όλα να έχουν αληθινές αναλογίες ως προς τον παίκτη:
+// τα μάτια του Ορφέα είναι στις 20 μονάδες (RC_EYE), άρα ένας άνθρωπος ≈ 23-24 μονάδες (1 μονάδα ≈ 7.5 εκ.).
+// Ένα sprite με όνομα εδώ παίρνει αυτό το ύψος × o.size (το o.scale αγνοείται)· τα άλλα όπως πριν.
+const RC_REAL_H = {
+  // άνθρωποι και θεοί
+  euryAlive: 23, eurydice3d: 23, euryLying: 5, villager: 23, mournerF: 22, mournerM: 23, charon3d: 24,
+  hades3d: 31, persephone3d: 30, soulM3d: 23, soulF3d: 22, soulOld3d: 22,
+  // τέρατα και ζώα (λίγο πιο μεγάλα από άνθρωπο), φίδι, κατσίκα
+  ghoul: 28, erinys3d: 30, snake3d: 5, goat: 11, boat3d: 10,
+  // ο πάνω κόσμος: δέντρα, σπίτι, αυλή
+  olive: 62, cypress: 105, amphora: 10, amphoraBroken: 6, stele: 17, hearth: 13, loom: 22, table: 10, bed: 8,
+  laundry: 24, well: 13, asphodel: 7,
+  // σπηλιές και Κάτω Κόσμος
+  stalagmite: 15, stalactite: 13, rocks: 4, bones: 2.5, skull: 3, reeds: 20, roots: 26, statue: 30, skullpile: 7, chain: 48,
+  // αντικείμενα
+  chest: 8, niche: 26, bars: 44, boulder: 44, tablet: 6, lekythos: 5, cake: 2.5, bell: 3, tripod: 14, obol: 3,
+  stringCoil: 3.5, shard: 1.5,
+};
+const CERB_BOSS_H = 34;              // ο Κέρβερος: ένα τεράστιο σκυλί (~2.5 μ.)
 const RC_DAY = [255, 236, 190];      // το φως της ημέρας στην έξοδο
 const RC_AO = 0.3;                   // ως πόσο μακριά (σε κελιά) από τοίχο σκοτεινιάζει το δάπεδο/ταβάνι
 const RC_RED_R = 1.8;                // ακτίνα (κελιά) της κόκκινης λάμψης κάτω από μια σκιά που φάνηκε
@@ -1167,7 +1186,8 @@ const Raycast = {
       if (alpha < 0.01) continue;
       const fh = frame ? frame.h : 1, fw = frame ? frame.w : 1;
       // Τα καρέ διπλής ανάλυσης (frame.hd = 2) έχουν το ίδιο μέγεθος στον κόσμο με τα απλά.
-      const h = (o.h || (fh / ((frame && frame.hd) || 1)) * RC_SPX * (o.scale || 1)) * k;
+      const real = !o.h && frame && frame.name && RC_REAL_H[frame.name];
+      const h = (o.h || (real ? real * (o.size || 1) : (fh / ((frame && frame.hd) || 1)) * RC_SPX * (o.scale || 1))) * k;
       const w = (h * fw) / fh;
       const bottom = this.horizon + (this.focal * (RC_EYE - (o.z || 0) / TILE)) / p.depth;
       const top = Math.round(bottom - h), left = Math.round(p.sx - w / 2);

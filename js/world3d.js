@@ -81,7 +81,10 @@ const World3D = {
   },
 
   // Καλείται σε κάθε spawn.
+  braziers: [],    // τα μαγκάλια της αρένας του Κέρβερου (main.js, lightArena)
+
   reset() {
+    this.braziers = [];
     this.sparks = [];
     this.drips = [];
     this.ripples = [];
@@ -151,6 +154,16 @@ const World3D = {
       });
     }
 
+    // ---- Τα μαγκάλια της αρένας (πάντα αναμμένα) ----
+    for (const b of this.braziers) {
+      const p = R.project(b.x, b.y);
+      if (!p || p.depth > 14) continue;
+      if (!flameDrawn) { this.drawFlame(now); flameDrawn = true; }
+      R.sprite(S('tripod'), { x: b.x, y: b.y, alpha: 0.9 });
+      const flick = 0.8 + 0.12 * Math.sin(now * 11 + b.x) + 0.08 * Math.sin(now * 4.7 + b.y);
+      R.sprite(this.flame, { x: b.x, y: b.y, z: 12, h: 18, add: true, fog: false, glow: { r: 34, color: '255,150,60', a: 0.32 * flick, cy: 0.85 } });
+    }
+
     // ---- Αντικείμενα στο έδαφος ----
     for (const it of Items.list) {
       if (it.taken) continue;
@@ -174,8 +187,8 @@ const World3D = {
         const p = R.project(it.x, it.y);
         if (!p || p.depth < 0.7) continue;
         const z = 2 + 12 * Math.min(1, Math.hypot(it.vx, it.vy) / JAR_SPEED);
-        const look = { jar: ['lekythos', 0.45], pebble: ['rocks', 0.18], cake: ['cake', 0.5], bell: ['bell', 0.5] }[it.kind || 'jar'];
-        R.sprite(S(look[0]), { x: it.x, y: it.y, z, scale: look[1] });
+        const look = { jar: ['lekythos', 1], pebble: ['rocks', 0.5], cake: ['cake', 1], bell: ['bell', 1] }[it.kind || 'jar'];
+        R.sprite(S(look[0]), { x: it.x, y: it.y, z, size: look[1] });
         continue;
       }
       // Η μελόπιτα / το κουδούνι μένουν στο έδαφος (το κουδούνι λάμπει όταν χτυπάει).
@@ -224,6 +237,9 @@ const World3D = {
     for (const m of monsters) {
       if (m === killer && deathAlpha !== undefined) {
         this.monster(m, now, m.x, m.y, deathAlpha, Math.floor(now * 5), false);
+      } else if (m.boss) {
+        // Ο Κέρβερος της αρένας φαίνεται πάντα (τον φωτίζουν τα μαγκάλια της Πύλης).
+        this.monster(m, now, m.x, m.y, 1, 0, false);
       } else if (m.isFrozen() && m.kind !== 'cerberus') {
         // Παγωμένη από τη Μελωδία: χλωμή, ήρεμη ψυχή στη θέση της.
         const left = m.frozenUntil - now;
@@ -317,7 +333,7 @@ const World3D = {
         R.sprite(S('snake3d', hiss), { x: d.x, y: d.y, alpha: a, flip: true, bias: 0.01, scale: 0.36 });
       } else if (d.kind === 'hades') {
         R.sprite(S('hades3d'), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
-        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 26, alpha: a, scale: 0.3 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
+        R.sprite(Sprites.cerberusHD([false, false, false], Math.sin(now * 1.6) > 0 ? 1 : 0), { x: d.x - 8, y: d.y - 26, alpha: a, h: 10 });   // δίπλα στον θρόνο, από την άλλη μεριά της Περσεφόνης
       } else {
         R.sprite(S('persephone3d', typeof Throne !== 'undefined' && Throne.lean ? 1 : 0), { x: d.x, y: d.y, alpha: a, scale: 0.44 });
       }
@@ -342,7 +358,7 @@ const World3D = {
       // Πολύ κοντά στην κάμερα (π.χ. στο κελί που στέκεσαι) δεν ζωγραφίζεται: θα γέμιζε την οθόνη.
       const pd = (dx * R.dirX + dy * R.dirY) / TILE;
       if (pd < 0.55) continue;
-      R.sprite(S(d.name), { x: d.x, y: d.y, z: d.z, scale: d.scale, alpha: a, flip: d.flip });
+      R.sprite(S(d.name), { x: d.x, y: d.y, z: d.z, size: d.size, alpha: a, flip: d.flip });
     }
 
     // Πού είναι στην οθόνη οι πηγές φωτός (για τις ακτίνες φωτός του bloom): οι φλόγες των βωμών
@@ -392,12 +408,36 @@ const World3D = {
     const R = Raycast;
     const p = R.project(x, y);
     if (!p) return;
+    if (m.boss) {
+      // Το boss: γαβγίζει όσο ετοιμάζεται / ορμάει· ξαπλωμένο = κεφάλια σιωπηλά, ζαλισμένο = αστεράκια.
+      const s = m.bstate, k = Math.floor(now * 6) % 3;
+      const loud = s === 'windup' || s === 'charge' || s === 'rise';
+      const barking = [0, 1, 2].map((i) => loud && i >= m.asleep && i === k);
+      const down = s === 'tired' || s === 'eating' || s === 'asleep';
+      const breath = down ? (Math.sin(now * (s === 'tired' ? 7 : 1.4)) > 0 ? 1 : 0) : Math.sin(now * 1.6) > 0 ? 1 : 0;
+      const shake = s === 'windup' ? (Math.random() - 0.5) * 2 : 0;
+      R.sprite(Sprites.cerberusHD(barking, breath), { x: x + shake, y, z: down ? -3 : 0, alpha: a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H,
+        glow: { r: 46, color: s === 'windup' || s === 'charge' ? '255,60,40' : POT.red, a: (s === 'windup' ? 0.5 + 0.3 * Math.sin(now * 20) : 0.35) * a },
+        after: (pc, b) => {
+          if (s !== 'stunned' && s !== 'tired') return;
+          // Αστεράκια / ιδρώτας: μικρές φωτεινές κουκκίδες που γυρίζουν πάνω από τα κεφάλια.
+          pc.globalCompositeOperation = 'lighter';
+          pc.fillStyle = 'rgba(255,236,180,0.85)';
+          for (let i = 0; i < 5; i++) {
+            const t = now * 3 + (i * Math.PI * 2) / 5;
+            const r = b.w * 0.28;
+            pc.fillRect(Math.round(b.sx + Math.cos(t) * r), Math.round(b.top + b.h * 0.08 + Math.sin(t) * r * 0.25), Math.max(1, Math.round(b.k * 2)), Math.max(1, Math.round(b.k * 2)));
+          }
+          pc.globalCompositeOperation = 'source-over';
+        } });
+      return;
+    }
     if (m.kind === 'cerberus') {
       // Ο Κέρβερος: τα κεφάλια που κοιμούνται δεν γαβγίζουν· όταν κυνηγάει, γαβγίζουν με τη σειρά.
       const hunting = m.state === 'hunt' && !m.isFrozen();
       const k = Math.floor(now * 3) % 3;
       const barking = [0, 1, 2].map((i) => hunting && i >= m.asleep && i === k);
-      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, scale: 0.62,
+      R.sprite(Sprites.cerberusHD(barking, Math.sin(now * 1.6) > 0 ? 1 : 0), { x, y, alpha: m.asleep >= 3 ? Math.max(a, 0.5) : a, flip: p.sx > R.W / 2, fog: false, h: CERB_BOSS_H,
         glow: { r: 40, color: POT.red, a: a * 0.45 } });
       return;
     }
@@ -464,15 +504,15 @@ const World3D = {
     const out = [];
     const dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]];
     const SPX = RC_SPX;
-    const put = (name, tx, ty, ox, oy, scale, hang, c) => {
+    // size = πόσο μεγαλύτερο / μικρότερο από το κανονικό του ύψος (RC_REAL_H).
+    const put = (name, tx, ty, ox, oy, size, hang, c) => {
       // Κρεμαστά (σταλακτίτες, ρίζες, αλυσίδες): από το ταβάνι στα στενά περάσματα· αλλού κρέμονται
       // από το σκοτάδι, πιο ψηλά και πιο μεγάλα (το ταβάνι δεν φαίνεται).
       const open = hang && !Raycast.ceilOn[c];
-      if (open) scale *= 1.35;
-      const fr = Sprites.frames[name][0];
-      const h = fr.h * SPX * scale;
+      if (open) size *= 1.35;
+      const h = RC_REAL_H[name] * size;
       out.push({
-        name, c, scale, flip: hash(tx, ty, 9) > 0.5,
+        name, c, size, flip: hash(tx, ty, 9) > 0.5,
         x: (tx + 0.5 + ox) * TILE, y: (ty + 0.5 + oy) * TILE,
         z: hang ? (open ? Math.max(TILE * 1.5, TILE * (2.6 + hash(tx, ty, 11) * 0.9) - h) : Math.max(0, TILE - h)) : 0,
       });
@@ -487,7 +527,7 @@ const World3D = {
         const water = dirs.filter(([dx, dy]) => L.terrainAt(tx + dx, ty + dy) === T_WATER);
         const h1 = hash(tx, ty, 1), h2 = hash(tx, ty, 2), h3 = hash(tx, ty, 3);
         const jx = (hash(tx, ty, 4) - 0.5) * 0.5, jy = (hash(tx, ty, 5) - 0.5) * 0.5;
-        const sc = 0.85 + hash(tx, ty, 6) * 0.45;
+        const sc = 0.7 + hash(tx, ty, 6) * 0.75;   // από μικρά ως μεγάλα
         const toWall = wall.length ? wall[Math.floor(h3 * wall.length)] : null;
         const wx = toWall ? toWall[0] * 0.3 : jx, wy = toWall ? toWall[1] * 0.3 : jy;
         const ch = CHAPTERS[r] || {};
@@ -497,32 +537,32 @@ const World3D = {
             const w = water[0];
             put('reeds', tx, ty, w[0] * 0.3, w[1] * 0.3, sc, false, c);
           } else if (toWall && h1 < 0.17) put('stalagmite', tx, ty, wx, wy, sc, false, c);
-          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
-          else if (r !== 0 && h1 < 0.255) put('bones', tx, ty, jx, jy, 0.9, false, c);
-          else if (r !== 0 && h1 < 0.27) put('skull', tx, ty, jx, jy, 0.55, false, c);
+          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc, false, c);
+          else if (r !== 0 && h1 < 0.255) put('bones', tx, ty, jx, jy, 1, false, c);
+          else if (r !== 0 && h1 < 0.27) put('skull', tx, ty, jx, jy, 1, false, c);
           // Από πάνω: ρίζες κοντά στην επιφάνεια (Ταίναρο, Άνοδος), αλλού σταλακτίτες (όχι πάνω από τη φωτιά).
           if (ch.roots && h2 < 0.13) put('roots', tx, ty, jx, jy, sc, true, c);
           else if (!fire && h2 < 0.15) put('stalactite', tx, ty, (hash(tx, ty, 7) - 0.5) * 0.6, (hash(tx, ty, 8) - 0.5) * 0.6, sc, true, c);
         } else if (ch.decor === 'mourning') {
           // Οι Αγροί του Πένθους: ασφόδελοι, σπασμένα αγγεία, αγάλματα στους τοίχους — ήσυχα.
-          if (h1 < 0.2) put('asphodel', tx, ty, jx, jy, sc * 0.75, false, c);
+          if (h1 < 0.2) put('asphodel', tx, ty, jx, jy, sc, false, c);
           else if (toWall && h1 < 0.25) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1, false, c);
-          else if (toWall && h1 < 0.3) put('amphoraBroken', tx, ty, wx, wy, 0.85, false, c);
+          else if (toWall && h1 < 0.3) put('amphoraBroken', tx, ty, wx, wy, 1, false, c);
         } else if (ch.decor === 'asphodel') {
-          if (h1 < 0.33) put('asphodel', tx, ty, jx, jy, sc * 0.8, false, c);
-          else if (toWall && h1 < 0.39) put('amphoraBroken', tx, ty, wx, wy, 0.9, false, c);
-          else if (h1 < 0.43) put('bones', tx, ty, jx, jy, 0.9, false, c);
-          else if (h1 < 0.45) put('skull', tx, ty, jx, jy, 0.55, false, c);
+          if (h1 < 0.33) put('asphodel', tx, ty, jx, jy, sc, false, c);
+          else if (toWall && h1 < 0.39) put('amphoraBroken', tx, ty, wx, wy, 1, false, c);
+          else if (h1 < 0.43) put('bones', tx, ty, jx, jy, 1, false, c);
+          else if (h1 < 0.45) put('skull', tx, ty, jx, jy, 1, false, c);
         } else if (ch.decor === 'tartarus') {
-          if (toWall && h1 < 0.06) put('skullpile', tx, ty, wx, wy, 0.9, false, c);
-          else if (h1 < 0.14) put('bones', tx, ty, jx, jy, 0.9, false, c);
-          else if (h1 < 0.19) put('skull', tx, ty, jx, jy, 0.55, false, c);
-          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc * 0.9, false, c);
-          if (h2 < 0.12) put('chain', tx, ty, jx, jy, 0.5 + hash(tx, ty, 10) * 0.12, true, c);
+          if (toWall && h1 < 0.06) put('skullpile', tx, ty, wx, wy, 1, false, c);
+          else if (h1 < 0.14) put('bones', tx, ty, jx, jy, 1, false, c);
+          else if (h1 < 0.19) put('skull', tx, ty, jx, jy, 1, false, c);
+          else if (h1 < 0.23) put('rocks', tx, ty, jx, jy, sc, false, c);
+          if (h2 < 0.12) put('chain', tx, ty, jx, jy, 0.8 + hash(tx, ty, 10) * 0.4, true, c);
         } else if (ch.decor === 'palace') {
-          if (toWall && h1 < 0.07) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1.05, false, c);
-          else if (toWall && h1 < 0.15) put('amphora', tx, ty, wx, wy, 0.85, false, c);
-          else if (toWall && h1 < 0.17) put('amphoraBroken', tx, ty, wx, wy, 0.85, false, c);
+          if (toWall && h1 < 0.07) put('statue', tx, ty, wx * 1.1, wy * 1.1, 1, false, c);
+          else if (toWall && h1 < 0.15) put('amphora', tx, ty, wx, wy, 1, false, c);
+          else if (toWall && h1 < 0.17) put('amphoraBroken', tx, ty, wx, wy, 1, false, c);
         }
       }
     }

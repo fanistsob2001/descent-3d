@@ -32,9 +32,9 @@ const Missions = {
     else if (id === 'obol') { cur = Charon.paid ? 1 : 0; }
     else if (id === 'souls') { cur = this.heard.size; total = Level.souls.length; }
     else if (id === 'jars') {
-      const jars = Items.list.filter((it) => it.kind === 'jar');
-      cur = jars.filter((it) => it.taken).length;
-      total = jars.length;
+      // Φτιάξε και τα τέσσερα αντικείμενα σε ένα ιερό (τα αγγεία δεν βρίσκονται πια σκόρπια).
+      cur = RECIPES.filter((r) => Inventory.made.has(r.id)).length;
+      total = RECIPES.length;
     } else if (id === 'altars') { cur = Altars.list.filter((a) => a.lit).length; total = Altars.list.length; }
     else { cur = this.secrets.has(id) ? 1 : 0; }
     return { cur, total, done: cur >= total };

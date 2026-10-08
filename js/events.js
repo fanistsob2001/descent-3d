@@ -91,6 +91,187 @@ class Cerberus extends Monster {
   }
 }
 
+// ---- Ο Κέρβερος ως boss (X), σαν τη μάχη με τον Tiny Tiger του Crash Bandicoot ----
+// Δεν βλέπει, αλλά σε μυρίζει: γυρίζει προς το μέρος σου, γρυλίζει και ξύνει το χώμα (προειδοποίηση), και
+// ορμάει σε ευθεία εκεί που ήσουν. Δεν μπορεί να στρίψει: αν παραμερίσεις, χτυπάει στην πέτρα και ζαλίζεται.
+// Μετά από 3 ορμές ξαπλώνει λαχανιασμένος (tired): τότε μόνο τρώει μια μελόπιτα (που πέταξες κοντά του —
+// τρώει και όσες είναι ήδη κάτω) ή ακούει τη Μελωδία από κοντά → ένα κεφάλι κοιμάται (η μπάρα ζωής πέφτει
+// κατά ένα τρίτο). Κάθε φάση πιο γρήγορος. Σκοτώνει μόνο όσο ορμάει ή όταν πέσεις πάνω του ξύπνιο.
+const BOSS = {
+  windup: [1.25, 1.0, 0.8],       // δευτ. προειδοποίησης ανά φάση (κεφάλια που κοιμούνται: 0, 1, 2)
+  charge: [235, 275, 315],        // ταχύτητα ορμής (ο παίκτης τρέχει με 115)
+  tired: [7, 6, 5.5],             // πόσο μένει ξαπλωμένος
+  charges: 3,                     // ορμές πριν κουραστεί
+  stun: 1.1,                      // ζάλη μετά από κάθε χτύπημα σε τοίχο
+  eatReach: 230,                  // μελόπιτα τόσο κοντά του = την τρώει (όσο είναι κουρασμένος)
+  songReach: 240,                 // Μελωδία από τόσο κοντά
+  eat: 1.6,
+  rise: 1.8,
+};
+
+class CerberusBoss extends Cerberus {
+  constructor(x, y, region) {
+    super(x, y, region);
+    this.boss = true;
+    this.guard = true;
+    this.bstate = 'idle';       // idle | windup | charge | prowl | stunned | tired | eating | rise | asleep
+    this.bUntil = 0;
+    this.dirX = 0; this.dirY = 1;
+    this.facing = Math.PI / 2;
+    this.chargesDone = 0;
+    this.fight = false;
+    this.cake = null;
+    // Η αρένα: τα κελιά του κεφαλαίου κάτω από τον διάδρομο (εκεί που ξεκινάει ο μεγάλος χώρος).
+    this.arenaTop = Math.floor(y / TILE) - 3;
+    this.homeX = x; this.homeY = y;
+  }
+
+  hears() { return false; }
+
+  inArena(x, y) {
+    const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+    return ty >= this.arenaTop && Level.regionAt(tx, ty) === this.region && !Level.isWall(tx, ty);
+  }
+
+  // Η Μελωδία (Melody.play καλεί freeze σε όλα τα τέρατα κοντά): μόνο όσο είναι κουρασμένος.
+  freeze() {
+    if (this.bstate !== 'tired' || Math.hypot(player.x - this.x, player.y - this.y) > BOSS.songReach) return;
+    this.headSleeps(Echoes.now);
+  }
+
+  isFrozen() {
+    return this.asleep >= 3;
+  }
+
+  set(s, dur, now) {
+    this.bstate = s;
+    this.bUntil = now + dur;
+  }
+
+  headSleeps(now) {
+    this.asleep++;
+    this.cake = null;
+    if (this.asleep >= 3) {
+      this.bstate = 'asleep';
+      this.fight = false;
+      if (this.onAsleep) this.onAsleep();
+      return;
+    }
+    Notice.show(STORY.headSleeps, now, 2.5);
+    this.set('rise', BOSS.rise, now);
+    CERB_PITCH.forEach((f, i) => Sound.bark(this.x, this.y, f, 0.4 + i * 0.25));
+  }
+
+  update(dt, now) {
+    if (this.asleep >= 3) return;
+    const ph = Math.min(2, this.asleep);
+    const pdx = player.x - this.x, pdy = player.y - this.y;
+    // Η μάχη αρχίζει μόλις μπεις στην αρένα· αν βγεις πίσω στον διάδρομο, σε περιμένει.
+    const inside = this.inArena(player.x, player.y);
+    if (!this.fight) {
+      if (!inside) {
+        // Περιμένει στη μέση της αρένας, γυρισμένος προς την είσοδο.
+        this.facing = Math.atan2(pdy, pdx);
+        return;
+      }
+      this.fight = true;
+      this.chargesDone = 0;
+      this.set('windup', BOSS.windup[ph] + 0.6, now);
+      CERB_PITCH.forEach((f, i) => Sound.bark(this.x, this.y, f, i * 0.3));
+    }
+    const s = this.bstate;
+    if (s === 'windup') {
+      // Γυρίζει προς το μέρος σου (όχι ακαριαία) και γρυλίζει· στο τέλος ορμάει.
+      const want = Math.atan2(pdy, pdx);
+      let da = Math.atan2(Math.sin(want - this.facing), Math.cos(want - this.facing));
+      this.facing += Math.max(-dt * 8, Math.min(dt * 8, da));
+      if (now >= this.barkAt) { this.barkAt = now + 0.45; Sound.bark(this.x, this.y, CERB_PITCH[Math.floor(Math.random() * 3)], 0); }
+      if (now >= this.bUntil) {
+        if (!inside) { this.set('windup', 0.5, now); return; }
+        // Ορμάει εκεί που είσαι τη στιγμή που ξεκινάει (όχι εκεί που προλάβαινε να κοιτάξει).
+        this.facing = want;
+        this.dirX = Math.cos(want);
+        this.dirY = Math.sin(want);
+        this.set('charge', 6, now);
+        this.chargeFromX = this.x; this.chargeFromY = this.y;
+      }
+    } else if (s === 'charge') {
+      // Σε ευθεία, όσο δεν βρίσκει πέτρα (ή την άκρη της αρένας).
+      const step = BOSS.charge[ph] * dt;
+      const nx = this.x + this.dirX * step, ny = this.y + this.dirY * step;
+      // Μόνο μπροστά του (η μουσούδα και οι δύο "ώμοι"): ένας τοίχος δίπλα του δεν τον σταματάει.
+      const fx = nx + this.dirX * this.r, fy = ny + this.dirY * this.r;
+      const sx = this.dirY * this.r * 0.5, sy = -this.dirX * this.r * 0.5;
+      const hit = !this.inArena(fx, fy) || !this.inArena(fx + sx, fy + sy) || !this.inArena(fx - sx, fy - sy);
+      Sound.rumble(true, this.x, this.y);
+      if (hit && Math.hypot(this.x - this.chargeFromX, this.y - this.chargeFromY) < TILE * 1.2) {
+        // Πέτρα ακριβώς μπροστά του (κρύφτηκες πίσω από κολόνα): δεν ορμάει, έρχεται γύρω της να σε βρει.
+        Sound.rumble(false);
+        this.path = Level.findPath(Math.floor(this.x / TILE), Math.floor(this.y / TILE), Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+        this.set('prowl', 1.6, now);
+      } else if (hit || now >= this.bUntil) {
+        Sound.rumble(false);
+        this.chargesDone++;
+        Level.pushOutOfWalls(this);
+        // Το χτύπημα: ένας κούφιος γδούπος, και η πέτρα "φωτίζεται" (κύμα — αλλά οι σκιές εδώ δεν υπάρχουν).
+        Echoes.emit(this.x + this.dirX * this.r, this.y + this.dirY * this.r, 260, 0.75, 'jar');
+        Sound.thud(this.x, this.y);
+        if (typeof vibrate === 'function') vibrate(60);
+        if (this.chargesDone >= BOSS.charges) {
+          this.chargesDone = 0;
+          this.set('tired', BOSS.tired[ph], now);
+          Notice.show(STORY.bossTired, now, 2.5);
+        } else this.set('stunned', BOSS.stun, now);
+      } else { this.x = nx; this.y = ny; }
+    } else if (s === 'prowl') {
+      // Περπατάει γρήγορα γύρω από το εμπόδιο, προς το μέρος σου, και μετά ξαναετοιμάζεται.
+      let st = 120 * dt;
+      while (st > 0 && this.path.length) {
+        const [tx, ty] = this.path[0];
+        const gx = (tx + 0.5) * TILE, gy = (ty + 0.5) * TILE, d = Math.hypot(gx - this.x, gy - this.y);
+        if (!this.inArena(gx, gy)) { this.path = []; break; }
+        if (d <= st) { this.x = gx; this.y = gy; st -= d; this.path.shift(); }
+        else { this.x += ((gx - this.x) / d) * st; this.y += ((gy - this.y) / d) * st; this.facing = Math.atan2(gy - this.y, gx - this.x); st = 0; }
+      }
+      if (now >= this.bUntil || !this.path.length) this.set('windup', BOSS.windup[ph] * 0.8, now);
+    } else if (s === 'stunned' || s === 'rise') {
+      if (now >= this.bUntil) this.set('windup', BOSS.windup[ph], now);
+    } else if (s === 'tired') {
+      // Μια μελόπιτα κοντά του (πεταμένη, στο έδαφος): σέρνεται ως εκεί και την τρώει.
+      const cake = Jars.items.find((it) => it.kind === 'cake' && it.brokenAt >= 0 && !it.eaten &&
+        Math.hypot(it.x - this.x, it.y - this.y) < BOSS.eatReach);
+      if (cake) {
+        cake.eaten = true;
+        this.cake = cake;
+        this.set('eating', BOSS.eat, now);
+      } else if (now >= this.bUntil) {
+        this.set('windup', BOSS.windup[ph], now);
+        CERB_PITCH.forEach((f, i) => Sound.bark(this.x, this.y, f, i * 0.2));
+      }
+    } else if (s === 'eating') {
+      const c = this.cake;
+      if (c) {
+        const d = Math.hypot(c.x - this.x, c.y - this.y);
+        if (d > this.r) { this.x += ((c.x - this.x) / d) * Math.min(d, 60 * dt); this.y += ((c.y - this.y) / d) * Math.min(d, 60 * dt); }
+        else c.brokenAt = now - 1e3;   // φαγώθηκε (σβήνει)
+      }
+      if (now >= this.bUntil) this.headSleeps(now);
+    }
+  }
+
+  // Η "ζωή" που φαίνεται στην μπάρα (1 = ξύπνιος, 0 = κοιμάται).
+  health() {
+    return 1 - this.asleep / 3;
+  }
+
+  touches(p) {
+    if (this.asleep >= 3) return false;
+    const s = this.bstate;
+    if (s !== 'charge' && s !== 'windup' && s !== 'idle' && s !== 'prowl') return false;
+    return Math.hypot(p.x - this.x, p.y - this.y) < p.r + this.r;
+  }
+}
+
 // Η πέτρα του Σίσυφου: κατρακυλάει πάνω σε μια διαδρομή, φωτίζει τον δρόμο της με τον θόρυβό της
 // (κύμα κάθε μισό δευτερόλεπτο) και σε συνθλίβει αν σε φτάσει.
 const Boulder = {
