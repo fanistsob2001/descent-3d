@@ -122,57 +122,6 @@ function artThrone(g, cx) {
   g.line([[cx - 25, 96.5], [cx + 25, 96.5]], 1, 'gld2', { px: true });
 }
 
-// Καθιστός, από μπροστά: πόδια, γόνατα, κορμός, χέρια στα μπράτσα, κεφάλι. o: { skin, robe, robe2, hair, beard, crown, lean, hold }
-function artSeated(g, cx, o) {
-  const skin = o.skin || 'skn3', lean = o.lean || 0;
-  // Γόνατα και κνήμες, πόδια.
-  for (const s of [-1, 1]) {
-    g.limb([[cx + s * 5, 66], [cx + s * 6, 80], [cx + s * 6.5, 94]], [8, 6.5, 5], 0, o.robe, { size: 6 });
-    g.blob([[cx + s * 6.5 - 3.5, 94], [cx + s * 6.5 + 3.5, 94], [cx + s * 7 + 3.5, 98], [cx + s * 7 - 3.5, 98]], 'brn2', { size: 3 });
-  }
-  if (o.skirt) g.blob([[cx - 13, 64], [cx + 13, 64], [cx + 14, 95], [cx - 14, 95]], o.robe, { size: 14 });
-  // Μηροί (κοιτάμε από μπροστά: φαίνονται κοντοί).
-  g.blob([[cx - 13, 58], [cx + 13, 58], [cx + 12, 70], [cx - 12, 70]], o.robe, { size: 12 });
-  // Κορμός (γέρνει με το lean).
-  const L = lean * 5;
-  const torso = g.blob([[cx - 11 + L * 0.3, 30], [cx + L, 28], [cx + 11 + L * 0.3, 30], [cx + 10, 46], [cx + 12, 60], [cx - 12, 60], [cx - 10, 46]], o.robe, { size: 18 });
-  g.hatch(torso, o.robe.replace(/\d/, (d) => Math.max(0, d - 2)), 4, (i) => [[cx - 6 + i * 4 + L * 0.5, 32], [cx - 7 + i * 4.6, 58]], 1, 3);
-  if (o.robe2) g.blob([[cx - 12 + L * 0.3, 29], [cx - 4 + L, 28], [cx + 6, 44], [cx + 12, 64], [cx + 2, 70], [cx - 13, 62]], o.robe2, { size: 14 });
-  if (o.armor) {
-    g.blob([[cx - 9 + L * 0.3, 31], [cx + 9 + L * 0.3, 31], [cx + 8, 44], [cx - 8, 44]], o.armor, { size: 10 });
-    g.line([[cx - 6 + L * 0.3, 36], [cx + 6 + L * 0.3, 36]], 1, 'gld3', { px: true });
-    g.line([[cx + L * 0.3, 32], [cx + L * 0.3, 43]], 1, 'gld2', { px: true });
-  }
-  g.line([[cx - 10, 46], [cx + 10, 46]], 1.6, 'gld2', {});
-  // Χέρια: από τους ώμους στα μπράτσα του θρόνου (ή κρατάνε κάτι).
-  const sh = [[cx - 12 + L * 0.3, 32], [cx + 12 + L * 0.3, 32]];
-  const handL = o.handL || [cx - 22, 55], handR = o.handR || [cx + 22, 55];
-  g.limb([sh[0], [cx - 16, 44], handL], [6, 5, 4], 0, skin, { size: 5 });
-  g.limb([sh[1], [cx + 16, 44], handR], [6, 5, 4], 0, skin, { size: 5 });
-  g.limb([sh[0], [cx - 15, 38]], 7, 6.5, o.robe, { size: 6 });
-  g.limb([sh[1], [cx + 15, 38]], 7, 6.5, o.robe, { size: 6 });
-  g.ell(handL[0], handL[1], 2.5, 2.5, skin); g.ell(handR[0], handR[1], 2.5, 2.5, skin);
-  // Λαιμός, κεφάλι (από μπροστά).
-  const hx = cx + L, hy = 17 + Math.abs(lean) * 2;
-  g.limb([[hx, 30], [hx, hy + 6]], 5, 4.5, skin, { size: 4 });
-  if (o.hair && !o.beard) g.blob([[hx - 8, hy - 2], [hx - 6, hy - 9], [hx, hy - 11], [hx + 6, hy - 9], [hx + 8, hy - 2], [hx + 10, hy + 17], [hx + 6, hy + 19], [hx + 4.5, hy + 7], [hx - 4.5, hy + 7], [hx - 6, hy + 19], [hx - 10, hy + 17]], o.hair, { size: 8 });
-  else if (o.hair) g.blob([[hx - 8, hy - 2], [hx - 6, hy - 9], [hx, hy - 11], [hx + 6, hy - 9], [hx + 8, hy - 2], [hx + 8, hy + 6], [hx - 8, hy + 6]], o.hair, { size: 8 });
-  g.blob([[hx - 6, hy - 3], [hx - 4.5, hy - 8.5], [hx, hy - 9.5], [hx + 4.5, hy - 8.5], [hx + 6, hy - 3], [hx + 5, hy + 4], [hx + 2, hy + 7.5], [hx - 2, hy + 7.5], [hx - 5, hy + 4]], skin, { size: 11 });
-  g.px(hx - 2.4, hy - 1.5, o.eyes || 'ink1', 1); g.px(hx + 2.4, hy - 1.5, o.eyes || 'ink1', 1);
-  if (o.eyes) { g.mark(hx - 2.4, hy - 1.5); g.mark(hx + 2.4, hy - 1.5); }
-  g.line([[hx - 3.6, hy - 3.4], [hx - 1.2, hy - 3]], 1, 'ink1', { px: true }); g.line([[hx + 1.2, hy - 3], [hx + 3.6, hy - 3.4]], 1, 'ink1', { px: true });
-  g.line([[hx, hy - 1], [hx + 0.4, hy + 1.8]], 1, skin.replace(/\d/, (d) => Math.max(0, d - 1)), { px: true });
-  g.line([[hx - 1.4, hy + 4.2], [hx + 1.4, hy + 4.2]], 1, 'mar3', { px: true });
-  if (o.beard) {
-    g.blob([[hx - 5.5, hy + 1], [hx + 5.5, hy + 1], [hx + 5, hy + 8], [hx + 2, hy + 13], [hx - 2, hy + 13], [hx - 5, hy + 8]], o.beard, { size: 8 });
-    g.line([[hx - 1.8, hy + 4], [hx + 1.8, hy + 4]], 1, 'mar2', { px: true });
-    g.hatch(g.path([[hx - 5.5, hy + 1], [hx + 5.5, hy + 1], [hx + 5, hy + 8], [hx + 2, hy + 13], [hx - 2, hy + 13], [hx - 5, hy + 8]]), 'ink0', 4, (i) => [[hx - 3 + i * 2, hy + 6], [hx - 2.5 + i * 1.6, hy + 12]], 1, 7);
-  }
-  if (o.hairTop) g.blob([[hx - 6.5, hy - 3], [hx - 5, hy - 9.5], [hx, hy - 11], [hx + 5, hy - 9.5], [hx + 6.5, hy - 3], [hx + 3, hy - 6.5], [hx - 3, hy - 6.5]], o.hairTop, { size: 6 });
-  if (o.crown) o.crown(g, hx, hy - 9);
-  if (o.hold) o.hold(g, handL, handR);
-}
-
 // Η Ευρυδίκη (ζωντανή ή σκιά): λεπτή, φόρεμα (πέπλος) με ζώνη κάτω από το στήθος που ανοίγει σε μακριά φούστα με
 // πτυχώσεις, κόκκινο σάλι στους ώμους, μακριά κυματιστά μαλλιά με μια μπούκλα μπροστά στον ώμο, στεφάνι από λουλούδια.
 // o: { frame (0 στέκεται, 1 / 2 βάδισμα), ghost (χλωμή, η ουρά της λιώνει) }. Σχέδιο 60 × 100, κοιτάζει δεξιά.
@@ -325,6 +274,89 @@ function artHades(g) {
   g.dot(hx - 5, cy + 1, 0.7, 'red3'); g.dot(hx + 5, cy + 1, 0.7, 'red3');
 }
 
+// Η Περσεφόνη στον θρόνο της (από μπροστά): η βασίλισσα του Κάτω Κόσμου και της άνοιξης — όμορφο, λυπημένο πρόσωπο,
+// μακριά σκούρα κυματιστά μαλλιά στους ώμους, στεφάνι από λουλούδια και ρόδια με χρυσά φύλλα, κρασάτο φόρεμα με χρυσές
+// ακμές και ζώνη, μανδύας στους ώμους, κολιέ, ένα ρόδι στο χέρι. lean = 1: γέρνει προς τον Άδη, το χέρι στην καρδιά.
+// Σχέδιο 70 × 100.
+function artPersephone(g, lean) {
+  const cx = 35, L = lean ? -3.2 : 0;
+  const SKN = 'skn3/skn4', DR = 'mar4/mar6', DRd = 'mar2', HR = 'mar1/mar3', GOLD = 'gld3';
+  artThrone(g, cx);
+  // Λουλούδια σκαλισμένα στην κορυφή του θρόνου της (δεν είναι ίδιος με του Άδη).
+  for (const [x, y] of [[cx - 9, 9], [cx, 5], [cx + 9, 9]]) { g.dot(x, y, 2, 'red3'); g.px(x, y, 'gld4'); }
+  // Ο μανδύας πίσω από τους ώμους, ως το κάθισμα (σκούρο κόκκινο με χρυσή ακμή).
+  const cape = [[cx - 17, 32], [cx - 11 + L * 0.4, 25], [cx + 11 + L * 0.4, 25], [cx + 17, 32], [cx + 19, 64], [cx + 13, 72], [cx - 13, 72], [cx - 19, 64]];
+  g.blob(cape, 'red2/red3', { size: 20 });
+  // Τα μαλλιά πίσω: πέφτουν κυματιστά ως κάτω από τους ώμους.
+  const hx = cx + L, hy = 17 + (lean ? 1.2 : 0);
+  const hairBack = [[hx - 9, hy - 3], [hx - 7, hy - 10], [hx, hy - 12], [hx + 7, hy - 10], [hx + 9, hy - 3], [hx + 11, hy + 10], [hx + 12.5, hy + 22], [hx + 8, hy + 25], [hx - 8, hy + 25], [hx - 12.5, hy + 22], [hx - 11, hy + 10]];
+  g.blob(hairBack, HR, { size: 14 });
+  g.hatch(g.path(hairBack), 'mar0', 6, (i) => { const s = i < 3 ? -1 : 1, k = i % 3; return [[hx + s * (6 + k * 1.5), hy - 2], [hx + s * (8 + k * 1.5) + 1.5, hy + 10], [hx + s * (7 + k * 2), hy + 24]]; }, 1, 4);
+  // Η φούστα ως τα πόδια (κάθεται: τα γόνατα μπροστά), με πτυχώσεις και χρυσή ταινία στον ποδόγυρο.
+  const skirt = [[cx - 14, 58], [cx + 14, 58], [cx + 15.5, 80], [cx + 16, 95], [cx - 16, 95], [cx - 15.5, 80]];
+  const sk = g.blob(skirt, DR, { size: 18 });
+  g.hatch(sk, DRd, 7, (i) => [[cx - 10 + i * 3.4, 66], [cx - 12 + i * 4, 95]], 1, 2);
+  g.inside(sk, () => {
+    g.line([[cx - 16, 92.5], [cx + 16, 92.5]], 2.2, GOLD, {});
+    for (let x = cx - 14; x <= cx + 14; x += 2.8) g.dot(x, 92.5, 0.45, 'mar1');
+  });
+  for (const s of [-1, 1]) g.blob([[cx + s * 5.5 - 3, 94.5], [cx + s * 5.5 + 3, 94.5], [cx + s * 6 + 3.4, 97.6], [cx + s * 6 - 3.4, 97.6]], 'gld2/gld4', { size: 3 });
+  // Τα γόνατα (από μπροστά).
+  g.blob([[cx - 14.5, 54], [cx + 14.5, 54], [cx + 14.5, 66], [cx - 14.5, 66]], DR, { size: 12 });
+  g.line([[cx, 56], [cx, 66]], 1, DRd, { px: true });
+  // Κορμός: λεπτή μέση, εφαρμοστό πάνω μέρος με λαιμόκοψη, ζώνη, κολιέ.
+  const torso = [[cx - 10 + L * 0.3, 30], [cx + L * 0.5, 28], [cx + 10 + L * 0.3, 30], [cx + 9, 40], [cx + 7.5, 47], [cx + 12, 57], [cx - 12, 57], [cx - 7.5, 47], [cx - 9, 40]];
+  const tp = g.blob(torso, DR, { size: 16 });
+  g.hatch(tp, DRd, 3, (i) => [[cx - 3 + i * 3 + L * 0.3, 41], [cx - 4 + i * 4, 56]], 1, 3);
+  g.blob([[cx - 5 + L * 0.4, 29], [cx + 5 + L * 0.4, 29], [cx + L * 0.4, 35]], SKN, { size: 5 });   // λαιμόκοψη
+  g.line([[cx - 9.5 + L * 0.3, 30], [cx + L * 0.4, 35.5], [cx + 9.5 + L * 0.3, 30]], 1, GOLD, { px: true });
+  g.line([[cx - 8, 46.5], [cx, 47.6], [cx + 8, 46.5]], 2, GOLD, {});
+  g.dot(cx, 47.4, 1.4, 'red4'); g.px(cx, 47.2, 'red6');
+  g.limb([[cx + 0.5, 48], [cx + 1.5, 55], [cx + 0.5, 60]], 1.4, 0.8, GOLD, { size: 1 });   // η άκρη της ζώνης
+  // Χέρια: λεπτά, με χρυσά βραχιόλια. Αριστερά (για εμάς) στο μπράτσο του θρόνου με το ρόδι· δεξιά στο γόνατο
+  // — ή στην καρδιά όταν γέρνει.
+  const shL = [cx - 10.5 + L * 0.3, 32], shR = [cx + 10.5 + L * 0.3, 32];
+  const hL = [cx - 21, 54], hR = lean ? [cx - 1 + L, 38] : [cx + 9, 58];
+  g.limb([shL, [cx - 16, 43], hL], [4.6, 3.6, 3], 0, SKN, { size: 4 });
+  g.limb(lean ? [shR, [cx + 9, 44], hR] : [shR, [cx + 14, 46], hR], [4.6, 3.6, 3], 0, SKN, { size: 4 });
+  for (const s of [shL, shR]) g.blob([[s[0] - 3.5, s[1] - 2.5], [s[0] + 3.5, s[1] - 2.5], [s[0] + 4, s[1] + 4], [s[0] - 4, s[1] + 4]], DR, { size: 5 });   // μανίκια
+  g.line([[cx - 18.6, 48.8], [cx - 16.4, 49.6]], 1.4, GOLD, {});
+  g.ell(hL[0], hL[1], 2.2, 2.2, SKN);
+  g.ell(hR[0], hR[1], 2.2, 2.2, SKN);
+  // Το ρόδι στο χέρι της (με το "στέμμα" του).
+  g.ell(hL[0] + 0.5, hL[1] - 3, 3.2, 3, 'red3/red5');
+  g.poly([[hL[0] - 0.4, hL[1] - 5.8], [hL[0] + 0.5, hL[1] - 7.6, 1], [hL[0] + 1.4, hL[1] - 5.8]], 'gld2', { flat: true });
+  // Λαιμός, κολιέ, πρόσωπο.
+  g.limb([[hx * 0.5 + cx * 0.5, 29], [hx, hy + 5]], 4.4, 4, SKN, { size: 4 });
+  g.line([[hx - 3.6, 29.4], [hx, 31.6], [hx + 3.6, 29.4]], 1.2, GOLD, {});
+  g.dot(hx, 31.8, 0.9, 'red4');
+  const face = [[hx - 6.4, hy - 4], [hx - 5.2, hy - 9.4], [hx, hy - 11], [hx + 5.2, hy - 9.4], [hx + 6.4, hy - 4], [hx + 5.6, hy + 2.5], [hx + 2.6, hy + 6.6], [hx, hy + 7.4], [hx - 2.6, hy + 6.6], [hx - 5.6, hy + 2.5]];
+  g.blob(face, SKN, { size: 12, hi: 0.9, rim: 2 });
+  // Μάτια με βλεφαρίδες (λυπημένα — μισόκλειστα όταν γέρνει), φρύδια, μύτη, κόκκινα χείλη.
+  for (const s of [-1, 1]) {
+    const ex = hx + s * 2.7, ey = hy - 1;
+    g.ell(ex, ey, 1.5, lean ? 0.6 : 0.9, 'crm5', { flat: true });
+    g.px(ex + (lean ? -0.4 : 0), ey + (lean ? 0.2 : 0), 'ink1', 1);
+    g.line([[ex - 1.7, ey - 0.9], [ex + 1.7, ey - 0.9]], 1, 'ink1', { px: true });
+    g.line([[ex + s * 1.7, ey - 2.2], [ex - s * 1.5, ey - 2.9]], 1, 'mar1', { px: true });   // φρύδια (λυπημένα: ψηλότερα μέσα)
+  }
+  g.line([[hx, hy - 0.4], [hx + 0.4, hy + 2.6]], 1, 'skn2', { px: true });
+  g.blob([[hx - 1.8, hy + 4.4], [hx, hy + 4], [hx + 1.8, hy + 4.4], [hx, hy + 5.4]], 'red3/red4', { size: 2 });
+  // Τα μαλλιά από πάνω (χωρίστρα στη μέση) και δύο τούφες μπροστά στους ώμους.
+  g.blob([[hx - 6.8, hy - 2], [hx - 6.5, hy - 9], [hx, hy - 12.2], [hx + 6.5, hy - 9], [hx + 6.8, hy - 2], [hx + 4.6, hy - 6.6], [hx + 0.6, hy - 8.4], [hx - 0.6, hy - 8.4], [hx - 4.6, hy - 6.6]], HR, { size: 8 });
+  for (const s of [-1, 1]) g.limb([[hx + s * 6, hy - 2], [hx + s * 7.4, hy + 8], [hx + s * 6.4, hy + 16], [hx + s * 7.6, hy + 22]], [3.2, 3, 2.6, 1.4], 0, HR, { size: 3 });
+  // Στεφάνι: χρυσά φύλλα, λευκά και κόκκινα λουλούδια, και δύο ρόδια στα πλάγια.
+  const cy = hy - 9.5;
+  g.line([[hx - 7.6, cy + 2], [hx - 4, cy - 1.4], [hx, cy - 2.4], [hx + 4, cy - 1.4], [hx + 7.6, cy + 2]], 1.4, 'gld2', {});
+  for (let i = 0; i < 9; i++) {
+    const a = Math.PI * (0.08 + i * 0.105), px = hx - Math.cos(a) * 7.8, py = cy + 2.4 - Math.sin(a) * 4.6;
+    if (i === 1 || i === 7) { g.ell(px, py, 1.9, 1.8, 'red3/red5'); g.px(px, py - 1.8, 'gld4'); continue; }
+    g.poly([[px - 1.2, py + 0.6], [px, py - 2.2, 1], [px + 1.2, py + 0.6]], 'gld3', { flat: true });
+    g.dot(px, py - 0.3, 1.15, i % 2 ? 'crm5' : 'red4');
+    g.px(px, py - 0.3, i % 2 ? 'gld4' : 'red6');
+  }
+}
+
 ART_BUILDERS.push((A) => {
   const P = ART_PX;
   // Η ζωντανή Ευρυδίκη: λευκό φόρεμα με κόκκινη ταινία, μακριά σκούρα μαλλιά, στεφάνι από λουλούδια.
@@ -383,15 +415,7 @@ ART_BUILDERS.push((A) => {
   A.paint('hades3d', 70, 100, 31 * P, artHades, { dither: 0.3 });
   // Η Περσεφόνη: καθιστή, κρασάτο φόρεμα με χρυσή ζώνη, μακριά μαλλιά, στεφάνι με λουλούδια και ρόδια,
   // ένα ρόδι στο χέρι. f = 1: γέρνει, συγκινημένη.
-  A.paint('persephone3d', 70, 100, 30 * P, (g, f) => {
-    artThrone(g, 35);
-    artSeated(g, 35, {
-      robe: 'mar4', robe2: 'red3', skin: 'skn3', hair: 'mar2', hairTop: 'mar2', skirt: true, lean: f ? -0.8 : 0,
-      handL: [26, 54], handR: f ? [33, 36] : [44, 54],
-      crown: (g2, x, y) => { for (let i = 0; i < 7; i++) { const a = Math.PI * (0.15 + i * 0.117); const px = x - Math.cos(a) * 7, py = y + 4 - Math.sin(a) * 4; g2.dot(px, py, 1.4, i % 2 ? 'crm4' : 'red4'); g2.px(px, py, i % 2 ? 'gld4' : 'red5'); } },
-      hold: (g2, hl) => { g2.ell(hl[0], hl[1] - 1, 3, 2.8, 'red4'); g2.px(hl[0], hl[1] - 3.6, 'gld3'); },
-    });
-  }, { frames: 2, dither: 0.3 });
+  A.paint('persephone3d', 70, 100, 30 * P, (g, f) => artPersephone(g, f === 1), { frames: 2, dither: 0.3 });
 
   // Άγαλμα: μια μορφή από μάρμαρο σε βάθρο, με δόρυ (ο μεγάλος τοίχος του παλατιού / των Αγρών του Πένθους).
   A.paint('statue', 60, 130, 30 * P, (g) => {
