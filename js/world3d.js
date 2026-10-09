@@ -95,8 +95,6 @@ const World3D = {
       ...d, revealTime: -1e6, revealStrength: 0,
       onHear(wave, dist, los) {
         if (!los) return;
-        // Το φίδι σφυρίζει όταν το βρει ο ήχος (το πολύ κάθε 3 δευτ.).
-        if (this.kind === 'snake' && Echoes.now - this.revealTime > 3) Sound.hiss(this.x, this.y);
         // Ο Άδης και η Περσεφόνη μιλάνε από τους θρόνους τους (STORY.md, ενότητα 8).
         if ((this.kind === 'hades' || this.kind === 'persephone') && typeof state !== 'undefined' && state === 'play' &&
             Echoes.now - (this.spokeAt || -1e6) > 25) {

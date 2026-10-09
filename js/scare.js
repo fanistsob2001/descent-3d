@@ -220,13 +220,13 @@ const Scare = {
     if (!this.kinds) this.build();
     this.kind = this.kinds[kind] ? kind : 'shade';
     this.seed = Math.random() * 100;
-    // Δύο ή τρία χέρια: x = θέση στο πλάτος της οθόνης, flip = δεξί χέρι.
-    const n = Math.random() < 0.5 ? 2 : 3;
+    // Δύο χέρια (ένα αριστερά, ένα δεξιά): x = θέση στο πλάτος της οθόνης, flip = δεξί χέρι.
+    const n = 2;
     this.hands = [];
     for (let i = 0; i < n; i++) {
       const left = i % 2 === 0;
       this.hands.push({
-        x: i === 2 ? 0.4 + Math.random() * 0.2 : left ? 0.14 + Math.random() * 0.12 : 0.74 + Math.random() * 0.12,
+        x: left ? 0.14 + Math.random() * 0.12 : 0.74 + Math.random() * 0.12,
         flip: !left,
         delay: 0.14 + Math.random() * 0.1,
         reach: 0.55 + Math.random() * 0.25,

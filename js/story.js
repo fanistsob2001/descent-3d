@@ -118,7 +118,7 @@ const STORY = {
   resinUsed: "The lyre can play once more.",
   holdBreath: "You hold your breath.",
   gasp: "You gasp for air!",
-  prompts: { open: "Open", shrine: "Shrine", hide: "Hide", leave: "Come out", play: "Play", turn: "Turn around", water: "Draw water" },
+  prompts: { open: "Open", shrine: "Shrine", hide: "Hide", leave: "Come out", play: "Play", turn: "Turn around", water: "Draw water", take: "Take" },
   // Οι μεγάλες σκηνές (STORY.md, ενότητα 12, "Texts of the set pieces").
   chaseStyx: "Chains snap somewhere in the marsh. Three voices howl.",
   chaseStyxEnd: "Behind you, the hound stops at the edge of the fire. He will wait for you at the gate.",

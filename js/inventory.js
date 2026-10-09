@@ -4,10 +4,10 @@
 // (Inventory), κιβώτια που τρίζουν όταν τα ανοίγεις (Chests), κρυψώνες όπου κρατάς την ανάσα σου (Hides).
 // Τα ονόματα / μηνύματα: STORY.materials, STORY.tools κ.λπ.
 //
-// Από 8/10 το Inventory είναι σαν του Minecraft: θέσεις (slots) με στοίβες { id, n }. Οι πρώτες
-// HOTBAR_SLOTS είναι η μπάρα κάτω στη μέση (1-6 / ροδέλα = τι κρατάς στο χέρι), οι υπόλοιπες ο "σάκος".
-// Η λύρα είναι κι αυτή αντικείμενο: τη βάζεις στον σάκο για να κρατάς κάτι άλλο (το κύμα με το Space
-// βγαίνει πάντα — είναι η φωνή του Ορφέα).
+// Θέσεις (slots) με στοίβες { id, n }: μόνο οι HOTBAR_SLOTS (5) της μπάρας κάτω στη μέση (1-5 / ροδέλα = τι κρατάς
+// στο χέρι) — χωρίς σάκο (9/10, ο χρήστης το ζήτησε). Χωράνε ακριβώς η λύρα και τα 4 αντικείμενα (αγγείο, χαλίκι,
+// δαυλός, κουδούνι), το καθένα σε μία στοίβα. Τα υλικά δεν πιάνουν θέση: μπαίνουν σε ένα σακουλάκι (mats), που
+// φαίνεται στο ιερό και στο Inventory. Το κύμα με το Space βγαίνει πάντα (η φωνή του Ορφέα).
 
 const MATERIALS = ['clay', 'wine', 'oil', 'linen', 'bronze', 'thread', 'resin', 'wax'];
 // Τι φτιάχνεται από τι (δύο υλικά το καθένα).
@@ -21,8 +21,7 @@ const RECIPES = [
 const TOOL_ORDER = ['jar', 'pebble', 'torch', 'bell'];
 const TORCH_TIME = 30;        // δευτ. που καίει ένας δαυλός
 const TORCH_R = 2.8;          // κελιά: ως πού φωτίζει
-const HOTBAR_SLOTS = 6;
-const BAG_SLOTS = 18;
+const HOTBAR_SLOTS = 5;
 const STACK_MAX = 64;
 
 const CHEST_REACH = 34;       // τόσο κοντά = "Open"
@@ -33,7 +32,8 @@ const TABLET_RECIPES = 1;
 const TABLET_BOSS = 5;
 
 const Inventory = {
-  slots: [],            // HOTBAR_SLOTS + BAG_SLOTS θέσεις: null ή { id, n }
+  slots: [],            // HOTBAR_SLOTS θέσεις: null ή { id, n }
+  mats: {},             // τα υλικά: id → πόσα
   sel: 0,               // ποια θέση της μπάρας κρατάς
   opened: new Set(),    // id των κιβωτίων που άνοιξες
   maps: new Set(),      // κεφάλαια των οποίων βρήκες τον χάρτη
@@ -42,16 +42,23 @@ const Inventory = {
 
   reset(saved) {
     const inv = saved.inv || {};
-    this.slots = new Array(HOTBAR_SLOTS + BAG_SLOTS).fill(null);
+    this.slots = new Array(HOTBAR_SLOTS).fill(null);
+    this.mats = {};
+    if (inv.mats && !Array.isArray(inv.mats) && Array.isArray(inv.slots)) for (const m of MATERIALS) this.mats[m] = inv.mats[m] | 0;
     if (Array.isArray(inv.slots)) {
-      // (παλιά save: μέλι / παπαρούνα / μελόπιτα έγιναν λάδι / λινάρι / δαυλός)
+      // (παλιά save: μέλι / παπαρούνα / μελόπιτα έγιναν λάδι / λινάρι / δαυλός· οι παλιές 24 θέσεις — με σάκο —
+      // ξαναμπαίνουν μία-μία: τα αντικείμενα στη μπάρα, τα υλικά στο σακουλάκι)
       const OLD = { honey: 'oil', poppy: 'linen', cake: 'torch' };
       inv.slots.forEach((s, i) => {
-        if (i < this.slots.length && s && typeof s.id === 'string' && Number.isInteger(s.n) && s.n > 0) this.slots[i] = { id: OLD[s.id] || s.id, n: s.n };
+        if (!s || typeof s.id !== 'string' || !Number.isInteger(s.n) || s.n <= 0) return;
+        const id = OLD[s.id] || s.id;
+        if (i < HOTBAR_SLOTS && !this.isMaterial(id) && !this.slots[i]) this.slots[i] = { id, n: s.n };
+        else this.add(id, s.n);
       });
     } else {
       // Παλιό save (πριν τις θέσεις): η λύρα, τα αντικείμενα στη μπάρα, τα υλικά στον σάκο.
       this.slots[0] = { id: 'lyre', n: 1 };
+      for (const m of MATERIALS) this.mats[m] = 0;
       this.add('jar', saved.jars | 0);
       this.add('pebble', inv.pebbles | 0);
       this.add('torch', inv.cakes | 0);
@@ -67,7 +74,7 @@ const Inventory = {
   },
 
   saveData() {
-    return { inv: { slots: this.slots.map((s) => (s ? { id: s.id, n: s.n } : null)), sel: this.sel,
+    return { inv: { slots: this.slots.map((s) => (s ? { id: s.id, n: s.n } : null)), sel: this.sel, mats: { ...this.mats },
       opened: [...this.opened], maps: [...this.maps], tablets: [...this.tablets], made: [...this.made] } };
   },
 
@@ -81,6 +88,7 @@ const Inventory = {
 
   // Πόσα έχεις από κάτι (σε όλες τις θέσεις).
   count(id) {
+    if (this.isMaterial(id)) return this.mats[id] | 0;
     let n = 0;
     for (const s of this.slots) if (s && s.id === id) n += s.n;
     return n;
@@ -92,36 +100,33 @@ const Inventory = {
     return s ? s.id : null;
   },
 
-  // Βάζει n από κάτι: πρώτα στις στοίβες που υπάρχουν, μετά σε άδεια θέση (αντικείμενα: πρώτα στη
-  // μπάρα· υλικά: πρώτα στον σάκο). Ό,τι δεν χωράει χάνεται (δεν γίνεται με 24 θέσεις).
+  // Βάζει n από κάτι: τα υλικά στο σακουλάκι· τα αντικείμενα πρώτα στις στοίβες που υπάρχουν, μετά σε άδεια θέση
+  // (5 θέσεις = η λύρα και τα 4 αντικείμενα, άρα πάντα χωράνε).
   add(id, n = 1) {
     if (n <= 0) return;
+    if (this.isMaterial(id)) { this.mats[id] = (this.mats[id] | 0) + n; return; }
     const max = id === 'lyre' ? 1 : STACK_MAX;
     for (const s of this.slots) {
       if (n <= 0) return;
       if (s && s.id === id && s.n < max) { const k = Math.min(n, max - s.n); s.n += k; n -= k; }
     }
-    const order = [];
-    const hot = [...Array(HOTBAR_SLOTS).keys()], bag = [...Array(BAG_SLOTS).keys()].map((i) => i + HOTBAR_SLOTS);
-    order.push(...(this.isMaterial(id) ? bag.concat(hot) : hot.concat(bag)));
-    for (const i of order) {
+    for (let i = 0; i < HOTBAR_SLOTS; i++) {
       if (n <= 0) return;
       if (!this.slots[i]) { const k = Math.min(n, max); this.slots[i] = { id, n: k }; n -= k; }
     }
   },
 
-  // Παίρνει n από κάτι (πρώτα από τον σάκο, ώστε η μπάρα να αδειάζει τελευταία). true αν υπήρχαν.
+  // Παίρνει n από κάτι. true αν υπήρχαν.
   take(id, n = 1) {
     if (this.count(id) < n) return false;
-    for (let pass = 0; pass < 2 && n > 0; pass++) {
-      for (let i = 0; i < this.slots.length && n > 0; i++) {
-        const s = this.slots[i];
-        if (!s || s.id !== id || (pass === 0) === (i < HOTBAR_SLOTS)) continue;
-        const k = Math.min(n, s.n);
-        s.n -= k;
-        n -= k;
-        if (!s.n) this.slots[i] = null;
-      }
+    if (this.isMaterial(id)) { this.mats[id] -= n; return true; }
+    for (let i = 0; i < this.slots.length && n > 0; i++) {
+      const s = this.slots[i];
+      if (!s || s.id !== id) continue;
+      const k = Math.min(n, s.n);
+      s.n -= k;
+      n -= k;
+      if (!s.n) this.slots[i] = null;
     }
     return true;
   },

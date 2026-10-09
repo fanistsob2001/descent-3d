@@ -633,7 +633,6 @@ const Prologue = {
       this.setStep('');
       this.lock = true;
       this.snake.leaveAt = now;
-      Sound.hiss(this.snake.x, this.snake.y);
       this.narrate(0);
       this.after(4.5, () => this.narrate(1));
       this.after(8.5, () => this.fadeTo(1, 2));
@@ -697,6 +696,8 @@ const Prologue = {
     // Είναι πολύ μακριά: η κραυγή ακούγεται από την κατεύθυνσή της, σιγανή (από ένα σημείο προς τα εκεί).
     const dx = e.x - player.x, dy = e.y - player.y, dd = Math.hypot(dx, dy) || 1, far = Math.min(dd, 520);
     const sx = player.x + (dx / dd) * far, sy = player.y + (dy / dd) * far;
+    // Το φίδι την τσιμπάει: το σφύριγμά του (ο μόνος ήχος του φιδιού στο παιχνίδι) και η κραυγή της.
+    Sound.hiss(sx, sy);
     Sound.scream(sx, sy);
     const text = STORY.prologueEury.scream;
     Voice.say(text, 'eurydice', { x: sx, y: sy, delay: 0.3 });

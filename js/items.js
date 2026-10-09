@@ -33,13 +33,18 @@ const Items = {
   // Επιστρέφει το αντικείμενο που μόλις μάζεψε ο παίκτης, ή null.
   check(p) {
     for (const it of this.list) {
-      if (it.taken) continue;
+      if (it.taken || it.kind === 'tablet') continue;   // (οι πινακίδες: με E — nearTablet)
       if (Math.hypot(p.x - it.x, p.y - it.y) < ITEM_REACH) {
         it.taken = true;
         return it;
       }
     }
     return null;
+  },
+
+  // Μια πήλινη πινακίδα (γράμμα) δίπλα σου: τη μαζεύεις με E ("Take").
+  nearTablet(p) {
+    return this.list.find((it) => it.kind === 'tablet' && !it.taken && Math.hypot(p.x - it.x, p.y - it.y) < TILE * 0.8) || null;
   },
 
   draw(ctx, now, view) {

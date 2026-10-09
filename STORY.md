@@ -436,7 +436,7 @@ Interface text, not voiced.
   after crafting: Made: (item).; after resting, the checkpoint message of section 8.
 - Using lyre resin: The lyre can play once more.
 - Hiding: You hold your breath. · When the breath runs out: You gasp for air!
-- Prompts: Open · Shrine · Hide · Come out · Draw water (the well, in the prologue)
+- Prompts: Open · Shrine · Hide · Come out · Take (a clay tablet) · Draw water (the well, in the prologue)
 - What each item does (shown in the Inventory and next to each recipe at the shrine):
   - Lyre: Hold it to play: the wave shows you the world. With three strings, it can play the Melody.
   - Libation jar: Thrown: it shatters with a loud sound, and the shades run to it.
@@ -445,8 +445,8 @@ Interface text, not voiced.
   - Bronze bell: Thrown: it rings loudly a few seconds after it lands, far from you.
   - Lyre resin: One more use of the Melody.
   - Any material: A material. Bring it to a shrine of Hermes.
-- The Inventory (like Minecraft): sections "Bag" and "In hand" (the bar of six at the bottom of the screen); the lyre
-  is one of the things you can hold — put it in the bag to hold something else. Maps · Tablets.
+- The Inventory: "In hand" (the bar of five at the bottom of the screen: the lyre and the four things you make or find),
+  "Materials" (they take no place in the bar) and Maps. Letters: the clay tablets you took (E — "Take"), from the pause menu.
 
 ### Texts of the set pieces (interface / narration, not voiced)
 

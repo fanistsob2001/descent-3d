@@ -56,7 +56,7 @@ let ctx = canvas.getContext('2d', { alpha: false });
 const screens = {
   menu: $('menu'), settings: $('settings'), pause: $('pause'),
   endGood: $('end-good'), endBad: $('end-bad'), map: $('map-screen'), shrine: $('shrine'),
-  controls: $('controls'), inventory: $('inventory'),
+  controls: $('controls'), inventory: $('inventory'), letters: $('letters'),
 };
 const hudEl = $('hud');
 const melodyBtn = $('btn-melody');
@@ -364,6 +364,9 @@ function interact() {
   if (state === 'play' && Prologue.active) { Prologue.interact(); return; }
   if (state !== 'play' || Crossing.active) return;
   if (Hides.active) { Hides.exit(); updateInteract(); return; }
+  // Μια πήλινη πινακίδα (γράμμα) δίπλα σου: τη μαζεύεις και τη διαβάζεις.
+  const tb = Items.nearTablet(player);
+  if (tb) { tb.taken = true; pickUp(tb); updateInteract(); return; }
   const sh = shrineHere();
   if (sh >= 0) { openShrine(sh); return; }
   const c = Chests.near(player);
@@ -403,6 +406,7 @@ function updateInteract() {
     const P = STORY.prompts;
     if (Throne.prompt()) t = (IS_TOUCH ? '' : 'Space — ') + Throne.prompt();
     else if (Hides.active) t = P.leave;
+    else if (Items.nearTablet(player)) t = P.take;
     else if (shrineHere() >= 0) t = P.shrine;
     else if (Chests.near(player)) t = P.open;
     else if (Hides.near(player)) t = P.hide;
@@ -468,8 +472,8 @@ function updateItemSlot() {
 
 // ---- Inventory (Tab / I, ή από την παύση), σαν του Minecraft ----
 // Κλικ σε θέση = σηκώνεις τη στοίβα (ακολουθεί τον κέρσορα)· κλικ σε άλλη = την αφήνεις / ενώνεις / αλλάζεις.
-// Δεξί κλικ = μισή στοίβα (ή αφήνεις μία). Shift + κλικ = πάει από τον σάκο στη μπάρα και αντίστροφα.
-// 1-6 πάνω από μια θέση = την ανταλλάσσεις με αυτή τη θέση της μπάρας.
+// Δεξί κλικ = μισή στοίβα (ή αφήνεις μία). 1-5 πάνω από μια θέση = την ανταλλάσσεις με αυτή τη θέση.
+// Μόνο οι 5 θέσεις της μπάρας (χωρίς σάκο)· τα υλικά φαίνονται σε λίστα από κάτω.
 let invFrom = 'play';
 let cursorStack = null;     // { id, n }: ό,τι κρατάει ο κέρσορας
 let cursorFrom = -1;
@@ -480,7 +484,6 @@ function openInventory() {
   stopInput();
   cursorStack = null;
   fillInventory();
-  $('inv-read').textContent = '';
   showScreen('inventory');
 }
 
@@ -500,18 +503,11 @@ function closeInventory() {
   updateHud();
 }
 
-function invClick(i, right, shift) {
+function invClick(i, right) {
   const S = Inventory.slots;
   const s = S[i];
   Sound.unlock();
-  if (shift && s && !cursorStack) {
-    // Γρήγορη μετακίνηση: σάκος ⇄ μπάρα (στην πρώτη θέση που χωράει).
-    const range = i < HOTBAR_SLOTS ? [HOTBAR_SLOTS, S.length] : [0, HOTBAR_SLOTS];
-    for (let j = range[0]; j < range[1] && S[i]; j++) {
-      if (S[j] && S[j].id === s.id && s.id !== 'lyre') { S[j].n += s.n; S[i] = null; }
-    }
-    for (let j = range[0]; j < range[1] && S[i]; j++) if (!S[j]) { S[j] = s; S[i] = null; }
-  } else if (!cursorStack) {
+  if (!cursorStack) {
     if (!s) return;
     if (right && s.n > 1) {
       const k = Math.ceil(s.n / 2);
@@ -557,14 +553,12 @@ function showItemInfo(i) {
 }
 
 function fillInventory() {
-  const bag = $('inv-bag'), hot = $('inv-hot');
-  bag.textContent = '';
+  const hot = $('inv-hot');
   hot.textContent = '';
-  for (let i = HOTBAR_SLOTS; i < HOTBAR_SLOTS + BAG_SLOTS; i++) bag.appendChild(slotEl(i));
   for (let i = 0; i < HOTBAR_SLOTS; i++) hot.appendChild(slotEl(i, i === Inventory.sel ? 'sel' : ''));
   for (const d of document.querySelectorAll('#inventory .slot')) {
     const i = Number(d.dataset.i);
-    d.addEventListener('pointerdown', (e) => { e.preventDefault(); invClick(i, e.button === 2, e.shiftKey); });
+    d.addEventListener('pointerdown', (e) => { e.preventDefault(); invClick(i, e.button === 2); });
     d.addEventListener('pointerenter', () => { invHover = i; showItemInfo(i); });
     d.addEventListener('pointerleave', () => { if (invHover === i) { invHover = -1; showItemInfo(-1); } });
   }
@@ -595,8 +589,39 @@ function fillInventory() {
     }
   };
   list('inv-maps', CHAPTERS.map((c, i) => [c.numeral + '. ' + c.name, Inventory.maps.has(i) ? '✓' : '', !Inventory.maps.has(i)]));
-  list('inv-tablets', [...Inventory.tablets].sort((a, b) => a - b).map((n) => [STORY.tablets[n].split('.')[0].slice(0, 32) + '…', '', false,
-    () => { $('inv-read').textContent = STORY.tablets[n]; }]));
+  // Τα υλικά (στο σακουλάκι, χωρίς θέσεις), με το εικονίδιό τους.
+  const mats = $('inv-mats');
+  mats.textContent = '';
+  for (const m of MATERIALS) {
+    const n = Inventory.count(m);
+    const li = document.createElement('li');
+    if (!n) li.classList.add('missing');
+    const img = document.createElement('img'); img.src = Inventory.icon(m); img.className = 'mat-icon';
+    const t = document.createElement('span'); t.className = 'name'; t.textContent = STORY.materials[m];
+    const c = document.createElement('span'); c.className = 'prog'; c.textContent = String(n);
+    li.append(img, t, c);
+    mats.appendChild(li);
+  }
+}
+
+// Τα γράμματα (πήλινες πινακίδες) που μάζεψες, από την παύση: κλικ = το διαβάζεις ξανά.
+function fillLetters() {
+  const ul = $('letters-list'), read = $('letters-read');
+  ul.textContent = '';
+  read.textContent = '';
+  const got = [...Inventory.tablets].sort((a, b) => a - b);
+  for (const n of got) {
+    const li = document.createElement('li');
+    li.classList.add('link');
+    const a = document.createElement('span'); a.className = 'name'; a.textContent = STORY.tablets[n].split('.')[0].slice(0, 40) + '…';
+    li.appendChild(a);
+    li.addEventListener('click', () => {
+      read.textContent = STORY.tablets[n];
+      for (const x of ul.children) x.classList.toggle('sel', x === li);
+    });
+    ul.appendChild(li);
+  }
+  if (got.length) ul.firstChild.click();
 }
 
 let shrineAltar = -1;
@@ -1965,6 +1990,7 @@ function doAction(action) {
   }
   else if (action === 'back') showScreen(backTo);
   else if (action === 'inventory') openInventory();
+  else if (action === 'letters') { backTo = 'pause'; fillLetters(); showScreen('letters'); }
   else if (action === 'inventory-close') closeInventory();
   else if (action === 'invert') { Settings.invert = !Settings.invert; Settings.store(); updateToggleLabels(); }
   else if (action === 'fov') {
@@ -2090,7 +2116,7 @@ function init() {
       closeShrine();
     } else if (e.code === 'Escape' && state === 'inventory') {
       closeInventory();
-    } else if (e.code === 'Escape' && (visibleScreen() === screens.settings || visibleScreen() === screens.controls)) {
+    } else if (e.code === 'Escape' && [screens.settings, screens.controls, screens.letters].includes(visibleScreen())) {
       showScreen(backTo);
     } else if (e.code === 'Escape' || e.code === 'KeyP') {
       if (state === 'play') pauseGame();
@@ -2103,13 +2129,13 @@ function init() {
       if (e.repeat) return;
       if (state === 'inventory') closeInventory();
       else if (state === 'play' && !Prologue.active && !Crossing.active) openInventory();
-    } else if (state === 'inventory' && /^Digit[1-6]$/.test(e.code)) {
+    } else if (state === 'inventory' && /^Digit[1-5]$/.test(e.code)) {
       invSwapHotbar(Number(e.code.slice(5)) - 1);
     } else if (state === 'play' && Hides.active && HeartGame.active && !e.repeat && ['KeyA', 'ArrowLeft', 'KeyD', 'ArrowRight'].includes(e.code)) {
       HeartGame.press(e.code === 'KeyA' || e.code === 'ArrowLeft' ? -1 : 1, gameTime);
     } else if (e.code === 'KeyE' && !e.repeat) {
       interact();
-    } else if (/^Digit[1-6]$/.test(e.code) && state === 'play') {
+    } else if (/^Digit[1-5]$/.test(e.code) && state === 'play') {
       Inventory.sel = Number(e.code.slice(5)) - 1;
       updateItemSlot();
     } else if (e.code === 'KeyQ' && !e.repeat) {
