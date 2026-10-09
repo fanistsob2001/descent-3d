@@ -603,98 +603,6 @@ const Sound = {
 
   // ---- Ηχητικά εφέ ----
 
-  // Η φωνή του Ορφέα: ένα τραγουδιστό "Αα" που σβήνει μέσα στη σπηλιά, σαν να φωνάζει
-  // στο σκοτάδι. Μικρό κύμα = απαλό, ψηλό μουρμουρητό ("Μμ"). Μεγάλο κύμα = βαθύ,
-  // δυνατό, ανοιχτό "Αα". Φτιαγμένη με φωνηεντικά φίλτρα (formants) πάνω σε πριονωτούς
-  // τόνους, με δονισμό (vibrato) και λίγη ανάσα. lyre = η λύρα είναι ολόκληρη: ακούγεται
-  // και μια χορδή της μαζί με τη φωνή.
-  voice(size, lyre) {
-    if (!this.ready()) return;
-    const ac = this.ctx, t = ac.currentTime;
-    const f0 = 262 * Math.pow(131 / 262, size);          // 262 Hz (μικρό) → 131 Hz (μεγάλο)
-    const dur = 0.5 + 1.2 * size;
-    const peak = 0.11 + 0.3 * size;
-
-    const out = ac.createGain();
-    out.connect(this.sfx);
-    const send = ac.createGain();
-    send.gain.value = 0.7 + 0.25 * size;
-    out.connect(send);
-    send.connect(this.echoSend);
-    send.connect(this.reverbSend);
-    this.envelope(out.gain, t, peak, 0.06, dur);
-
-    // Πηγή: δύο πριονωτοί τόνοι ελαφρά ξεκούρδιστοι + ένας τριγωνικός μια οκτάβα πάνω.
-    const mix = ac.createGain();
-    const lp = ac.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 4200;
-    mix.connect(lp);
-
-    const vib = ac.createOscillator();      // δονισμός: μπαίνει σιγά σιγά, όπως στους τραγουδιστές
-    vib.frequency.value = 5.3;
-    const vibGain = ac.createGain();
-    vibGain.gain.setValueAtTime(0, t);
-    vibGain.gain.linearRampToValueAtTime(f0 * 0.014, t + 0.3);
-    vib.connect(vibGain);
-    vib.start(t);
-    vib.stop(t + dur + 0.4);
-
-    for (const [type, mul, detune, amp] of [['sawtooth', 1, -7, 0.5], ['sawtooth', 1, 7, 0.5], ['triangle', 2, 0, 0.25]]) {
-      const o = ac.createOscillator();
-      o.type = type;
-      o.detune.value = detune;
-      o.frequency.setValueAtTime(f0 * mul * 1.05, t);
-      o.frequency.exponentialRampToValueAtTime(f0 * mul, t + 0.09);
-      o.frequency.linearRampToValueAtTime(f0 * mul * 0.955, t + dur);   // η φωνή πέφτει στο τέλος
-      vibGain.connect(o.frequency);
-      const g = ac.createGain();
-      g.gain.value = amp;
-      o.connect(g);
-      g.connect(mix);
-      o.start(t);
-      o.stop(t + dur + 0.4);
-    }
-
-    // Φωνηεντικά φίλτρα: το στόμα ανοίγει από "Μμ" προς "Αα" στην αρχή της νότας.
-    const open = 0.25 + 0.75 * size;                     // πόσο ανοιχτό καταλήγει το στόμα
-    const formants = [
-      [270, 730, 10, 1.0],                             // F1: κλειστό → ανοιχτό
-      [800, 1090, 12, 0.45],                           // F2
-      [2500, 2440, 14, 0.2],                           // F3
-    ];
-    for (const [fClosed, fOpen, q, gain] of formants) {
-      const bp = ac.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.Q.value = q;
-      const target = fClosed + (fOpen - fClosed) * open;
-      bp.frequency.setValueAtTime(fClosed, t);
-      bp.frequency.linearRampToValueAtTime(target, t + 0.22);
-      const g = ac.createGain();
-      g.gain.value = gain * 4.6;
-      lp.connect(bp);
-      bp.connect(g);
-      g.connect(out);
-    }
-
-    // Λίγη ανάσα στην αρχή της νότας.
-    const n = this.noiseSource();
-    const nbp = ac.createBiquadFilter();
-    nbp.type = 'bandpass';
-    nbp.frequency.value = 2600;
-    nbp.Q.value = 0.8;
-    const ng = ac.createGain();
-    this.envelope(ng.gain, t, 0.05 + 0.05 * size, 0.03, 0.22);
-    n.connect(nbp);
-    nbp.connect(ng);
-    ng.connect(out);
-    n.start(t, Math.random());
-    n.stop(t + 0.3);
-
-    // Η χορδή της λύρας μαζί με τη φωνή (Ρε δώριος, ίδια με τη Μελωδία).
-    if (lyre) this.pluck(size > 0.5 ? 146.83 : 293.66, t + 0.03, 0.26);
-  },
-
   step(surface = 'stone', wet = false) {
     // Βήμα (μόνο όταν τρέχεις): ο γδούπος της φτέρνας + το σύρσιμο της σόλας. surface:
     // 'gravel' (σπηλιά: κοκκώδες, με χαλίκια), 'stone' (λαξευμένη πέτρα), 'marble' (παλάτι: καθαρό
@@ -875,7 +783,8 @@ const Sound = {
     return buf;
   },
 
-  pluck(freq, when, vol) {
+  // o: { dest: αντί για το sfx (η μουσική), echo: και στην ηχώ (η λύρα στο κύμα) }
+  pluck(freq, when, vol, o = {}) {
     const ac = this.ctx;
     const src = ac.createBufferSource();
     src.buffer = this.pluckBuffer(freq);
@@ -886,8 +795,9 @@ const Sound = {
     g.gain.value = vol;
     src.connect(lp);
     lp.connect(g);
-    g.connect(this.sfx);
+    g.connect(o.dest || this.sfx);
     g.connect(this.reverbSend);
+    if (o.echo) g.connect(this.echoSend);
     src.start(when);
   },
 
@@ -967,7 +877,176 @@ const Sound = {
       o.connect(lp); lp.connect(g); g.connect(this.sfx); g.connect(this.reverbSend);
       o.start(t0); o.stop(end + 0.1);
     }
+    this.songEnd = end;
     return end - t0;
+  },
+
+  // ---- Το κύμα όταν κρατάς τη λύρα: ακούγεται μόνο η λύρα, και κάθε χορδή που βρίσκεις αλλάζει τον ήχο της ----
+  // 0 χορδές = ένα κούφιο χτύπημα στο καβούκι· 1 = μία νότα· 2 = δύο νότες (διάστημα)· 3 = ολόκληρη συγχορδία που
+  // ανεβαίνει και ξανακατεβαίνει. size 0..1: μικρό κύμα = ψηλά, γρήγορα, απαλά· μεγάλο = μια οκτάβα πιο χαμηλά,
+  // περισσότερες νότες, πιο δυνατά.
+  lyreCall(size, n) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const notes = [293.66, 349.23, 440].slice(0, Math.max(0, Math.min(3, n)));
+    if (!notes.length) {
+      // Χωρίς χορδές: ο Ορφέας χτυπάει το ηχείο (καβούκι χελώνας) — ένα ή δύο ξερά "τοκ" με ηχώ.
+      const knocks = size > 0.5 ? 2 : 1;
+      for (let k = 0; k < knocks; k++) {
+        const at = t + k * 0.16;
+        const o = ac.createOscillator(), g = ac.createGain(), bp = ac.createBiquadFilter();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(240 - k * 30, at);
+        o.frequency.exponentialRampToValueAtTime(110, at + 0.09);
+        bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 2.5;
+        this.envelope(g.gain, at, 0.35 + 0.3 * size, 0.003, 0.14);
+        o.connect(bp); bp.connect(g); g.connect(this.sfx); g.connect(this.echoSend); g.connect(this.reverbSend);
+        o.start(at); o.stop(at + 0.25);
+        const nz = this.noiseSource(), nb = ac.createBiquadFilter(), ng = ac.createGain();
+        nb.type = 'bandpass'; nb.frequency.value = 1800; nb.Q.value = 1.4;
+        this.envelope(ng.gain, at, 0.12 + 0.1 * size, 0.002, 0.05);
+        nz.connect(nb); nb.connect(ng); ng.connect(this.sfx); ng.connect(this.echoSend);
+        nz.start(at, Math.random()); nz.stop(at + 0.08);
+      }
+      return;
+    }
+    const oct = size > 0.5 ? 0.5 : 1;
+    const gap = 0.06 + 0.1 * size;
+    const vol = 0.32 + 0.3 * size;
+    const seq = notes.map((f) => f * oct);
+    if (size > 0.35 && seq.length > 1) seq.push(...seq.slice(0, -1).reverse());   // πάνω και πίσω κάτω
+    seq.forEach((f, i) => this.pluck(f, t + i * gap, vol * (1 - i * 0.06), { echo: true }));
+    if (n >= 3 && size > 0.5) this.pluck(146.83, t, vol * 0.8, { echo: true });       // η χαμηλή νότα: η λύρα ολόκληρη
+  },
+
+  // ---- Το κύμα όταν ΔΕΝ κρατάς τη λύρα (ή κρατάς κάτι άλλο): μια κραυγή του Ορφέα ----
+  // Ανοιχτό "Ά!" που ξεκινάει ψηλά και πέφτει, με ανάσα, χωρίς δονισμό. Μεγάλο κύμα = πιο μακριά, πιο δυνατή κραυγή.
+  cry(size) {
+    if (!this.ready()) return;
+    const ac = this.ctx, t = ac.currentTime;
+    const f0 = 300 * Math.pow(200 / 300, size);
+    const dur = 0.32 + 0.6 * size;
+    const peak = 0.16 + 0.32 * size;
+    const out = ac.createGain();
+    out.connect(this.sfx);
+    const send = ac.createGain();
+    send.gain.value = 0.8 + 0.2 * size;
+    out.connect(send);
+    send.connect(this.echoSend);
+    send.connect(this.reverbSend);
+    this.envelope(out.gain, t, peak, 0.02, dur);
+    const mix = ac.createGain();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 5000;
+    mix.connect(lp);
+    for (const [type, detune, amp] of [['sawtooth', -10, 0.55], ['sawtooth', 10, 0.55], ['square', 0, 0.15]]) {
+      const o = ac.createOscillator();
+      o.type = type;
+      o.detune.value = detune;
+      o.frequency.setValueAtTime(f0 * 1.3, t);
+      o.frequency.exponentialRampToValueAtTime(f0, t + 0.07);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.72, t + dur);   // η κραυγή πέφτει
+      const g = ac.createGain();
+      g.gain.value = amp;
+      o.connect(g);
+      g.connect(mix);
+      o.start(t);
+      o.stop(t + dur + 0.3);
+    }
+    // Φωνήεν "α", ανοιχτό από την αρχή (λίγο τραχύ: πιο φαρδιά φίλτρα).
+    for (const [f, q, gain] of [[800, 6, 1], [1250, 8, 0.6], [2600, 10, 0.25]]) {
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const g = ac.createGain();
+      g.gain.value = gain * 4;
+      lp.connect(bp); bp.connect(g); g.connect(out);
+    }
+    // Ανάσα / τράχυνση.
+    const n = this.noiseSource();
+    const nbp = ac.createBiquadFilter();
+    nbp.type = 'bandpass'; nbp.frequency.value = 1500; nbp.Q.value = 0.7;
+    const ng = ac.createGain();
+    this.envelope(ng.gain, t, 0.1 + 0.08 * size, 0.01, dur * 0.8);
+    n.connect(nbp); nbp.connect(ng); ng.connect(out);
+    n.start(t, Math.random());
+    n.stop(t + dur + 0.1);
+  },
+
+  // ---- Μουσική (μενού, πρόλογος, τέλη, πέρασμα, μάχη, καταδιώξεις — τα κομμάτια: MUSIC, js/music.js) ----
+  // Χωρίς αρχεία: λύρα (Karplus-Strong), απαλό χαλί από κάτω, τύμπανα. setMusic(name) αλλάζει κομμάτι με σβήσιμο·
+  // musicTick() (κάθε καρέ) προγραμματίζει νότες λίγο μπροστά. Στον Κάτω Κόσμο, όσο εξερευνάς, σιωπή (ο τρόμος είναι
+  // οι ήχοι του χώρου). Όσο ο Ορφέας παίζει τραγούδι (song), η μουσική περιμένει (songEnd).
+  musicName: null,
+  _mus: null,
+  setMusic(name) {
+    if (name === this.musicName) return;
+    this.musicName = name;
+    this._stopMusic();
+  },
+  _stopMusic() {
+    const m = this._mus;
+    this._mus = null;
+    if (!m || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    m.out.gain.cancelScheduledValues(t);
+    m.out.gain.setValueAtTime(Math.max(0.0001, m.out.gain.value), t);
+    m.out.gain.linearRampToValueAtTime(0.0001, t + 2);
+    for (const o of m.pads) o.stop(t + 2.1);
+    setTimeout(() => m.out.disconnect(), 2600);
+  },
+  musicTick() {
+    const name = this.musicName;
+    if (!name || !this.ready() || typeof MUSIC === 'undefined' || !MUSIC[name]) return;
+    const ac = this.ctx, M = MUSIC[name];
+    if (!this._mus) {
+      const out = ac.createGain();
+      out.gain.setValueAtTime(0.0001, ac.currentTime);
+      out.gain.linearRampToValueAtTime(M.vol, ac.currentTime + 2.5);
+      out.connect(this.sfx);
+      const rv = ac.createGain();
+      rv.gain.value = 0.6;
+      out.connect(rv);
+      rv.connect(this.reverbSend);
+      // Το χαλί: απαλοί τόνοι (θεμέλιο, πέμπτη) που "αναπνέουν" αργά.
+      const pads = [];
+      for (const st of M.pad || []) {
+        const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter(), lfo = ac.createOscillator(), lg = ac.createGain();
+        o.type = 'triangle';
+        o.frequency.value = 293.66 * Math.pow(2, st / 12);
+        lp.type = 'lowpass'; lp.frequency.value = 700;
+        g.gain.value = 0.03;
+        lfo.frequency.value = 0.07 + Math.random() * 0.05; lg.gain.value = 0.018;
+        lfo.connect(lg); lg.connect(g.gain);
+        o.connect(lp); lp.connect(g); g.connect(out);
+        o.start(); lfo.start();
+        pads.push(o, lfo);
+      }
+      this._mus = { name, out, pads, next: ac.currentTime + 0.3, bar: 0 };
+    }
+    const m = this._mus;
+    if (ac.currentTime < (this.songEnd || 0)) { m.next = Math.max(m.next, this.songEnd + 0.5); return; }
+    while (m.next < ac.currentTime + 0.8) {
+      M.bar(this, m.next, m.bar, m.out);
+      m.next += M.len;
+      m.bar++;
+    }
+  },
+  // Τύμπανο (μάχη / καταδιώξεις): χαμηλός τόνος που πέφτει + λίγος θόρυβος.
+  drum(t, dest, vol, low = 1) {
+    const ac = this.ctx;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120 * low, t);
+    o.frequency.exponentialRampToValueAtTime(45 * low, t + 0.18);
+    this.envelope(g.gain, t, vol, 0.004, 0.3);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + 0.4);
+    const n = this.noiseSource(), lp = ac.createBiquadFilter(), ng = ac.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = 900;
+    this.envelope(ng.gain, t, vol * 0.35, 0.002, 0.08);
+    n.connect(lp); lp.connect(ng); ng.connect(dest);
+    n.start(t, Math.random()); n.stop(t + 0.12);
   },
 
   // Τα βήματα της Ευρυδίκης: πιο απαλά και πιο "ελαφριά" από του παίκτη,

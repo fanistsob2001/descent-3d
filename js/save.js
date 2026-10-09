@@ -117,6 +117,7 @@ const Settings = {
   vibration: true,
   mouse: 1,          // πολλαπλασιαστής του βλέμματος με το ποντίκι (ένα από τα MOUSE_SENS)
   voice: 'on',       // φωνές των χαρακτήρων: 'on' | 'off' (οι υπότιτλοι μένουν πάντα)
+  music: 'on',       // μουσική (μενού, πρόλογος, τέλη, μάχη, καταδιώξεις): 'on' | 'off'
   invert: false,     // ποντίκι: πάνω-κάτω ανάποδα
   fov: 0,            // οπτικό πεδίο σε μοίρες (0 = το προεπιλεγμένο: 80 στο PC, 66 στο κινητό)
   bright: 1,         // φωτεινότητα (1 = κανονική)
@@ -131,6 +132,7 @@ const Settings = {
         this.vibration = d.vibration !== false;
         if (MOUSE_SENS.includes(d.mouse)) this.mouse = d.mouse;
         if (d.voice === 'off') this.voice = 'off';
+        if (d.music === 'off') this.music = 'off';
         this.invert = d.invert === true;
         if (SETTINGS_FOV.includes(d.fov)) this.fov = d.fov;
         if (SETTINGS_BRIGHT.includes(d.bright)) this.bright = d.bright;
@@ -142,7 +144,7 @@ const Settings = {
 
   store() {
     try {
-      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice, invert: this.invert, fov: this.fov, bright: this.bright, subs: this.subs, renderer: this.renderer }));
+      localStorage.setItem(this.KEY, JSON.stringify({ sound: this.sound, vibration: this.vibration, mouse: this.mouse, voice: this.voice, music: this.music, invert: this.invert, fov: this.fov, bright: this.bright, subs: this.subs, renderer: this.renderer }));
     } catch (_) { /* - */ }
   },
 };

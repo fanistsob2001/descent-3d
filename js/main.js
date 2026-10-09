@@ -201,18 +201,46 @@ function cancelCall(amount) {
 
 let lastCallAt = -1e6;   // πότε έβγαλε ο παίκτης το τελευταίο κύμα (για το "παίζει λύρα")
 let callReadyAt = 0;     // πότε μπορεί να ξαναπαίξει η λύρα (cooldown)
+// Κρατάει ο παίκτης τη λύρα; (στον πρόλογο πάντα — ώσπου να σπάσει στα σκαλιά)
+function holdingLyre() {
+  if (Prologue.active) return !Prologue.noLyre;
+  return Inventory.held() === 'lyre';
+}
+
+// Η μουσική ανάλογα με το πού είσαι (Sound.setMusic, κομμάτια στο js/music.js). Στις οθόνες πάνω από το παιχνίδι
+// (παύση, inventory, χάρτης, ιερό) συνεχίζει ό,τι έπαιζε. Στον Κάτω Κόσμο, όσο εξερευνάς: σιωπή.
+function musicFor() {
+  if (Settings.music === 'off') return null;
+  if (state === 'menu') return 'menu';
+  if (state === 'end') return screens.endBad && !screens.endBad.classList.contains('hidden') ? 'bad' : 'good';
+  if (state === 'cutscene') return 'dusk';
+  if (state !== 'play' && state !== 'dead') return Sound.musicName;
+  if (Prologue.active) {
+    if (Prologue.mode === 'good') return 'good';
+    if (Prologue.mode === 'bad') return 'bad';
+    const r = Level.regionAt(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+    return r >= 0 && r <= PRO_MEADOW ? 'prologue' : 'dusk';
+  }
+  if (Crossing.active) return 'dusk';
+  if (monsters.some((m) => m.boss && m.fight)) return 'boss';
+  if (Chases.active()) return 'chase';
+  return null;
+}
+
 function emitCall(held) {
   if (state !== 'play') return;
   lastCallAt = gameTime;
   const c = Math.min(1, held / MAX_CHARGE);
   callReadyAt = gameTime + LYRE_COOLDOWN + c * LYRE_COOLDOWN_BIG;
   // Ο Κέρβερος (X): ξαπλωμένος, ακούει τη λύρα σου από κοντά και αποκοιμιέται (όπως στον μύθο).
-  if (Prologue.active || Inventory.held() === 'lyre') for (const m of monsters) if (m.boss) m.onSong(gameTime);
+  if (holdingLyre()) for (const m of monsters) if (m.boss) m.onSong(gameTime);
   Echoes.emit(player.x, player.y,
     CALL_WAVE.minR + (CALL_WAVE.maxR - CALL_WAVE.minR) * c,
     CALL_WAVE.minS + (CALL_WAVE.maxS - CALL_WAVE.minS) * c,
     'call');
-  Sound.voice(c, strings >= 3 && (Prologue.active || Inventory.held() === 'lyre'));   // η λύρα ακούγεται μόνο αν την κρατάς
+  // Κρατάς τη λύρα: ακούγεται μόνο η λύρα (κάθε χορδή αλλάζει τον ήχο της). Αλλιώς (άλλο αντικείμενο, τίποτα, ή η λύρα
+  // έσπασε στον πρόλογο): ο Ορφέας φωνάζει.
+  if (holdingLyre()) Sound.lyreCall(c, strings); else Sound.cry(c);
   Hints.notify('call');
   Prologue.onCall(c);
   Throne.onCall(gameTime);
@@ -1364,6 +1392,8 @@ function frame(t) {
   const now = t / 1000;
   const dt = Math.min(0.05, Math.max(0, now - (lastFrame || now)));
   lastFrame = now;
+  Sound.setMusic(musicFor());
+  Sound.musicTick();
 
   if (state === 'play' && Prologue.active) {
     // Ο πρόλογος: χωρίς σκιές, βωμούς, αντικείμενα — μόνο ο κόσμος, η Ευρυδίκη και το σενάριο.
@@ -1601,6 +1631,7 @@ function updateToggleLabels() {
   }
   for (const b of document.querySelectorAll('.mouse-toggle')) b.textContent = `Mouse: ${Settings.mouse}x`;
   for (const b of document.querySelectorAll('.voice-toggle')) b.textContent = Settings.voice === 'off' ? 'Voices: Off' : 'Voices: On';
+  for (const b of document.querySelectorAll('.music-toggle')) b.textContent = Settings.music === 'off' ? 'Music: Off' : 'Music: On';
   for (const b of document.querySelectorAll('.invert-toggle')) b.textContent = 'Invert mouse: ' + (Settings.invert ? 'on' : 'off');
   for (const b of document.querySelectorAll('.fov-toggle')) b.textContent = 'Field of view: ' + (Settings.fov || (IS_TOUCH ? 66 : 80));
   for (const b of document.querySelectorAll('.bright-toggle')) b.textContent = 'Brightness: ' + Math.round(Settings.bright * 100) + '%';
@@ -1876,7 +1907,7 @@ function spawn(saved) {
 
   // Μια πρώτη ανάσα: ένα μέτριο κύμα για να δεις πού βρίσκεσαι.
   Echoes.emit(player.x, player.y, 220, 0.6, 'call');
-  Sound.voice(0.3, strings >= 3);
+  if (holdingLyre()) Sound.lyreCall(0.3, strings); else Sound.cry(0.3);
 }
 
 // Παίζει μια cutscene (με τη ζωγραφιά art από πάνω) και μετά καλεί το then.
@@ -2009,6 +2040,7 @@ function doAction(action) {
   else if (action.startsWith('craft:')) craftAt(action.slice(6));
   else if (action === 'skip-prologue') { if (Prologue.active) Prologue.finish(); }
   else if (action === 'sound') { Sound.setMuted(!Sound.muted); updateToggleLabels(); }
+  else if (action === 'music') { Settings.music = Settings.music === 'off' ? 'on' : 'off'; Settings.store(); updateToggleLabels(); }
   else if (action === 'voice') {
     // Φωνές των χαρακτήρων: ναι / όχι.
     Settings.voice = Settings.voice === 'off' ? 'on' : 'off';

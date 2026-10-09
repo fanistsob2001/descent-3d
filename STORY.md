@@ -479,6 +479,13 @@ chapter). These become side missions.
   can only walk until it recovers). No stamina loss in the chases and the prologue.
 - The lyre cannot be spammed: after each wave it needs a moment (longer after a big one) — the strings are dim.
   Holding the button too long past the full charge cancels the wave (the strings fade out, no sound).
+- The sound of the wave: holding the lyre, only the lyre plays — and every string you find changes it (no strings: a
+  knock on the empty shell; one string: one note; two: two notes; three: the whole chord). Not holding the lyre
+  (or holding something else), Orpheus cries out into the dark instead.
+- Music: the main menu, the prologue (day, then dusk and night), the crossing with Charon, the fight with Cerberus, the
+  chases and the endings have their own music, played on the lyre. Exploring the Underworld there is no music — only
+  the sounds of the place. The song Orpheus plays for Eurydice and the lament before Hades are his own songs, not the
+  Melody. (Settings: "Music: On / Off".)
 - Hiding: when a shade that heard you searches right outside your hiding place, you hold your breath with the
   heartbeat (like the hiding minigame in DOORS): hearts come from left and right; press their side (A / D, left /
   right click, or tap left / right) as they reach the circle. Every miss costs breath; out of breath, you gasp.
